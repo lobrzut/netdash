@@ -6,7 +6,8 @@ from app.arp_scan import batch_lookup_macs, lookup_mac_for_ip
 from app.database import async_session
 from app.icons import resolve_brand_icon
 from app.models import Service
-from app.scanner import LOGIN_KNOWN_SERVICES, LOGIN_TITLE_RE
+from app.scanner import LOGIN_KNOWN_SERVICES, LOGIN_TITLE_RE, _fallback_service_name, is_http_error_name
+from app.url_utils import sanitize_service_url
 
 LOGIN_NAME_RE = re.compile(
     r"login|sign\s*in|authorization|authenticate|zaloguj|portal|grafana|portainer|"
@@ -27,6 +28,23 @@ def infer_has_login(name: str, description: str | None, url: str) -> bool:
 
 def should_auto_wol(service: Service) -> bool:
     return service.category == DEVICE_CATEGORY or service.port == HOST_ONLY_PORT
+
+
+def _repair_http_error_name(service: Service) -> bool:
+    """Fix services whose display name was set to an HTTP error page title."""
+    if not is_http_error_name(service.name):
+        return False
+    err = service.name[:128]
+    if not service.health_detail:
+        service.health_detail = err
+    brand_icon = resolve_brand_icon(service.name, service.description)
+    if brand_icon and service.description:
+        for known in LOGIN_KNOWN_SERVICES:
+            if known.lower() in (service.description or "").lower():
+                service.name = known
+                return True
+    service.name = _fallback_service_name(service.host, service.port, "")
+    return True
 
 
 async def enrich_mac_addresses(*, auto_wol: bool = True) -> int:
@@ -61,6 +79,8 @@ async def enrich_all_services() -> int:
         result = await db.execute(select(Service))
         for svc in result.scalars().all():
             changed = False
+            if _repair_http_error_name(svc):
+                changed = True
             icon = resolve_brand_icon(svc.name, svc.description)
             if icon and svc.icon_url != icon:
                 svc.icon_url = icon

@@ -20,9 +20,11 @@ from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.scanner import (
     DiscoveredService,
+    _fallback_service_name,
     build_local_host_service,
     get_local_ip,
     get_local_network,
+    is_http_error_name,
     is_likely_docker_bridge,
     resolve_scan_cidr,
     parse_host_scan_ports,
@@ -107,6 +109,7 @@ def _migrate_db(sync_conn):
             sync_conn.execute(text("ALTER TABLE services ADD COLUMN icon_url VARCHAR(512)"))
         service_migrations = [
             ("is_online", "BOOLEAN DEFAULT 1"),
+            ("health_detail", "VARCHAR(128)"),
             ("last_checked", "DATETIME"),
             ("service_notes", "TEXT"),
             ("mac_address", "VARCHAR(17)"),
@@ -573,7 +576,17 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
         service = existing.scalar_one_or_none()
         now = datetime.now(timezone.utc)
         if service:
-            service.name = item.name
+            if is_http_error_name(item.name):
+                if not is_http_error_name(service.name) and not service.name.startswith("Port "):
+                    pass
+                else:
+                    service.name = _fallback_service_name(item.host, item.port, item.name)
+                if item.health_detail or is_http_error_name(item.name):
+                    service.health_detail = (item.health_detail or item.name)[:128]
+            else:
+                service.name = item.name
+                if item.health_detail:
+                    service.health_detail = item.health_detail[:128]
             service.url = item.url
             service.protocol = item.protocol
             service.category = item.category
@@ -590,9 +603,12 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
                     service.mac_address = mac
         else:
             mac = await lookup_mac_for_ip(item.host)
+            new_name = item.name
+            if is_http_error_name(new_name):
+                new_name = _fallback_service_name(item.host, item.port, new_name)
             db.add(
                 Service(
-                    name=item.name,
+                    name=new_name,
                     url=item.url,
                     host=item.host,
                     port=item.port,
@@ -605,6 +621,7 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
                     has_login=item.has_login,
                     is_online=True,
                     last_checked=now,
+                    health_detail=(item.health_detail or item.name)[:128] if is_http_error_name(item.name) else item.health_detail,
                     mac_address=mac,
                 )
             )

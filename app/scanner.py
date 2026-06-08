@@ -44,9 +44,16 @@ TLS_MISMATCH_RE = re.compile(
 
 GENERIC_TITLES = {
     "400 bad request", "bad request", "403 forbidden", "forbidden",
-    "401 unauthorized", "unauthorized", "404 not found", "not found",
+    "401 unauthorized", "401 authorization required", "authorization required",
+    "unauthorized", "404 not found", "not found",
     "error", "login", "sign in",
 }
+
+HTTP_ERROR_TITLE_RE = re.compile(
+    r"^\d{3}\s+(?:authorization|unauthorized|forbidden|not\s+found|bad\s+request|"
+    r"internal\s+server|service\s+unavailable|gateway|error)",
+    re.IGNORECASE,
+)
 
 COMMON_PORTS = [
     21, 22, 23, 25, 53, 80, 81, 88, 110, 135, 139, 143, 443, 445,
@@ -110,6 +117,8 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
     (r"jellyfin", "Jellyfin", "play", "Media"),
     (r"sonarr", "Sonarr", "tv", "Media"),
     (r"radarr", "Radarr", "film", "Media"),
+    (r"readarr", "Readarr", "doc", "Media"),
+    (r"lidarr", "Lidarr", "play", "Media"),
     (r"prowlarr", "Prowlarr", "search", "Media"),
     (r"transmission", "Transmission", "download", "Media"),
     (r"qbittorrent", "qBittorrent", "download", "Media"),
@@ -186,6 +195,7 @@ class DiscoveredService:
     description: str | None = None
     has_login: bool = False
     icon_url: str | None = None
+    health_detail: str | None = None
 
 
 def get_local_ip() -> str:
@@ -411,6 +421,36 @@ def _base_from_port(port: int) -> tuple[str, str, str]:
     return PORT_SIGNATURES.get(port, (f"Port {port}", "plug", "Inne"))
 
 
+def _is_generic_title(title: str) -> bool:
+    clean = re.sub(r"\s+", " ", title).strip().lower()
+    if not clean:
+        return True
+    if clean in GENERIC_TITLES:
+        return True
+    if HTTP_ERROR_TITLE_RE.match(clean):
+        return True
+    if re.match(r"^\d{3}[\s:.\-]+", clean):
+        return True
+    if re.search(r"\b(401|403|404|500)\b.*\b(authorization|unauthorized|forbidden|not\s+found)\b", clean):
+        return True
+    if re.search(r"\b(authorization\s+required|unauthorized|forbidden|not\s+found|bad\s+request)\b", clean):
+        return True
+    return False
+
+
+def is_http_error_name(name: str) -> bool:
+    """True when a string looks like an HTTP status page title, not a service name."""
+    return _is_generic_title(name)
+
+
+def _fallback_service_name(host: str, port: int, name: str) -> str:
+    if name and not name.startswith("Port "):
+        return name
+    if host:
+        return f"{host}:{port}" if port else host
+    return f"Service :{port}" if port else "Service"
+
+
 def _schemes_for_port(port: int) -> list[str]:
     if port in HTTPS_PORTS:
         return ["https", "http"]
@@ -466,7 +506,7 @@ def _probe_score(response: httpx.Response, body: str, title: str | None) -> int:
         score += 10
     else:
         score -= 20
-    if title and title.lower() not in GENERIC_TITLES:
+    if title and not _is_generic_title(title):
         score += 30
     if "text/html" in response.headers.get("content-type", ""):
         score += 10
@@ -486,17 +526,29 @@ def _parse_probe_response(host: str, port: int, response: httpx.Response) -> Dis
 
     name, icon, category = _base_from_port(port)
     description = None
+    health_detail = None
     scheme = response.url.scheme
 
     if title:
         hint = _match_hints(title, TITLE_HINTS)
         if hint:
             name, icon, category = hint
+        elif not _is_generic_title(title):
+            name = re.sub(r"\s+", " ", title)[:80]
         else:
-            clean = re.sub(r"\s+", " ", title)[:80]
-            if clean.lower() not in GENERIC_TITLES:
-                name = clean
+            body_hint = _match_hints(body, TITLE_HINTS)
+            if body_hint:
+                name, icon, category = body_hint
+            else:
+                name = _fallback_service_name(host, port, name)
+        if _is_generic_title(title):
+            health_detail = re.sub(r"\s+", " ", title).strip()[:128]
         description = title[:200]
+
+    if is_http_error_name(name):
+        if health_detail is None:
+            health_detail = name[:128]
+        name = _fallback_service_name(host, port, name)
 
     server_match = SERVER_RE.search(headers_text)
     if server_match:
@@ -523,6 +575,7 @@ def _parse_probe_response(host: str, port: int, response: httpx.Response) -> Dis
         icon_url=icon_url,
         description=description,
         has_login=has_login,
+        health_detail=health_detail,
     )
 
 

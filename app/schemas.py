@@ -59,6 +59,7 @@ class ServiceOut(BaseModel):
     has_login: bool
     pinned: bool
     is_online: bool = True
+    health_detail: str | None = None
     last_seen: datetime
     last_checked: datetime | None = None
     service_notes: str | None = None

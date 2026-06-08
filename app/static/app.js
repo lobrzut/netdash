@@ -1039,6 +1039,27 @@ function statusTooltip(s) {
   return since ? t('status.offlineSince', { time: since }) : t('status.offline');
 }
 
+function isHttpErrorName(name) {
+  if (!name) return false;
+  const n = String(name).trim().toLowerCase();
+  if (/^\d{3}[\s:.\-]/.test(n)) return true;
+  return /\b(authorization\s+required|unauthorized|forbidden|not\s+found|bad\s+request)\b/.test(n);
+}
+
+function displayServiceName(s) {
+  if (!isHttpErrorName(s.name)) return s.name;
+  if (s.host && s.port) return `${s.host}:${s.port}`;
+  if (s.host) return s.host;
+  if (s.port) return `Service :${s.port}`;
+  return t('badge.error');
+}
+
+function serviceHealthError(s) {
+  if (s.health_detail) return s.health_detail;
+  if (isHttpErrorName(s.name)) return s.name;
+  return '';
+}
+
 function serviceCardHtml(s, opts = {}) {
   const { context = 'services' } = opts;
   const compact = context === 'home' || appSettings.card_style === 'compact';
@@ -1058,18 +1079,18 @@ function serviceCardHtml(s, opts = {}) {
       ${renderServiceWatermark(s)}
       <button class="service-delete" data-id="${s.id}" title="${t('modal.delete')}">&times;</button>
       <div class="service-top">
-        <div class="service-icon-wrap">
-          ${renderServiceIcon(s)}
-          <span class="status-dot ${offline ? 'status-offline' : 'status-online'}" title="${esc(statusTooltip(s))}"></span>
-        </div>
         <div class="service-badges">
           ${s.has_login ? `<span class="badge badge-login">${t('badge.login')}</span>` : ''}
           ${!compact && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
           ${s.pinned ? `<span class="badge badge-pin">${t('badge.pin')}</span>` : ''}
           ${offline ? `<span class="badge badge-offline">${t('badge.offline')}</span>` : ''}
         </div>
+        <div class="service-icon-wrap">
+          ${renderServiceIcon(s)}
+          <span class="status-dot ${offline ? 'status-offline' : 'status-online'}" title="${esc(statusTooltip(s))}"></span>
+        </div>
       </div>
-      <div class="service-name">${esc(s.name)}</div>
+      <div class="service-name">${esc(displayServiceName(s))}</div>
       ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}">${esc(urlLabel)}</div>` : ''}
       ${showMeta ? `<div class="service-meta">
         ${!compact ? `<span class="service-category">${esc(s.category)}</span>` : ''}
