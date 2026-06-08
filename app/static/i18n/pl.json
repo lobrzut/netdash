@@ -120,6 +120,7 @@
   "settings.authorName": "Nick autora",
   "settings.authorUrl": "Link (GitHub)",
   "settings.aboutProject": "O projekcie NetDash",
+  "settings.aboutDescription": "Opis projektu",
   "settings.footer": "Tekst w stopce",
   "settings.scanCidr": "Domyślna sieć (CIDR)",
   "settings.dockerScanWarning": "NetDash działa w Dockerze (IP {ip}, sieć {network}) — to sieć kontenera, nie LAN. Ustaw CIDR (np. 192.168.1.0/24) lub włącz network_mode: host na serwerze Linux.",

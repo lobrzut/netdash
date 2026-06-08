@@ -120,6 +120,7 @@
   "settings.authorName": "Нік автора",
   "settings.authorUrl": "Посилання (GitHub)",
   "settings.aboutProject": "Про NetDash",
+  "settings.aboutDescription": "Опис проєкту",
   "settings.footer": "Текст у футері",
   "settings.scanCidr": "Мережа за замовч. (CIDR)",
   "settings.dockerScanWarning": "NetDash у Docker ({ip}, {network}) — це мережа контейнера, не LAN. Вкажіть CIDR (напр. 192.168.1.0/24) або увімкніть network_mode: host на Linux.",
