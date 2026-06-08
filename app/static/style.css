@@ -524,6 +524,25 @@ body.modal-open {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.field-with-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field-with-action input {
+  flex: 1;
+  min-width: 0;
+}
+
+.identify-status--ok {
+  color: var(--accent-bright);
+}
+
+.identify-status--warn {
+  color: #fbbf24;
+}
+
 .backup-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2660,6 +2679,17 @@ body.modal-open {
   min-height: 2rem;
   flex-shrink: 0;
   width: 100%;
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.service-card:hover .service-actions,
+.service-card:focus-within .service-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .service-action {
@@ -2725,6 +2755,16 @@ body.modal-open {
 .service-actions--power {
   gap: 0.5rem;
   padding-top: 0.875rem;
+}
+
+.service-card:focus-within .service-delete { opacity: 1; }
+
+@media (hover: none) {
+  .service-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
 }
 
 .service-card.power-context .service-wol-btn:not(.is-placeholder),

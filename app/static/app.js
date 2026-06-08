@@ -1436,18 +1436,64 @@ function updateEditMacVisibility() {
   wrap.classList.toggle('hidden', !$('#edit-wol-enabled')?.checked);
 }
 
-function clearEditIdentifyStatus() {
+let editIdentifySnapshot = null;
+
+function setEditIdentifyUndoVisible(visible) {
+  const undoBtn = $('#edit-identify-undo');
+  if (!undoBtn) return;
+  undoBtn.classList.toggle('hidden', !visible);
+}
+
+function clearEditIdentifyStatus({ keepUndo = false } = {}) {
   const status = $('#edit-identify-status');
   if (!status) return;
   status.classList.add('hidden');
   status.textContent = '';
   status.classList.remove('identify-status--ok', 'identify-status--warn');
+  if (!keepUndo) {
+    editIdentifySnapshot = null;
+    setEditIdentifyUndoVisible(false);
+  }
+}
+
+function captureEditIdentifySnapshot() {
+  return {
+    name: $('#edit-name')?.value || '',
+    url: $('#edit-url')?.value || '',
+    category: $('#edit-category')?.value || '',
+    icon: ($('#edit-icon')?.value || 'globe').toLowerCase(),
+    icon_url: $('#edit-icon-url')?.value || '',
+    description: $('#edit-description')?.value || '',
+    has_login: !!$('#edit-has-login')?.checked,
+  };
+}
+
+function applyEditIdentifySnapshot(snapshot) {
+  if (!snapshot) return;
+  $('#edit-name').value = snapshot.name || '';
+  $('#edit-url').value = snapshot.url || '';
+  $('#edit-category').value = snapshot.category || '';
+  populateServiceIconSelect(snapshot.icon || 'globe');
+  $('#edit-icon').value = (snapshot.icon || 'globe').toLowerCase();
+  $('#edit-icon-url').value = snapshot.icon_url || '';
+  $('#edit-description').value = snapshot.description || '';
+  $('#edit-has-login').checked = !!snapshot.has_login;
+  updateEditServiceIconPreview();
 }
 
 function formatIdentifyConfidence(confidence) {
   const key = `modal.edit.identifyConfidence.${confidence || 'low'}`;
   const translated = t(key);
   return translated === key ? confidence : translated;
+}
+
+function formatIdentifyFields(fields = []) {
+  if (!Array.isArray(fields) || fields.length === 0) return '—';
+  return fields.map((field) => {
+    const key = `modal.edit.identifyField.${field}`;
+    const translated = t(key);
+    return translated === key ? field : translated;
+  }).join(', ');
 }
 
 async function identifyServiceEdit() {
@@ -1458,6 +1504,7 @@ async function identifyServiceEdit() {
     return;
   }
 
+  const snapshot = captureEditIdentifySnapshot();
   const btn = $('#edit-identify');
   const status = $('#edit-identify-status');
   const prevLabel = btn?.textContent;
@@ -1495,14 +1542,19 @@ async function identifyServiceEdit() {
       $('#edit-has-login').checked = !!s.has_login;
     }
     updateEditServiceIconPreview();
+    const changed = Array.isArray(result.changed_fields) && result.changed_fields.length > 0;
+    editIdentifySnapshot = changed ? snapshot : null;
+    setEditIdentifyUndoVisible(changed);
 
     if (status) {
       status.classList.remove('hidden', 'identify-status--ok', 'identify-status--warn');
       if (result.matched) {
-        const fields = (result.changed_fields || []).join(', ') || '—';
-        status.textContent = t('modal.edit.identifySuccess', {
+        const fields = formatIdentifyFields(result.changed_fields || []);
+        const tags = (result.tags || []).join(', ');
+        status.textContent = t(tags ? 'modal.edit.identifySuccessWithTags' : 'modal.edit.identifySuccess', {
           confidence: formatIdentifyConfidence(result.confidence),
           fields,
+          tags: tags || '—',
         });
         status.classList.add('identify-status--ok');
       } else {
@@ -1540,6 +1592,16 @@ function openServiceEditModal(id) {
   updateEditMacVisibility();
   updateEditServiceIconPreview();
   openModal('edit-modal');
+}
+
+function undoServiceIdentifyEdit() {
+  if (!editIdentifySnapshot) return;
+  applyEditIdentifySnapshot(editIdentifySnapshot);
+  clearEditIdentifyStatus();
+  const status = $('#edit-identify-status');
+  if (!status) return;
+  status.classList.remove('hidden', 'identify-status--ok', 'identify-status--warn');
+  status.textContent = t('modal.edit.identifyUndoDone');
 }
 
 async function saveServiceEdit() {
@@ -2597,6 +2659,7 @@ $('#scan-start').addEventListener('click', () => {
 $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
 $('#edit-identify')?.addEventListener('click', () => identifyServiceEdit());
+$('#edit-identify-undo')?.addEventListener('click', () => undoServiceIdentifyEdit());
 $('#edit-icon')?.addEventListener('change', updateEditServiceIconPreview);
 $('#edit-icon-url')?.addEventListener('input', updateEditServiceIconPreview);
 $('#edit-open-notes')?.addEventListener('click', () => {
