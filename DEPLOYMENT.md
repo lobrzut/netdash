@@ -102,7 +102,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:8787/api/health          # {"ok":true,"version":"1.3.8",...}
+curl -s http://127.0.0.1:8787/api/health          # {"ok":true,"version":"1.3.10",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```
