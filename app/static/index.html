@@ -825,6 +825,15 @@ sol --udp-port 9
         <input type="checkbox" id="edit-has-login" />
         <span data-i18n="modal.edit.hasLogin">Wymaga logowania</span>
       </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="edit-wol-enabled" />
+        <span data-i18n="modal.edit.wolEnabled">Wake-on-LAN</span>
+      </label>
+      <div class="field edit-mac-field hidden" id="edit-mac-wrap">
+        <label for="edit-mac" data-i18n="settings.powerLinkMac">Adres MAC</label>
+        <input type="text" id="edit-mac" placeholder="AA:BB:CC:DD:EE:FF" spellcheck="false" />
+        <span class="hint" data-i18n="modal.edit.macHint">Wymagany do Wake-on-LAN i uśpienia</span>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="edit-cancel" data-i18n="modal.cancel">Anuluj</button>
         <button class="btn btn-primary" id="edit-save" data-i18n="modal.save">Zapisz</button>

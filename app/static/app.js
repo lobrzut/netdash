@@ -1268,13 +1268,19 @@ function renderServiceIcon(s) {
   return `<div class="service-icon ${getIconClass(s.icon)}"></div>`;
 }
 
+const LETTER_WATERMARK_ICONS = new Set(['nginx', 'apache', 'caddy', 'traefik']);
+
 function renderServiceWatermark(s) {
   if (s.icon_url) {
     return `<div class="service-card-watermark service-card-watermark--img" aria-hidden="true"><img src="${esc(s.icon_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`;
   }
-  const icon = (s.icon || '').trim();
+  const icon = (s.icon || 'globe').toLowerCase();
+  const cls = getIconClass(icon);
+  if (LETTER_WATERMARK_ICONS.has(icon)) {
+    return `<div class="service-card-watermark service-card-watermark--letter ${cls}" aria-hidden="true">${icon[0].toUpperCase()}</div>`;
+  }
   if (icon && icon !== 'globe') {
-    return `<div class="service-card-watermark ${getIconClass(icon)}" aria-hidden="true"></div>`;
+    return `<div class="service-card-watermark ${cls}" aria-hidden="true"></div>`;
   }
   const letter = (s.name || '').trim().charAt(0);
   if (letter) {
@@ -1318,6 +1324,12 @@ async function toggleServicePin(id) {
   refreshServiceViews();
 }
 
+function updateEditMacVisibility() {
+  const wrap = $('#edit-mac-wrap');
+  if (!wrap) return;
+  wrap.classList.toggle('hidden', !$('#edit-wol-enabled')?.checked);
+}
+
 function openServiceEditModal(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
@@ -1329,6 +1341,9 @@ function openServiceEditModal(id) {
   $('#edit-description').value = svc.description || '';
   $('#edit-pinned').checked = !!svc.pinned;
   $('#edit-has-login').checked = !!svc.has_login;
+  $('#edit-wol-enabled').checked = !!svc.wol_enabled;
+  $('#edit-mac').value = svc.mac_address || '';
+  updateEditMacVisibility();
   openModal('edit-modal');
 }
 
@@ -1341,10 +1356,15 @@ async function saveServiceEdit() {
   const description = $('#edit-description').value.trim() || null;
   const pinned = $('#edit-pinned').checked;
   const has_login = $('#edit-has-login').checked;
+  const wol_enabled = $('#edit-wol-enabled').checked;
+  const mac_address = wol_enabled ? ($('#edit-mac').value.trim() || null) : null;
   if (!name || !url) return alert(t('alert.serviceFields'));
+  if (wol_enabled && !mac_address) return alert(t('modal.edit.macRequired'));
   const updated = await api(`/api/services/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ name, url, category, icon, description, pinned, has_login }),
+    body: JSON.stringify({
+      name, url, category, icon, description, pinned, has_login, wol_enabled, mac_address,
+    }),
   });
   const idx = services.findIndex((s) => s.id === id);
   if (idx >= 0) services[idx] = normalizeService(updated);
@@ -2375,6 +2395,7 @@ $('#scan-start').addEventListener('click', () => {
 
 $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
+$('#edit-wol-enabled')?.addEventListener('change', updateEditMacVisibility);
 $('#edit-save').addEventListener('click', async () => {
   try {
     await saveServiceEdit();
