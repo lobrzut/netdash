@@ -1,0 +1,10 @@
+[Unit]
+Description=NetDash health watchdog (Docker)
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+Environment=NETDASH_DIR=/opt/netdash
+Environment=NETDASH_HEALTH_URL=http://127.0.0.1:8787/api/health
+ExecStart=/opt/netdash/deploy/netdash-watchdog.sh

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetDash — Network Dashboard</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css?v=1.3.7" />
+  <script src="/static/i18n.js?v=1.3.4"></script>
+</head>
+<body>
+  <div id="app">
+  <!-- Login -->
+  <div id="login-view" class="view">
+    <div class="login-bg"></div>
+    <div class="login-card">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+            <path d="M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </div>
+        <h1 id="login-title">NetDash</h1>
+        <p class="tagline" id="login-subtitle" data-i18n="app.tagline">Homelab dashboard z auto-wykrywaniem sieci</p>
+        <p class="login-version" id="login-version" aria-label="Wersja">—</p>
+      </div>
+      <form id="login-form">
+        <div class="field">
+          <label for="username" data-i18n="login.user">Użytkownik</label>
+          <input type="text" id="username" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label for="password" data-i18n="login.password">Hasło</label>
+          <input type="password" id="password" autocomplete="current-password" required />
+        </div>
+        <p id="login-error" class="error hidden"></p>
+        <button type="submit" class="btn btn-primary" data-i18n="login.submit">Zaloguj się</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard-view" class="view hidden">
+    <div id="dashboard-error" class="dashboard-error hidden" role="alert"></div>
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-small">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+          </svg>
+        </div>
+        <div>
+          <h1 id="app-title">NetDash</h1>
+          <span id="app-subtitle" class="network-badge">—</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <select id="lang-quick" class="lang-select" title="Language">
+          <option value="pl">PL</option>
+          <option value="en">EN</option>
+          <option value="de">DE</option>
+          <option value="uk">UK</option>
+        </select>
+        <button id="settings-btn" class="btn btn-ghost" data-i18n="nav.settings">⚙</button>
+        <button id="scan-btn" class="btn btn-accent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <path d="M21 12a9 9 0 11-6.22-8.56"/>
+            <polyline points="21 3 21 9 15 9"/>
+          </svg>
+          <span data-i18n="nav.scan">Skanuj sieć</span>
+        </button>
+        <button id="add-btn" class="btn btn-ghost"><span data-i18n="nav.add">+ Dodaj</span></button>
+        <button id="logout-btn" class="btn btn-ghost" data-i18n="nav.logout">Wyloguj</button>
+      </div>
+    </header>
+
+    <div id="scan-bar" class="scan-bar hidden">
+      <div class="scan-pulse"></div>
+      <span id="scan-status-text" data-i18n="scan.running">Skanowanie sieci...</span>
+    </div>
+
+    <main class="main">
+      <section class="widgets-row">
+        <div class="widget widget-clock" id="widget-clock">
+          <div class="widget-clock-time" id="clock-time">--:--</div>
+          <div class="widget-clock-date" id="clock-date">—</div>
+          <div class="widget-clock-net" id="clock-network">—</div>
+        </div>
+
+        <div class="widget widget-vault" id="widget-vault">
+          <div class="widget-header">
+            <div class="widget-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              <span data-i18n="widget.vault">Sejf API Keys</span>
+            </div>
+            <button class="btn-icon" id="add-key-btn" title="Dodaj klucz">+</button>
+          </div>
+          <div class="widget-search">
+            <input type="search" id="keys-search" data-i18n-placeholder="widget.search.keys" placeholder="Szukaj kluczy..." />
+          </div>
+          <div class="widget-body" id="keys-list"></div>
+        </div>
+
+        <div class="widget widget-notes" id="widget-notes">
+          <div class="widget-header">
+            <div class="widget-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+              <span data-i18n="widget.notes">Notatki</span>
+              <span class="widget-count hidden" id="notes-count" aria-label="Liczba notatek"></span>
+            </div>
+            <button class="btn-icon" id="add-note-btn" title="Dodaj notatkę">+</button>
+          </div>
+          <div class="widget-search">
+            <input type="search" id="notes-search" data-i18n-placeholder="widget.search.notes" placeholder="Szukaj notatek..." />
+          </div>
+          <div class="widget-body notes-grid" id="notes-list"></div>
+        </div>
+      </section>
+
+      <div id="stats" class="stats">
+        <div class="stat-card">
+          <span class="stat-value" id="stat-total">0</span>
+          <span class="stat-label" data-i18n="stat.services">Serwisy</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-online">0</span>
+          <span class="stat-label" data-i18n="stat.online">Online</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-login">0</span>
+          <span class="stat-label" data-i18n="stat.login">Z logowaniem</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-keys">0</span>
+          <span class="stat-label" data-i18n="stat.keys">Klucze API</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-notes">0</span>
+          <span class="stat-label" data-i18n="stat.notes">Notatki</span>
+        </div>
+      </div>
+
+      <h2 class="section-title" data-i18n="section.services">Serwisy</h2>
+      <div class="filters-toolbar">
+        <div class="services-search">
+          <input type="search" id="services-search" data-i18n-placeholder="services.search" placeholder="Szukaj serwisów..." autocomplete="off" aria-label="Szukaj serwisów" />
+        </div>
+        <div id="access-filters" class="filters access-filters filters-segmented" role="group" aria-label="Access filter"></div>
+        <div id="category-filters" class="filters category-filters"></div>
+        <div id="network-filters" class="filters network-filters hidden" role="group" aria-label="Network filter"></div>
+      </div>
+
+      <div id="services-container"></div>
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 12h8M12 8v8"/>
+          </svg>
+        </div>
+        <h2 id="empty-title" data-i18n="empty.services">Brak serwisów</h2>
+        <p id="empty-hint" data-i18n="empty.services.hint">Kliknij Skanuj sieć aby automatycznie wykryć serwisy w Twojej sieci lokalnej.</p>
+      </div>
+    </main>
+    <footer class="footer">
+      <span>NetDash <span id="app-version">—</span></span>
+      <span class="footer-sep">·</span>
+      <span id="network-badge-footer">—</span>
+    </footer>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-settings">
+      <div class="settings-shell">
+        <header class="settings-header">
+          <h2 data-i18n="settings.title">Ustawienia</h2>
+        </header>
+        <div class="settings-body">
+          <nav class="settings-sidebar" role="tablist" aria-label="Settings sections">
+            <button class="settings-tab active" data-tab="general" role="tab" aria-selected="true"><span class="settings-tab-icon" aria-hidden="true">⚙️</span><span data-i18n="settings.tab.general">Ogólne</span></button>
+            <button class="settings-tab" data-tab="appearance" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">🎨</span><span data-i18n="settings.tab.appearance">Wygląd</span></button>
+            <button class="settings-tab" data-tab="language" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">🌐</span><span data-i18n="settings.tab.language">Język</span></button>
+            <button class="settings-tab" data-tab="scan" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">📡</span><span data-i18n="settings.tab.scan">Skanowanie</span></button>
+            <button class="settings-tab" data-tab="power" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">⚡</span><span data-i18n="settings.tab.power">Zasilanie</span></button>
+            <button class="settings-tab" data-tab="backup" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">💾</span><span data-i18n="settings.tab.backup">Kopia zapasowa</span></button>
+            <button class="settings-tab" data-tab="account" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">🔐</span><span data-i18n="settings.tab.account">Konto</span></button>
+            <button class="settings-tab" data-tab="about" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">ℹ️</span><span data-i18n="settings.tab.about">O projekcie</span></button>
+          </nav>
+          <div class="settings-content">
+      <div class="settings-panel active" data-panel="general">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.section.basic">Podstawowe</summary>
+          <div class="settings-accordion-body">
+            <div class="field"><label for="settings-title" data-i18n="settings.appTitle">Tytuł</label><input type="text" id="settings-title" /></div>
+            <div class="field"><label for="settings-subtitle" data-i18n="settings.subtitle">Podtytuł</label><input type="text" id="settings-subtitle" /></div>
+            <div class="field"><label for="settings-footer" data-i18n="settings.footer">Stopka</label><input type="text" id="settings-footer" /></div>
+            <div class="field">
+              <label for="settings-favicon" data-i18n="settings.favicon">Favicon (URL)</label>
+              <input type="url" id="settings-favicon" placeholder="/static/favicon.svg" />
+              <span class="hint" data-i18n="settings.faviconHint">Pozostaw puste dla domyślnej ikony NetDash</span>
+            </div>
+          </div>
+        </details>
+        <details class="settings-accordion">
+          <summary data-i18n="settings.customCss">Własny CSS (zaawansowane)</summary>
+          <div class="settings-accordion-body">
+            <div class="field">
+              <textarea id="settings-custom-css" rows="5" placeholder="/* np. .service-card { border-radius: 4px; } */" spellcheck="false"></textarea>
+              <span class="hint" data-i18n="settings.customCssHint">Bez tagów &lt;script&gt;. Zmiany widoczne po zapisaniu.</span>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="appearance">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.accent">Kolor akcentu</summary>
+          <div class="settings-accordion-body">
+            <div class="field field-color-picker">
+              <div class="color-picker-row">
+                <input type="color" id="settings-accent" value="#22c55e" aria-label="Kolor akcentu" />
+                <output class="color-picker-hex" id="settings-accent-hex" for="settings-accent">#22c55e</output>
+              </div>
+            </div>
+          </div>
+        </details>
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.widgetsHeading">Widżety</summary>
+          <div class="settings-accordion-body">
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-clock" /><span data-i18n="settings.showClock">Pokaż zegar</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-vault" /><span data-i18n="settings.showVault">Pokaż sejf API</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-notes" /><span data-i18n="settings.showNotes">Pokaż notatki</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-stats" /><span data-i18n="settings.showStats">Pokaż statystyki</span></label>
+          </div>
+        </details>
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.servicesHeading">Lista serwisów</summary>
+          <div class="settings-accordion-body">
+            <div class="field">
+              <label for="settings-services-grouped" data-i18n="settings.servicesGrouped">Domyślny widok</label>
+              <select id="settings-services-grouped">
+                <option value="true" data-i18n="settings.servicesGroupedYes">Grupuj wg logowania</option>
+                <option value="false" data-i18n="settings.servicesGroupedNo">Płaska lista</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="settings-default-access" data-i18n="settings.defaultAccess">Domyślny filtr dostępu</label>
+              <select id="settings-default-access">
+                <option value="all" data-i18n="filter.all">Wszystkie</option>
+                <option value="login" data-i18n="filter.login">Z logowaniem</option>
+                <option value="public" data-i18n="filter.public">Publiczne</option>
+                <option value="wol" data-i18n="filter.wol">WoL</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="settings-services-columns" data-i18n="settings.servicesColumns">Gęstość siatki</label>
+              <select id="settings-services-columns">
+                <option value="compact" data-i18n="settings.columnsCompact">Kompaktowa (więcej kolumn)</option>
+                <option value="normal" data-i18n="settings.columnsNormal">Normalna</option>
+                <option value="comfortable" data-i18n="settings.columnsComfortable">Luźna (mniej kolumn)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="settings-card-style" data-i18n="settings.cardStyle">Styl kart</label>
+              <select id="settings-card-style">
+                <option value="detailed" data-i18n="settings.cardDetailed">Szczegółowy</option>
+                <option value="compact" data-i18n="settings.cardCompact">Kompaktowy</option>
+              </select>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-category-filters" /><span data-i18n="settings.showCategoryFilters">Pokaż filtry kategorii</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-service-urls" /><span data-i18n="settings.showServiceUrls">Pokaż adresy URL na kartach</span></label>
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-ports" /><span data-i18n="settings.showPorts">Pokaż numery portów</span></label>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="about">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.aboutProject">O projekcie NetDash</summary>
+          <div class="settings-accordion-body">
+            <div class="version-info-card">
+              <dl class="version-info-list">
+                <div class="version-info-row">
+                  <dt data-i18n="about.version">Wersja</dt>
+                  <dd id="settings-app-version">—</dd>
+                </div>
+                <div class="version-info-row">
+                  <dt data-i18n="about.buildDate">Data buildu</dt>
+                  <dd id="settings-build-date">—</dd>
+                </div>
+              </dl>
+              <a class="about-link" id="settings-github-link" href="https://github.com/lobrzut/netdash" target="_blank" rel="noopener" data-i18n="about.github">Repozytorium GitHub</a>
+            </div>
+            <div class="field"><textarea id="settings-about-project" rows="5"></textarea></div>
+            <div class="settings-about-author">
+              <h3 class="settings-subheading" data-i18n="about.author">Autor</h3>
+              <div class="field"><label for="settings-author-name" data-i18n="settings.authorName">Nick</label><input type="text" id="settings-author-name" placeholder="lobrzut" /></div>
+              <div class="field"><label for="settings-author-url" data-i18n="settings.authorUrl">Link (GitHub)</label><input type="url" id="settings-author-url" placeholder="https://github.com/lobrzut" /></div>
+            </div>
+            <div class="about-card settings-about-preview">
+              <div class="about-block">
+                <h3>NetDash</h3>
+                <p class="about-text" id="settings-preview-project">—</p>
+              </div>
+              <div class="about-block">
+                <h3 data-i18n="about.author">Autor</h3>
+                <p class="about-name" id="settings-preview-author">—</p>
+                <a class="about-link" id="settings-preview-url" href="#" target="_blank" rel="noopener"></a>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="scan">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.tab.scan">Skanowanie</summary>
+          <div class="settings-accordion-body">
+            <div class="field"><label for="settings-scan-cidr" data-i18n="settings.scanCidr">Domyślna sieć</label><input type="text" id="settings-scan-cidr" placeholder="192.168.1.0/24" /></div>
+            <p id="docker-scan-warning" class="hint hint-warning hidden" role="alert"></p>
+            <label class="checkbox-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
+            <div class="field">
+              <label for="settings-host-ports" data-i18n="settings.hostPorts">Porty urządzeń (SSH, SMB, RDP…)</label>
+              <input type="text" id="settings-host-ports" placeholder="22,445,3389,5900" />
+              <span class="hint" data-i18n="settings.hostPortsHint">Skanowane w trybie domyślnym obok portów webowych</span>
+            </div>
+            <label class="checkbox-row"><input type="checkbox" id="settings-host-only" checked /><span data-i18n="settings.hostOnly">Karty dla hostów bez otwartych portów (ping)</span></label>
+            <div class="field">
+              <label for="settings-stale-days" data-i18n="settings.staleDays">Usuń nieaktywne po (dni)</label>
+              <input type="number" id="settings-stale-days" min="0" max="365" placeholder="0 = nigdy" />
+              <span class="hint" data-i18n="settings.staleDaysHint">0 = zachowaj offline na stałe (tylko wyszarzone)</span>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="power">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.power.heading">Wake / Sleep on LAN</summary>
+          <div class="settings-accordion-body">
+            <div class="field">
+              <label for="settings-wol-broadcast" data-i18n="settings.wolBroadcast">Adres broadcast WoL</label>
+              <input type="text" id="settings-wol-broadcast" placeholder="255.255.255.255" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="settings-wol-port" data-i18n="settings.wolPort">Port UDP WoL</label>
+                <input type="number" id="settings-wol-port" min="1" max="65535" placeholder="9" />
+              </div>
+              <div class="field">
+                <label for="settings-sol-port" data-i18n="settings.solPort">Port UDP SOL</label>
+                <input type="number" id="settings-sol-port" min="1" max="65535" placeholder="9" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="settings-gptwol-url" data-i18n="settings.gptwolUrl">Opcjonalny URL GPTWOL</label>
+              <input type="url" id="settings-gptwol-url" placeholder="http://192.168.1.10:5000" />
+              <span class="hint" data-i18n="settings.gptwolHint">Jeśli ustawione, WoL/SOL idzie przez GPTWOL zamiast lokalnie</span>
+            </div>
+          </div>
+        </details>
+        <details class="settings-help-collapse" id="sol-setup-help">
+          <summary data-i18n="settings.solHelp.title">Jak skonfigurować Sleep-on-LAN</summary>
+          <div class="settings-help-body">
+            <p data-i18n="settings.solHelp.intro">Przycisk 💤 w NetDash wysyła magiczny pakiet SOL do hosta. Aby uśpienie zadziałało, na każdym komputerze docelowym musi działać agent nasłuchujący na porcie UDP (domyślnie 9).</p>
+            <p class="settings-help-links">
+              <span data-i18n="settings.solHelp.repoHint">Oficjalny projekt:</span>
+              <a href="https://github.com/SR-G/sleep-on-lan" target="_blank" rel="noopener">sleep-on-lan (SR-G)</a>
+              ·
+              <a href="https://github.com/Misterbabou/gptwol" target="_blank" rel="noopener">GPTWOL</a>
+            </p>
+            <p class="hint" data-i18n="settings.solHelp.gptwolHint">Alternatywnie ustaw URL GPTWOL powyżej — NetDash wyśle WoL/SOL przez bramkę zamiast lokalnie.</p>
+            <h4 class="settings-help-os" data-i18n="settings.solHelp.linux">Linux</h4>
+            <p><span data-i18n="settings.solHelp.linuxDesc">Zainstaluj sleep-on-lan (pip lub Docker). Agent nasłuchuje na UDP i po odebraniu pakietu z odwróconym MAC wykonuje uśpienie.</span> <a href="https://github.com/SR-G/sleep-on-lan" target="_blank" rel="noopener">sleep-on-lan</a></p>
+            <pre class="settings-code"><code># pip
+pip install sleep-on-lan
+sol --udp-port 9
+
+# Docker
+docker run -d --net=host --restart=always ghcr.io/sr-g/sleep-on-lan sol --udp-port 9</code></pre>
+            <p data-i18n="settings.solHelp.linuxFirewall">Zapora: zezwól na UDP port 9 (lub inny sol_port z ustawień NetDash).</p>
+            <pre class="settings-code"><code># Przykład usługi systemd (/etc/systemd/system/sleep-on-lan.service)
+[Unit]
+Description=Sleep-on-LAN listener
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/sol --udp-port 9
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+            <h4 class="settings-help-os" data-i18n="settings.solHelp.windows">Windows</h4>
+            <p data-i18n="settings.solHelp.windowsDesc">Użyj portu sleep-on-lan dla Windows, narzędzi Depicus WakeOnLan, własnego skryptu PowerShell nasłuchującego UDP lub innego agenta SOL. Uruchom jako usługę (NSSM lub Harmonogram zadań przy starcie systemu).</p>
+            <pre class="settings-code"><code># Przykład: sleep-on-lan (jeśli dostępny dla Windows)
+pip install sleep-on-lan
+sol --udp-port 9</code></pre>
+            <p data-i18n="settings.solHelp.windowsFirewall">Zapora Windows: reguła przychodząca UDP dla wybranego portu (domyślnie 9).</p>
+            <h4 class="settings-help-os" data-i18n="settings.solHelp.macos">macOS</h4>
+            <p data-i18n="settings.solHelp.macosDesc">Zainstaluj sleep-on-lan lub własny skrypt UDP. Do lokalnego uśpienia służy pmset, ale SOL wymaga stałego nasłuchu sieciowego na hoście.</p>
+            <pre class="settings-code"><code>pip install sleep-on-lan
+sol --udp-port 9
+# lub: pmset sleepnow  (tylko lokalnie — nie zastępuje agenta SOL)</code></pre>
+            <p data-i18n="settings.solHelp.macosFirewall">Ustawienia systemowe → Sieć → Zapora: zezwól na aplikację agenta SOL.</p>
+          </div>
+        </details>
+        <details class="settings-accordion">
+          <summary data-i18n="settings.sol.scripts.title">Skrypty instalacji SOL na hoście</summary>
+          <div class="settings-accordion-body sol-scripts-section" id="sol-scripts-section">
+            <p class="hint" data-i18n="settings.sol.scripts.hint">Uruchom wybrany skrypt na komputerze docelowym (jako root / administrator). Nasłuchuje na porcie UDP SOL z ustawień NetDash i uśpia host po odebraniu pakietu z odwróconym MAC.</p>
+            <div class="sol-script-os-tabs" role="tablist">
+              <button type="button" class="sol-script-os-tab active" data-os="linux" data-scope="settings" role="tab" aria-selected="true">Linux</button>
+              <button type="button" class="sol-script-os-tab" data-os="windows" data-scope="settings" role="tab" aria-selected="false">Windows</button>
+              <button type="button" class="sol-script-os-tab" data-os="macos" data-scope="settings" role="tab" aria-selected="false">macOS</button>
+            </div>
+            <textarea id="settings-sol-script-preview" class="sol-script-preview" readonly rows="12" spellcheck="false"></textarea>
+            <div class="sol-script-actions">
+              <button type="button" class="btn btn-ghost" id="settings-sol-script-copy" data-i18n="settings.sol.scripts.copy">Kopiuj do schowka</button>
+              <button type="button" class="btn btn-accent" id="settings-sol-script-download" data-i18n="settings.sol.scripts.download">Pobierz skrypt</button>
+            </div>
+            <p class="hint sol-script-security" data-i18n="settings.sol.scripts.security">Wymaga uprawnień administratora. Zapora musi zezwalać na UDP z podsieci serwera NetDash. W BIOS włącz Wake-on-LAN (dla przycisku ⚡).</p>
+          </div>
+        </details>
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.healthEnabled">Automatyczne sprawdzanie dostępności</summary>
+          <div class="settings-accordion-body">
+            <label class="checkbox-row"><input type="checkbox" id="settings-health-enabled" /><span data-i18n="settings.healthEnabled">Automatyczne sprawdzanie dostępności</span></label>
+            <div class="field">
+              <label for="settings-health-interval" data-i18n="settings.healthInterval">Interwał sprawdzania (s)</label>
+              <input type="number" id="settings-health-interval" min="15" max="3600" placeholder="60" />
+            </div>
+          </div>
+        </details>
+        <details class="settings-accordion">
+          <summary data-i18n="settings.arpScan.heading">Skan ARP</summary>
+          <div class="settings-accordion-body">
+            <p class="hint" data-i18n="settings.arpScan.hint">Wykryj urządzenia w sieci lokalnej (ping + tabela ARP) i przypisz MAC do serwisu.</p>
+            <div class="field-row arp-scan-row">
+              <button type="button" class="btn btn-accent" id="arp-scan-btn" data-i18n="settings.arpScan.start">Skanuj sieć (ARP)</button>
+              <span id="arp-scan-status" class="hint arp-scan-status"></span>
+            </div>
+            <div id="arp-scan-results" class="arp-scan-results hidden"></div>
+          </div>
+        </details>
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.powerDevices">Urządzenia z WoL</summary>
+          <div class="settings-accordion-body">
+            <p class="hint" data-i18n="settings.powerDevicesHint">Przypisz MAC do serwisu — edytuj notatki/MAC na karcie serwisu lub poniżej.</p>
+            <div id="power-devices-list" class="power-devices-list"></div>
+            <div class="field">
+              <label for="power-link-service" data-i18n="settings.powerLinkService">Serwis</label>
+              <select id="power-link-service"></select>
+            </div>
+            <div class="field">
+              <label for="power-link-mac" data-i18n="settings.powerLinkMac">Adres MAC</label>
+              <input type="text" id="power-link-mac" placeholder="AA:BB:CC:DD:EE:FF" />
+            </div>
+            <label class="checkbox-row"><input type="checkbox" id="power-link-enabled" checked /><span data-i18n="settings.powerLinkEnabled">Włącz WoL dla tego serwisu</span></label>
+            <button type="button" class="btn btn-ghost" id="power-link-save" data-i18n="settings.powerLinkSave">Zapisz MAC</button>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="language">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.language">Język</summary>
+          <div class="settings-accordion-body">
+            <div class="field">
+              <select id="settings-language">
+                <option value="pl">Polski</option>
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="uk">Українська</option>
+              </select>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="backup">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.backup.heading">Kopia zapasowa</summary>
+          <div class="settings-accordion-body">
+            <p class="hint" data-i18n="settings.backup.hint">Eksportuj lub przywróć ustawienia dashboardu, serwisy, klucze API (z sekretami) i notatki. Konto logowania nie jest uwzględniane.</p>
+            <div class="field-row backup-actions">
+              <button type="button" class="btn btn-accent" id="settings-backup-export" data-i18n="settings.backup.export">Eksportuj do pliku</button>
+              <button type="button" class="btn btn-ghost" id="settings-backup-import" data-i18n="settings.backup.import">Przywróć z pliku</button>
+              <input type="file" id="settings-backup-file" accept="application/json,.json" class="hidden" />
+            </div>
+            <p id="settings-backup-message" class="password-message hidden" role="status"></p>
+          </div>
+        </details>
+      </div>
+      <div class="settings-panel" data-panel="account">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.password.heading">Hasło</summary>
+          <div class="settings-accordion-body">
+            <div class="field">
+              <label for="settings-password-current" data-i18n="settings.password.current">Aktualne hasło</label>
+              <input type="password" id="settings-password-current" autocomplete="current-password" />
+            </div>
+            <div class="field">
+              <label for="settings-password-new" data-i18n="settings.password.new">Nowe hasło</label>
+              <input type="password" id="settings-password-new" autocomplete="new-password" minlength="4" />
+            </div>
+            <div class="field">
+              <label for="settings-password-confirm" data-i18n="settings.password.confirm">Potwierdź nowe hasło</label>
+              <input type="password" id="settings-password-confirm" autocomplete="new-password" minlength="4" />
+            </div>
+            <p id="settings-password-message" class="password-message hidden" role="status"></p>
+            <button type="button" class="btn btn-primary" id="settings-password-change" data-i18n="settings.password.change">Zmień hasło</button>
+          </div>
+        </details>
+      </div>
+          </div>
+        </div>
+        <footer class="settings-footer modal-actions">
+          <button class="btn btn-ghost" id="settings-cancel" data-i18n="modal.cancel">Anuluj</button>
+          <button class="btn btn-primary" id="settings-save" data-i18n="modal.save">Zapisz</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan Modal -->
+  <div id="scan-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2>Skanowanie sieci</h2>
+      <p class="modal-desc">Podaj zakres sieci w formacie CIDR lub zostaw puste aby skanować lokalną sieć.</p>
+      <div class="field">
+        <label for="cidr-input">Sieć (CIDR)</label>
+        <input type="text" id="cidr-input" placeholder="np. 192.168.1.0/24" />
+        <span class="hint" id="local-network-hint"></span>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="full-scan" />
+        <span>Pełny skan (wszystkie porty — wolniejszy, więcej wyników)</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="scan-cancel">Anuluj</button>
+        <button class="btn btn-accent" id="scan-start">Rozpocznij skan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API Key Modal -->
+  <div id="key-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <h2 id="key-modal-title">Dodaj klucz API</h2>
+      <input type="hidden" id="key-edit-id" />
+      <div class="field-row">
+        <div class="field">
+          <label for="key-name">Nazwa</label>
+          <input type="text" id="key-name" placeholder="np. OpenAI Production" />
+        </div>
+        <div class="field">
+          <label for="key-service">Serwis</label>
+          <input type="text" id="key-service" placeholder="np. OpenAI" list="service-suggestions" />
+          <datalist id="service-suggestions">
+            <option value="OpenAI"><option value="Anthropic"><option value="GitHub">
+            <option value="GitLab"><option value="Docker Hub"><option value="Cloudflare">
+            <option value="AWS"><option value="Google"><option value="Tailscale">
+            <option value="Proxmox"><option value="UniFi"><option value="Inne">
+          </datalist>
+        </div>
+      </div>
+      <div class="field">
+        <label for="key-secret">Klucz / Token</label>
+        <input type="password" id="key-secret" placeholder="sk-..." autocomplete="off" />
+        <span class="hint" id="key-secret-hint">Przy edycji zostaw puste aby nie zmieniać</span>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="key-username">Użytkownik (opcjonalnie)</label>
+          <input type="text" id="key-username" placeholder="login / client id" />
+        </div>
+        <div class="field">
+          <label for="key-url">URL (opcjonalnie)</label>
+          <input type="url" id="key-url" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="field">
+        <label for="key-notes">Notatka</label>
+        <textarea id="key-notes" rows="2" placeholder="Do czego służy ten klucz..."></textarea>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="key-pinned" />
+        <span>Przypnij na górze</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="key-cancel">Anuluj</button>
+        <button class="btn btn-primary" id="key-save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Note Modal -->
+  <div id="note-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <h2 id="note-modal-title">Nowa notatka</h2>
+      <input type="hidden" id="note-edit-id" />
+      <div class="field-row">
+        <div class="field field-grow">
+          <label for="note-title">Tytuł</label>
+          <input type="text" id="note-title" placeholder="np. Konfiguracja NAS" />
+        </div>
+        <div class="field field-color">
+          <label for="note-color">Kolor</label>
+          <select id="note-color">
+            <option value="green">Zielony</option>
+            <option value="red">Czerwony</option>
+            <option value="blue">Niebieski</option>
+            <option value="yellow">Żółty</option>
+            <option value="purple">Fioletowy</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="note-content">Treść</label>
+        <textarea id="note-content" rows="8" placeholder="Komendy, hasła do infrastruktury, TODO...&#10;&#10;Obsługiwany prosty markdown: **pogrubienie**, `kod`, listy -"></textarea>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="note-pinned" />
+        <span>Przypnij</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost hidden" id="note-delete">Usuń</button>
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost" id="note-cancel">Anuluj</button>
+        <button class="btn btn-primary" id="note-save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service notes modal -->
+  <div id="service-notes-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide modal-service-notes">
+      <h2 id="service-notes-title" data-i18n="modal.serviceNotes">Notatka serwisu</h2>
+      <input type="hidden" id="service-notes-id" />
+      <div class="field">
+        <label for="service-notes-mac" data-i18n="settings.powerLinkMac">Adres MAC</label>
+        <div class="mac-detect-row">
+          <input type="text" id="service-notes-mac" placeholder="AA:BB:CC:DD:EE:FF" />
+          <button type="button" class="btn btn-ghost btn-sm" id="service-notes-detect-mac" data-i18n="modal.detectMac">Wykryj MAC</button>
+          <span class="mac-detect-spinner-slot" aria-hidden="true"><span id="service-notes-mac-loading" class="mac-detect-spinner is-hidden"></span></span>
+        </div>
+        <span class="hint" id="service-notes-mac-hint" data-i18n="settings.arpScan.modalHint">MAC możesz też wybrać ze skanu ARP w Ustawieniach → Zasilanie.</span>
+      </div>
+      <label class="checkbox-row"><input type="checkbox" id="service-notes-wol" /><span data-i18n="settings.powerLinkEnabled">Włącz WoL dla tego serwisu</span></label>
+      <p class="sol-hint-row">
+        <button type="button" class="link-btn" id="service-notes-sol-help" data-i18n="modal.solHelpLink">Jak włączyć SOL na hoście?</button>
+        <span class="sol-hint-sep" aria-hidden="true">·</span>
+        <button type="button" class="link-btn" id="service-notes-sol-script" data-i18n="service.sol.getScript">Pobierz skrypt SOL dla tego serwisu</button>
+      </p>
+      <div class="field-row">
+        <div class="field">
+          <label for="service-notes-wol-port" data-i18n="settings.wolPort">Port UDP WoL</label>
+          <input type="number" id="service-notes-wol-port" min="1" max="65535" />
+          <span class="hint" id="service-notes-wol-port-hint"></span>
+        </div>
+        <div class="field">
+          <label for="service-notes-sol-port" data-i18n="settings.solPort">Port UDP SOL</label>
+          <input type="number" id="service-notes-sol-port" min="1" max="65535" />
+          <span class="hint" id="service-notes-sol-port-hint"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="service-notes-broadcast" data-i18n="settings.wolBroadcast">Adres broadcast WoL</label>
+        <input type="text" id="service-notes-broadcast" placeholder="255.255.255.255" />
+        <span class="hint" data-i18n="settings.broadcastHint">Pozostaw puste, aby użyć domyślnego z ustawień Zasilanie.</span>
+      </div>
+      <div class="field">
+        <label for="service-notes-text" data-i18n="modal.serviceNotesText">Notatka</label>
+        <textarea id="service-notes-text" rows="6" placeholder=""></textarea>
+      </div>
+      <div class="modal-actions">
+        <div style="flex:1"></div>
+        <button class="btn btn-ghost" id="service-notes-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button class="btn btn-primary" id="service-notes-save" data-i18n="modal.save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOL install script modal -->
+  <div id="sol-script-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide modal-sol-script">
+      <h2 data-i18n="settings.sol.scripts.title">Skrypty instalacji SOL na hoście</h2>
+      <p class="hint" id="sol-script-modal-hint" data-i18n="settings.sol.scripts.serviceHint">Skrypt dopasowany do MAC tego serwisu. Uruchom na hoście docelowym.</p>
+      <div class="sol-script-os-tabs" role="tablist">
+        <button type="button" class="sol-script-os-tab active" data-os="linux" data-scope="modal" role="tab" aria-selected="true">Linux</button>
+        <button type="button" class="sol-script-os-tab" data-os="windows" data-scope="modal" role="tab" aria-selected="false">Windows</button>
+        <button type="button" class="sol-script-os-tab" data-os="macos" data-scope="modal" role="tab" aria-selected="false">macOS</button>
+      </div>
+      <textarea id="sol-script-modal-preview" class="sol-script-preview" readonly rows="18" spellcheck="false"></textarea>
+      <div class="sol-script-actions">
+        <button type="button" class="btn btn-ghost" id="sol-script-modal-copy" data-i18n="settings.sol.scripts.copy">Kopiuj do schowka</button>
+        <button type="button" class="btn btn-accent" id="sol-script-modal-download" data-i18n="settings.sol.scripts.download">Pobierz skrypt</button>
+      </div>
+      <p class="hint sol-script-security" data-i18n="settings.sol.scripts.security">Wymaga uprawnień administratora. Zapora musi zezwalać na UDP z podsieci serwera NetDash. W BIOS włącz Wake-on-LAN (dla przycisku ⚡).</p>
+      <div class="modal-actions">
+        <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost" id="sol-script-modal-close" data-i18n="modal.cancel">Zamknij</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Modal -->
+  <div id="add-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2>Dodaj serwis</h2>
+      <div class="field">
+        <label for="add-name">Nazwa</label>
+        <input type="text" id="add-name" placeholder="np. Grafana" />
+      </div>
+      <div class="field">
+        <label for="add-url">URL</label>
+        <input type="url" id="add-url" placeholder="https://192.168.1.10:3000" />
+      </div>
+      <div class="field">
+        <label for="add-category">Kategoria</label>
+        <input type="text" id="add-category" value="Inne" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="add-cancel">Anuluj</button>
+        <button class="btn btn-primary" id="add-save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <script src="/static/app.js?v=1.3.4"></script>
+</body>
+</html>

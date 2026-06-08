@@ -1,0 +1,42 @@
+# Python
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Database & runtime data
+*.sqlite3
+db.sqlite3
+*.db
+data/
+media/
+
+# Secrets & credentials
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+*deploy-creds*
+*credentials*
+
+# IDE & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+*.swp
+*~
+
+# Docker local overrides
+docker-compose.override.yml

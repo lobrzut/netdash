@@ -1,0 +1,146 @@
+import re
+from urllib.parse import urljoin, urlparse
+
+FAVICON_LINK_RE = re.compile(
+    r'<link[^>]*rel=["\'](?:shortcut icon|icon|apple-touch-icon)["\'][^>]*>',
+    re.IGNORECASE,
+)
+FAVICON_LINK_RE_ALT = re.compile(
+    r'<link[^>]*href=["\']([^"\']+)["\'][^>]*rel=["\'](?:shortcut icon|icon|apple-touch-icon)["\']',
+    re.IGNORECASE,
+)
+HREF_RE = re.compile(r'href=["\']([^"\']+)["\']', re.IGNORECASE)
+
+# pattern → simple-icons slug (https://cdn.simpleicons.org/{slug})
+BRAND_SLUGS: list[tuple[str, str]] = [
+    (r"jellyfin", "jellyfin"),
+    (r"plex", "plex"),
+    (r"emby", "emby"),
+    (r"grafana", "grafana"),
+    (r"prometheus", "prometheus"),
+    (r"portainer", "portainer"),
+    (r"home\s*assistant", "homeassistant"),
+    (r"sonarr", "sonarr"),
+    (r"radarr", "radarr"),
+    (r"prowlarr", "prowlarr"),
+    (r"lidarr", "lidarr"),
+    (r"readarr", "readarr"),
+    (r"bazarr", "bazarr"),
+    (r"overseerr", "overseerr"),
+    (r"jackett", "jackett"),
+    (r"transmission", "transmission"),
+    (r"qbittorrent", "qbittorrent"),
+    (r"deluge", "deluge"),
+    (r"nextcloud", "nextcloud"),
+    (r"synology", "synology"),
+    (r"truenas", "truenas"),
+    (r"unifi", "ubiquiti"),
+    (r"ubiquiti", "ubiquiti"),
+    (r"openwrt", "openwrt"),
+    (r"gitlab", "gitlab"),
+    (r"github", "github"),
+    (r"gitea", "gitea"),
+    (r"jenkins", "jenkins"),
+    (r"vault", "vault"),
+    (r"minio", "minio"),
+    (r"phpmyadmin", "phpmyadmin"),
+    (r"pgadmin", "pgadmin"),
+    (r"vaultwarden", "bitwarden"),
+    (r"bitwarden", "bitwarden"),
+    (r"immich", "immich"),
+    (r"paperless", "paperlessngx"),
+    (r"homer", "homer"),
+    (r"pi-?hole", "pihole"),
+    (r"adguard", "adguard"),
+    (r"n8n", "n8n"),
+    (r"homebridge", "homebridge"),
+    (r"proxmox", "proxmox"),
+    (r"code-server", "visualstudiocode"),
+    (r"ollama", "ollama"),
+    (r"openwebui", "openai"),
+    (r"comfyui", "comfyui"),
+    (r"stable\s*diffusion", "stablediffusion"),
+    (r"nginx", "nginx"),
+    (r"apache", "apache"),
+    (r"traefik", "traefik"),
+    (r"caddy", "caddy"),
+    (r"docker", "docker"),
+    (r"kubernetes", "kubernetes"),
+    (r"redis", "redis"),
+    (r"mongodb", "mongodb"),
+    (r"mysql", "mysql"),
+    (r"mariadb", "mariadb"),
+    (r"postgres", "postgresql"),
+    (r"rabbitmq", "rabbitmq"),
+    (r"elasticsearch", "elasticsearch"),
+    (r"kibana", "kibana"),
+    (r"influx", "influxdb"),
+    (r"gunicorn", "gunicorn"),
+    (r"fastapi|uvicorn", "fastapi"),
+    (r"cloudflare", "cloudflare"),
+    (r"tailscale", "tailscale"),
+    (r"wireguard", "wireguard"),
+    (r"mqtt", "mqtt"),
+    (r"homeassistant", "homeassistant"),
+    (r"frigate", "frigate"),
+    (r"zigbee", "zigbee"),
+    (r"node-red|nodered", "nodered"),
+    (r"uptime\s*kuma", "uptimekuma"),
+    (r"netdata", "netdata"),
+    (r"watchtower", "watchtower"),
+    (r"duplicati", "duplicati"),
+    (r"resilio", "resilio"),
+    (r"sabnzbd", "sabnzbd"),
+    (r"file\s*browser", "filebrowser"),
+    (r"audiobookshelf", "audiobookshelf"),
+    (r"calibre", "calibreweb"),
+    (r"komga", "komga"),
+    (r"navidrome", "navidrome"),
+    (r"airsonic", "airsonic"),
+    (r"photoprism", "photoprism"),
+    (r"mealie", "mealie"),
+    (r"wordpress", "wordpress"),
+    (r"ghost", "ghost"),
+    (r"mattermost", "mattermost"),
+    (r"slack", "slack"),
+    (r"discord", "discord"),
+    (r"teamspeak|mumble", "teamspeak"),
+    (r"pterodactyl", "pterodactyl"),
+    (r"amp", "amp"),
+]
+
+
+def simple_icon_url(slug: str) -> str:
+    return f"https://cdn.simpleicons.org/{slug}"
+
+
+def resolve_brand_icon(*texts: str | None) -> str | None:
+    for text in texts:
+        if not text:
+            continue
+        lowered = text.lower()
+        for pattern, slug in BRAND_SLUGS:
+            if re.search(pattern, lowered):
+                return simple_icon_url(slug)
+    return None
+
+
+def extract_favicon_url(page_url: str, body: str) -> str | None:
+    for pattern in (FAVICON_LINK_RE,):
+        for match in pattern.finditer(body):
+            href_match = HREF_RE.search(match.group(0))
+            if href_match:
+                return urljoin(page_url, href_match.group(1))
+
+    for match in FAVICON_LINK_RE_ALT.finditer(body):
+        return urljoin(page_url, match.group(1))
+
+    base = f"{urlparse(page_url).scheme}://{urlparse(page_url).netloc}"
+    return urljoin(base + "/", "favicon.ico")
+
+
+def resolve_icon_url(name: str, title: str | None, page_url: str, body: str) -> str | None:
+    brand = resolve_brand_icon(name, title)
+    if brand:
+        return brand
+    return extract_favicon_url(page_url, body)

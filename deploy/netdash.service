@@ -1,0 +1,20 @@
+[Unit]
+Description=NetDash homelab network dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netdash
+Group=netdash
+WorkingDirectory=/opt/netdash
+EnvironmentFile=/opt/netdash/.env
+ExecStart=/opt/netdash/.venv/bin/python run.py
+Restart=on-failure
+RestartSec=5
+
+# SQLite + uploads
+ReadWritePaths=/opt/netdash/data
+
+[Install]
+WantedBy=multi-user.target

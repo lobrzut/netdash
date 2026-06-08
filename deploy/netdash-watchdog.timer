@@ -1,0 +1,11 @@
+[Unit]
+Description=Run NetDash watchdog every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

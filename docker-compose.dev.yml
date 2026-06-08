@@ -1,0 +1,27 @@
+# Opcjonalny profil: test Dockera lokalnie (bridge, bez network_mode: host).
+# Skan LAN wymaga NETDASH_SCAN_CIDR — ustaw w .env lub w panelu Ustawienia.
+# Użycie: docker compose -f docker-compose.dev.yml up -d --build
+
+services:
+  netdash:
+    build: .
+    container_name: netdash-dev
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./data:/app/data
+    environment:
+      NETDASH_SECRET_KEY: ${NETDASH_SECRET_KEY:?Set NETDASH_SECRET_KEY in .env}
+      NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
+      NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:?Set NETDASH_DEFAULT_ADMIN_PASSWORD in .env}
+      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
+      NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-192.168.1.0/24}
+    cap_add:
+      - NET_RAW
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

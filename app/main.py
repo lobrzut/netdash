@@ -1,0 +1,1025 @@
+import asyncio
+import logging
+import re
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+
+import httpx
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.config import BASE_DIR, BUILD_DATE, GITHUB_REPO, VERSION, settings
+from app.database import Base, async_session, engine, get_db
+from app.enrich import enrich_all_services, enrich_mac_addresses, should_auto_wol
+from app.health import check_all_services
+from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
+from app.vault import decrypt_secret, encrypt_secret, mask_secret
+from app.scanner import (
+    DiscoveredService,
+    build_local_host_service,
+    get_local_ip,
+    get_local_network,
+    is_likely_docker_bridge,
+    resolve_scan_cidr,
+    parse_host_scan_ports,
+    scan_network,
+)
+from app.arp_scan import lookup_mac_for_ip, scan_arp_network
+from app.wol import normalize_mac, send_magic_packet
+from app.schemas import (
+    BACKUP_FORMAT,
+    BACKUP_FORMAT_VERSION,
+    ApiKeyCreate,
+    ApiKeyOut,
+    ApiKeyReveal,
+    ApiKeyUpdate,
+    AppSettingsOut,
+    AppSettingsUpdate,
+    SettingsBackupApiKey,
+    SettingsBackupNote,
+    SettingsBackupOut,
+    SettingsBackupService,
+    SettingsImportRequest,
+    ArpDeviceOut,
+    ArpLookupOut,
+    ArpScanRequest,
+    LoginRequest,
+    PasswordChangeRequest,
+    NetworkInfo,
+    NoteCreate,
+    NoteOut,
+    NoteUpdate,
+    PowerActionResult,
+    ScanRequest,
+    ScanStatus,
+    ServiceCreate,
+    ServiceOut,
+    ServiceUpdate,
+    Token,
+)
+
+scan_tasks: dict[int, asyncio.Task] = {}
+health_task: asyncio.Task | None = None
+logger = logging.getLogger("netdash")
+
+PHASE_LABELS = {
+    "ping": "Wykrywanie aktywnych hostów",
+    "ports": "Skanowanie portów",
+    "identify": "Identyfikacja serwisów",
+}
+
+
+def _sanitize_custom_css(css: str | None) -> str | None:
+    if not css:
+        return None
+    cleaned = re.sub(r"(?is)<\s*script[^>]*>.*?<\s*/\s*script\s*>", "", css)
+    cleaned = re.sub(r"(?is)@import\s+[^;]+;?", "", cleaned)
+    cleaned = re.sub(r"(?i)javascript\s*:", "", cleaned)
+    cleaned = re.sub(r"(?i)expression\s*\(", "", cleaned)
+    return cleaned.strip() or None
+
+
+def _migrate_db(sync_conn):
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(sync_conn)
+    tables = inspector.get_table_names()
+
+    if "scan_jobs" in tables:
+        columns = {col["name"] for col in inspector.get_columns("scan_jobs")}
+        for name, ddl in [
+            ("progress_phase", "VARCHAR(32) DEFAULT ''"),
+            ("progress_current", "INTEGER DEFAULT 0"),
+            ("progress_total", "INTEGER DEFAULT 0"),
+        ]:
+            if name not in columns:
+                sync_conn.execute(text(f"ALTER TABLE scan_jobs ADD COLUMN {name} {ddl}"))
+
+    if "services" in tables:
+        columns = {col["name"] for col in inspector.get_columns("services")}
+        if "has_login" not in columns:
+            sync_conn.execute(text("ALTER TABLE services ADD COLUMN has_login BOOLEAN DEFAULT 0"))
+        if "icon_url" not in columns:
+            sync_conn.execute(text("ALTER TABLE services ADD COLUMN icon_url VARCHAR(512)"))
+        service_migrations = [
+            ("is_online", "BOOLEAN DEFAULT 1"),
+            ("last_checked", "DATETIME"),
+            ("service_notes", "TEXT"),
+            ("mac_address", "VARCHAR(17)"),
+            ("wol_enabled", "BOOLEAN DEFAULT 0"),
+            ("wol_port", "INTEGER"),
+            ("sol_port", "INTEGER"),
+            ("broadcast_ip", "VARCHAR(64)"),
+        ]
+        for name, ddl in service_migrations:
+            if name not in columns:
+                sync_conn.execute(text(f"ALTER TABLE services ADD COLUMN {name} {ddl}"))
+
+    if "app_settings" in tables:
+        columns = {col["name"] for col in inspector.get_columns("app_settings")}
+        settings_migrations = [
+            ("language", "VARCHAR(8) DEFAULT 'pl'"),
+            ("author_name", "VARCHAR(64) DEFAULT 'lobrzut'"),
+            ("author_bio", "TEXT DEFAULT ''"),
+            ("author_url", "VARCHAR(256) DEFAULT ''"),
+            ("about_project", "TEXT DEFAULT ''"),
+            ("footer_text", "VARCHAR(256) DEFAULT ''"),
+            ("scan_cidr_default", "VARCHAR(64)"),
+            ("full_scan_default", "BOOLEAN DEFAULT 0"),
+            ("host_scan_ports", "VARCHAR(128) DEFAULT '22,445,3389,5900'"),
+            ("host_only_entries", "BOOLEAN DEFAULT 1"),
+            ("show_vault", "BOOLEAN DEFAULT 1"),
+            ("show_notes", "BOOLEAN DEFAULT 1"),
+            ("show_about", "BOOLEAN DEFAULT 0"),
+            ("show_clock", "BOOLEAN DEFAULT 1"),
+            ("show_stats", "BOOLEAN DEFAULT 1"),
+            ("services_columns", "VARCHAR(16) DEFAULT 'normal'"),
+            ("show_category_filters", "BOOLEAN DEFAULT 1"),
+            ("show_service_urls", "BOOLEAN DEFAULT 1"),
+            ("show_ports", "BOOLEAN DEFAULT 1"),
+            ("services_grouped", "BOOLEAN DEFAULT 1"),
+            ("default_access_filter", "VARCHAR(16) DEFAULT 'all'"),
+            ("card_style", "VARCHAR(16) DEFAULT 'detailed'"),
+            ("custom_css", "TEXT"),
+            ("favicon_url", "VARCHAR(512)"),
+            ("wol_broadcast_ip", "VARCHAR(64) DEFAULT '255.255.255.255'"),
+            ("wol_port", "INTEGER DEFAULT 9"),
+            ("sol_port", "INTEGER DEFAULT 9"),
+            ("arp_scan_enabled", "BOOLEAN DEFAULT 1"),
+            ("health_check_enabled", "BOOLEAN DEFAULT 1"),
+            ("health_check_interval", "INTEGER DEFAULT 60"),
+            ("gptwol_url", "VARCHAR(256)"),
+            ("stale_remove_days", "INTEGER DEFAULT 0"),
+        ]
+        for name, ddl in settings_migrations:
+            if name not in columns:
+                sync_conn.execute(text(f"ALTER TABLE app_settings ADD COLUMN {name} {ddl}"))
+
+
+async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
+    result = await db.execute(select(AppSettings).limit(1))
+    app_settings = result.scalar_one_or_none()
+    if app_settings is None:
+        app_settings = AppSettings(about_project=DEFAULT_ABOUT_PROJECT)
+        db.add(app_settings)
+        await db.commit()
+        await db.refresh(app_settings)
+    else:
+        changed = False
+        if not app_settings.about_project:
+            app_settings.about_project = DEFAULT_ABOUT_PROJECT
+            changed = True
+        if app_settings.author_bio and ("Łukasz" in app_settings.author_bio or "30+" in app_settings.author_bio):
+            app_settings.author_bio = ""
+            changed = True
+        if changed:
+            await db.commit()
+            await db.refresh(app_settings)
+    return app_settings
+
+
+async def _ensure_local_host_service() -> None:
+    """Register this machine as a device card even when ping-to-self fails on Windows."""
+    item = build_local_host_service()
+    await _upsert_service(item)
+    async with async_session() as db:
+        result = await db.execute(select(Service).where(Service.protocol == "host"))
+        changed = False
+        for svc in result.scalars():
+            if svc.url.startswith("host://"):
+                svc.url = "#"
+                changed = True
+        if changed:
+            await db.commit()
+
+
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(_migrate_db)
+
+    async with async_session() as db:
+        result = await db.execute(select(User).where(User.username == settings.default_admin_user))
+        if result.scalar_one_or_none() is None:
+            db.add(
+                User(
+                    username=settings.default_admin_user,
+                    password_hash=hash_password(settings.default_admin_password),
+                )
+            )
+            await db.commit()
+        await _get_or_create_settings(db)
+
+    await _ensure_local_host_service()
+    await enrich_mac_addresses()
+    await enrich_all_services()
+
+
+async def _health_check_loop():
+    while True:
+        try:
+            async with async_session() as db:
+                settings_row = await _get_or_create_settings(db)
+                interval = max(15, settings_row.health_check_interval or 60)
+                enabled = settings_row.health_check_enabled
+            if enabled:
+                async with async_session() as db:
+                    count = await check_all_services(db)
+                    logger.debug("Health check completed for %s services", count)
+            async with async_session() as db:
+                settings_row = await _get_or_create_settings(db)
+                interval = max(15, settings_row.health_check_interval or 60)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Health check loop error")
+            interval = 60
+        await asyncio.sleep(interval)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global health_task
+    await init_db()
+    health_task = asyncio.create_task(_health_check_loop())
+    yield
+    if health_task:
+        health_task.cancel()
+        try:
+            await health_task
+        except asyncio.CancelledError:
+            pass
+    for task in scan_tasks.values():
+        task.cancel()
+
+
+app = FastAPI(title="NetDash", description="Dashboard sieci z auto-wykrywaniem serwisów", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
+
+
+@app.get("/")
+async def index():
+    return FileResponse(BASE_DIR / "app" / "static" / "index.html")
+
+
+@app.get("/api/health")
+async def health():
+    return {
+        "ok": True,
+        "version": VERSION,
+        "build_date": BUILD_DATE or None,
+        "github": GITHUB_REPO,
+    }
+
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.username == data.username))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(data.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
+    return Token(access_token=create_access_token(user.username))
+
+
+@app.patch("/api/auth/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_password(
+    data: PasswordChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędne aktualne hasło")
+    user.password_hash = hash_password(data.new_password)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/api/network", response_model=NetworkInfo)
+async def network_info(_: User = Depends(get_current_user)):
+    return NetworkInfo(
+        local_network=get_local_network(),
+        local_ip=get_local_ip(),
+        docker_bridge=is_likely_docker_bridge(),
+        scan_cidr_configured=bool(settings.scan_cidr),
+    )
+
+
+@app.get("/api/settings", response_model=AppSettingsOut)
+async def get_settings(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    return await _get_or_create_settings(db)
+
+
+@app.patch("/api/settings", response_model=AppSettingsOut)
+async def update_settings(
+    data: AppSettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    app_settings = await _get_or_create_settings(db)
+    updates = data.model_dump(exclude_unset=True)
+    if "custom_css" in updates:
+        updates["custom_css"] = _sanitize_custom_css(updates["custom_css"])
+    for field, value in updates.items():
+        setattr(app_settings, field, value)
+    await db.commit()
+    await db.refresh(app_settings)
+    return app_settings
+
+
+@app.get("/api/settings/export", response_model=SettingsBackupOut)
+async def export_settings(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    app_settings = await _get_or_create_settings(db)
+    svc_result = await db.execute(select(Service).order_by(Service.name))
+    key_result = await db.execute(select(ApiKey).order_by(ApiKey.name))
+    note_result = await db.execute(select(Note).order_by(Note.title))
+
+    services = [
+        SettingsBackupService(
+            name=s.name,
+            url=s.url,
+            host=s.host,
+            port=s.port,
+            protocol=s.protocol,
+            category=s.category,
+            icon=s.icon,
+            icon_url=s.icon_url,
+            description=s.description,
+            auto_discovered=s.auto_discovered,
+            has_login=s.has_login,
+            pinned=s.pinned,
+            service_notes=s.service_notes,
+            mac_address=s.mac_address,
+            wol_enabled=s.wol_enabled,
+            wol_port=s.wol_port,
+            sol_port=s.sol_port,
+            broadcast_ip=s.broadcast_ip,
+        )
+        for s in svc_result.scalars().all()
+    ]
+    api_keys = [
+        SettingsBackupApiKey(
+            name=k.name,
+            secret=decrypt_secret(k.secret_encrypted),
+            service=k.service,
+            username=k.username,
+            url=k.url,
+            notes=k.notes,
+            pinned=k.pinned,
+        )
+        for k in key_result.scalars().all()
+    ]
+    notes = [
+        SettingsBackupNote(
+            title=n.title,
+            content=n.content,
+            color=n.color,
+            pinned=n.pinned,
+        )
+        for n in note_result.scalars().all()
+    ]
+
+    return SettingsBackupOut(
+        app_version=VERSION,
+        exported_at=datetime.now(timezone.utc),
+        settings=AppSettingsOut.model_validate(app_settings),
+        services=services,
+        api_keys=api_keys,
+        notes=notes,
+    )
+
+
+@app.post("/api/settings/import", response_model=AppSettingsOut)
+async def import_settings(
+    data: SettingsImportRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    if data.format != BACKUP_FORMAT:
+        raise HTTPException(status_code=400, detail="Nieprawidłowy format pliku kopii zapasowej")
+    if data.format_version != BACKUP_FORMAT_VERSION:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nieobsługiwana wersja kopii zapasowej: {data.format_version}",
+        )
+
+    app_settings = await _get_or_create_settings(db)
+    settings_data = data.settings.model_dump()
+    if "custom_css" in settings_data:
+        settings_data["custom_css"] = _sanitize_custom_css(settings_data.get("custom_css"))
+    for field, value in settings_data.items():
+        setattr(app_settings, field, value)
+
+    for key in (await db.execute(select(ApiKey))).scalars().all():
+        await db.delete(key)
+    for note in (await db.execute(select(Note))).scalars().all():
+        await db.delete(note)
+    for service in (await db.execute(select(Service))).scalars().all():
+        await db.delete(service)
+    await db.flush()
+
+    for item in data.services:
+        from urllib.parse import urlparse
+
+        host = item.host
+        port = item.port
+        protocol = item.protocol
+        if not host or port is None:
+            parsed = urlparse(item.url)
+            host = host or parsed.hostname or "localhost"
+            port = port if port is not None else (parsed.port or (443 if parsed.scheme == "https" else 80))
+            protocol = protocol or parsed.scheme or "http"
+        mac = normalize_mac(item.mac_address) if item.mac_address else None
+        db.add(
+            Service(
+                name=item.name,
+                url=item.url,
+                host=host,
+                port=port,
+                protocol=protocol,
+                category=item.category,
+                icon=item.icon,
+                icon_url=item.icon_url,
+                description=item.description,
+                auto_discovered=item.auto_discovered,
+                has_login=item.has_login,
+                pinned=item.pinned,
+                service_notes=item.service_notes,
+                mac_address=mac,
+                wol_enabled=item.wol_enabled,
+                wol_port=item.wol_port,
+                sol_port=item.sol_port,
+                broadcast_ip=item.broadcast_ip,
+            )
+        )
+
+    for item in data.api_keys:
+        secret = item.secret
+        db.add(
+            ApiKey(
+                name=item.name,
+                service=item.service,
+                secret_encrypted=encrypt_secret(secret),
+                secret_hint=secret[-4:] if len(secret) >= 4 else secret,
+                username=item.username,
+                url=item.url,
+                notes=item.notes,
+                pinned=item.pinned,
+            )
+        )
+
+    for item in data.notes:
+        db.add(Note(**item.model_dump()))
+
+    await db.commit()
+    await db.refresh(app_settings)
+    return app_settings
+
+
+@app.post("/api/services/enrich")
+async def enrich_services(_: User = Depends(get_current_user)):
+    mac_count = await enrich_mac_addresses()
+    count = await enrich_all_services()
+    return {"updated": count + mac_count}
+
+
+@app.get("/api/services", response_model=list[ServiceOut])
+async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(Service).order_by(Service.pinned.desc(), Service.name))
+    return result.scalars().all()
+
+
+@app.post("/api/services", response_model=ServiceOut)
+async def create_service(
+    data: ServiceCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    from urllib.parse import urlparse
+
+    parsed = urlparse(data.url)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    service = Service(
+        name=data.name,
+        url=data.url,
+        host=host,
+        port=port,
+        protocol=parsed.scheme or "http",
+        category=data.category,
+        icon=data.icon,
+        description=data.description,
+        auto_discovered=False,
+        has_login=data.has_login,
+        pinned=data.pinned,
+    )
+    db.add(service)
+    await db.commit()
+    await db.refresh(service)
+    return service
+
+
+@app.patch("/api/services/{service_id}", response_model=ServiceOut)
+async def update_service(
+    service_id: int,
+    data: ServiceUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Serwis nie znaleziony")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        if field == "mac_address" and value:
+            value = normalize_mac(value)
+        setattr(service, field, value)
+    await db.commit()
+    await db.refresh(service)
+    return service
+
+
+@app.delete("/api/services/{service_id}")
+async def delete_service(
+    service_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Serwis nie znaleziony")
+    await db.delete(service)
+    await db.commit()
+    return {"ok": True}
+
+
+async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
+    async with async_session() as db:
+        existing = await db.execute(
+            select(Service).where(Service.host == item.host, Service.port == item.port)
+        )
+        service = existing.scalar_one_or_none()
+        now = datetime.now(timezone.utc)
+        if service:
+            service.name = item.name
+            service.url = item.url
+            service.protocol = item.protocol
+            service.category = item.category
+            service.icon = item.icon
+            service.icon_url = item.icon_url
+            service.description = item.description
+            service.has_login = item.has_login
+            service.is_online = True
+            service.last_seen = now
+            service.last_checked = now
+            if not service.mac_address:
+                mac = await lookup_mac_for_ip(item.host)
+                if mac:
+                    service.mac_address = mac
+        else:
+            mac = await lookup_mac_for_ip(item.host)
+            db.add(
+                Service(
+                    name=item.name,
+                    url=item.url,
+                    host=item.host,
+                    port=item.port,
+                    protocol=item.protocol,
+                    category=item.category,
+                    icon=item.icon,
+                    icon_url=item.icon_url,
+                    description=item.description,
+                    auto_discovered=True,
+                    has_login=item.has_login,
+                    is_online=True,
+                    last_checked=now,
+                    mac_address=mac,
+                )
+            )
+        await db.commit()
+    return item.host, item.port
+
+
+async def _finalize_scan(seen: set[tuple[str, int]]) -> None:
+    async with async_session() as db:
+        app_settings = await _get_or_create_settings(db)
+        result = await db.execute(select(Service))
+        now = datetime.now(timezone.utc)
+        stale_days = app_settings.stale_remove_days or 0
+        to_delete: list[Service] = []
+
+        for service in result.scalars().all():
+            key = (service.host, service.port)
+            if key in seen:
+                continue
+            service.is_online = False
+            service.last_checked = now
+            if stale_days > 0 and service.last_seen:
+                last = service.last_seen
+                if last.tzinfo is None:
+                    last = last.replace(tzinfo=timezone.utc)
+                if now - last > timedelta(days=stale_days):
+                    to_delete.append(service)
+
+        for service in to_delete:
+            await db.delete(service)
+
+        await db.commit()
+        if to_delete:
+            logger.info("Removed %s stale services (older than %s days)", len(to_delete), stale_days)
+
+
+async def _update_scan_progress(job_id: int, phase: str, current: int, total: int, found: int | None = None):
+    async with async_session() as db:
+        result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+        job = result.scalar_one_or_none()
+        if not job:
+            return
+        job.progress_phase = phase
+        job.progress_current = current
+        job.progress_total = total
+        if found is not None:
+            job.found_count = found
+        await db.commit()
+
+
+async def _run_scan(job_id: int, cidr: str, full_scan: bool = False):
+    async with async_session() as db:
+        result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+        job = result.scalar_one()
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
+        job.found_count = 0
+        await db.commit()
+
+    found_count = 0
+    seen_keys: set[tuple[str, int]] = set()
+
+    async def on_progress(phase: str, current: int, total: int):
+        await _update_scan_progress(job_id, phase, current, total, found_count)
+
+    async def on_service(item: DiscoveredService):
+        nonlocal found_count
+        key = await _upsert_service(item)
+        seen_keys.add(key)
+        found_count += 1
+        await _update_scan_progress(job_id, "identify", found_count, max(found_count, 1), found_count)
+
+    async with async_session() as db:
+        app_settings = await _get_or_create_settings(db)
+        host_ports = parse_host_scan_ports(app_settings.host_scan_ports)
+        host_only = app_settings.host_only_entries is not False
+
+    try:
+        discovered = await scan_network(
+            cidr,
+            full_scan=full_scan,
+            host_scan_ports=host_ports,
+            host_only_entries=host_only,
+            progress_callback=on_progress,
+            service_callback=on_service,
+        )
+        if host_only:
+            local_key = await _upsert_service(build_local_host_service())
+            seen_keys.add(local_key)
+        await _finalize_scan(seen_keys)
+        await enrich_mac_addresses()
+        await enrich_all_services()
+        async with async_session() as db:
+            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+            job = result.scalar_one()
+            job.status = "completed"
+            job.found_count = len(discovered)
+            job.finished_at = datetime.now(timezone.utc)
+            job.progress_phase = "done"
+            await db.commit()
+        logger.info("Scan %s completed: %s services in %s", job_id, len(discovered), cidr)
+    except Exception:
+        logger.exception("Scan %s failed for %s", job_id, cidr)
+        async with async_session() as db:
+            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+            job = result.scalar_one()
+            job.status = "failed"
+            job.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+    finally:
+        scan_tasks.pop(job_id, None)
+
+
+@app.post("/api/scan", response_model=ScanStatus)
+async def start_scan(
+    data: ScanRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    if any(not t.done() for t in scan_tasks.values()):
+        raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
+
+    app_settings = await _get_or_create_settings(db)
+    cidr = resolve_scan_cidr(data.cidr, app_settings.scan_cidr_default)
+    job = ScanJob(cidr=cidr, status="pending")
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    task = asyncio.create_task(_run_scan(job.id, cidr, data.full_scan))
+    scan_tasks[job.id] = task
+    return job
+
+
+@app.get("/api/scan/{job_id}", response_model=ScanStatus)
+async def scan_status(job_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Skan nie znaleziony")
+    return job
+
+
+@app.get("/api/scans", response_model=list[ScanStatus])
+async def list_scans(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(ScanJob).order_by(ScanJob.created_at.desc()).limit(10))
+    return result.scalars().all()
+
+
+def _resolve_power_params(service: Service, app_settings: AppSettings) -> tuple[str, int, int]:
+    broadcast = service.broadcast_ip or app_settings.wol_broadcast_ip or "255.255.255.255"
+    wol_port = service.wol_port if service.wol_port is not None else (app_settings.wol_port or 9)
+    sol_port = service.sol_port if service.sol_port is not None else (app_settings.sol_port or app_settings.wol_port or 9)
+    return broadcast, wol_port, sol_port
+
+
+async def _send_via_gptwol(base_url: str, mac: str, ip: str) -> bool:
+    url = base_url.rstrip("/") + "/wol_or_sol_send"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(url, json={"mac": mac, "ip": ip})
+            return response.status_code < 400
+    except httpx.HTTPError:
+        return False
+
+
+@app.post("/api/services/health-check")
+async def run_health_check(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    count = await check_all_services(db)
+    return {"checked": count}
+
+
+@app.post("/api/services/{service_id}/wol", response_model=PowerActionResult)
+async def wake_service(
+    service_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Serwis nie znaleziony")
+    if not service.wol_enabled or not service.mac_address:
+        raise HTTPException(status_code=400, detail="WoL nie jest skonfigurowane dla tego serwisu")
+    mac = normalize_mac(service.mac_address)
+    app_settings = await _get_or_create_settings(db)
+
+    sent = False
+    if app_settings.gptwol_url:
+        sent = await _send_via_gptwol(app_settings.gptwol_url, mac, service.host)
+    if not sent:
+        broadcast, wol_port, _ = _resolve_power_params(service, app_settings)
+        try:
+            send_magic_packet(mac, broadcast_ip=broadcast, port=wol_port, sleep=False)
+            sent = True
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"Nie udało się wysłać pakietu WoL: {exc}") from exc
+
+    return PowerActionResult(ok=sent, action="wol", message=f"Wysłano pakiet Wake-on-LAN do {mac}")
+
+
+@app.post("/api/services/{service_id}/sleep", response_model=PowerActionResult)
+async def sleep_service(
+    service_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Serwis nie znaleziony")
+    if not service.wol_enabled or not service.mac_address:
+        raise HTTPException(status_code=400, detail="Sleep-on-LAN nie jest skonfigurowane dla tego serwisu")
+    mac = normalize_mac(service.mac_address)
+    app_settings = await _get_or_create_settings(db)
+
+    sent = False
+    if app_settings.gptwol_url:
+        sent = await _send_via_gptwol(app_settings.gptwol_url, mac, service.host)
+    if not sent:
+        broadcast, _, sol_port = _resolve_power_params(service, app_settings)
+        try:
+            send_magic_packet(mac, broadcast_ip=broadcast, port=sol_port, sleep=True)
+            sent = True
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"Nie udało się wysłać pakietu SOL: {exc}") from exc
+
+    return PowerActionResult(ok=sent, action="sleep", message=f"Wysłano pakiet Sleep-on-LAN do {mac}")
+
+
+@app.post("/api/network/arp-scan", response_model=list[ArpDeviceOut])
+async def arp_scan_network(
+    data: ArpScanRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    app_settings = await _get_or_create_settings(db)
+    if app_settings.arp_scan_enabled is False:
+        raise HTTPException(status_code=403, detail="Skan ARP jest wyłączony w ustawieniach")
+    cidr = resolve_scan_cidr(data.cidr if data else None, app_settings.scan_cidr_default)
+    try:
+        devices = await scan_arp_network(cidr)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Skan ARP nie powiódł się: {exc}") from exc
+
+    mac_by_ip = {d.ip: d.mac for d in devices}
+    async with async_session() as db:
+        result = await db.execute(select(Service))
+        for svc in result.scalars().all():
+            if not svc.mac_address and svc.host in mac_by_ip:
+                svc.mac_address = mac_by_ip[svc.host]
+                if should_auto_wol(svc) and not svc.wol_enabled:
+                    svc.wol_enabled = True
+        await db.commit()
+
+    return [ArpDeviceOut(ip=d.ip, mac=d.mac, hostname=d.hostname) for d in devices]
+
+
+@app.get("/api/network/arp-lookup", response_model=ArpLookupOut)
+async def arp_lookup(
+    ip: str = Query(..., description="Adres IP do wyszukania w tabeli ARP"),
+    ping: bool = Query(True, description="Wyślij pojedynczy ping, jeśli brak wpisu w ARP"),
+    _: User = Depends(get_current_user),
+):
+    mac = await lookup_mac_for_ip(ip, ping_first=ping)
+    return ArpLookupOut(ip=ip, mac=mac, found=mac is not None)
+
+
+@app.get("/api/services/{service_id}/network-info", response_model=ArpLookupOut)
+async def service_network_info(
+    service_id: int,
+    ping: bool = Query(True, description="Wyślij pojedynczy ping, jeśli brak wpisu w ARP"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Service).where(Service.id == service_id))
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Serwis nie znaleziony")
+    mac = await lookup_mac_for_ip(service.host, ping_first=ping)
+    if mac and not service.mac_address:
+        service.mac_address = mac
+        if should_auto_wol(service) and not service.wol_enabled:
+            service.wol_enabled = True
+        await db.commit()
+        await db.refresh(service)
+    return ArpLookupOut(ip=service.host, mac=mac, found=mac is not None)
+
+
+def _key_out(key: ApiKey) -> ApiKeyOut:
+    return ApiKeyOut(
+        id=key.id,
+        name=key.name,
+        service=key.service,
+        secret_masked=mask_secret(decrypt_secret(key.secret_encrypted)),
+        secret_hint=key.secret_hint,
+        username=key.username,
+        url=key.url,
+        notes=key.notes,
+        pinned=key.pinned,
+        created_at=key.created_at,
+        updated_at=key.updated_at,
+    )
+
+
+@app.get("/api/keys", response_model=list[ApiKeyOut])
+async def list_keys(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(ApiKey).order_by(ApiKey.pinned.desc(), ApiKey.name))
+    return [_key_out(key) for key in result.scalars().all()]
+
+
+@app.post("/api/keys", response_model=ApiKeyOut)
+async def create_key(
+    data: ApiKeyCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    key = ApiKey(
+        name=data.name,
+        service=data.service,
+        secret_encrypted=encrypt_secret(data.secret),
+        secret_hint=data.secret[-4:] if len(data.secret) >= 4 else data.secret,
+        username=data.username,
+        url=data.url,
+        notes=data.notes,
+        pinned=data.pinned,
+    )
+    db.add(key)
+    await db.commit()
+    await db.refresh(key)
+    return _key_out(key)
+
+
+@app.patch("/api/keys/{key_id}", response_model=ApiKeyOut)
+async def update_key(
+    key_id: int,
+    data: ApiKeyUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
+    key = result.scalar_one_or_none()
+    if not key:
+        raise HTTPException(status_code=404, detail="Klucz nie znaleziony")
+    payload = data.model_dump(exclude_unset=True)
+    if "secret" in payload:
+        secret = payload.pop("secret")
+        key.secret_encrypted = encrypt_secret(secret)
+        key.secret_hint = secret[-4:] if len(secret) >= 4 else secret
+    for field, value in payload.items():
+        setattr(key, field, value)
+    key.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(key)
+    return _key_out(key)
+
+
+@app.get("/api/keys/{key_id}/reveal", response_model=ApiKeyReveal)
+async def reveal_key(key_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
+    key = result.scalar_one_or_none()
+    if not key:
+        raise HTTPException(status_code=404, detail="Klucz nie znaleziony")
+    return ApiKeyReveal(secret=decrypt_secret(key.secret_encrypted))
+
+
+@app.delete("/api/keys/{key_id}")
+async def delete_key(key_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(ApiKey).where(ApiKey.id == key_id))
+    key = result.scalar_one_or_none()
+    if not key:
+        raise HTTPException(status_code=404, detail="Klucz nie znaleziony")
+    await db.delete(key)
+    await db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/notes", response_model=list[NoteOut])
+async def list_notes(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(Note).order_by(Note.pinned.desc(), Note.updated_at.desc()))
+    return result.scalars().all()
+
+
+@app.post("/api/notes", response_model=NoteOut)
+async def create_note(
+    data: NoteCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    note = Note(**data.model_dump())
+    db.add(note)
+    await db.commit()
+    await db.refresh(note)
+    return note
+
+
+@app.patch("/api/notes/{note_id}", response_model=NoteOut)
+async def update_note(
+    note_id: int,
+    data: NoteUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Note).where(Note.id == note_id))
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(note, field, value)
+    note.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(note)
+    return note
+
+
+@app.delete("/api/notes/{note_id}")
+async def delete_note(note_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(Note).where(Note.id == note_id))
+    note = result.scalar_one_or_none()
+    if not note:
+        raise HTTPException(status_code=404, detail="Notatka nie znaleziona")
+    await db.delete(note)
+    await db.commit()
+    return {"ok": True}
