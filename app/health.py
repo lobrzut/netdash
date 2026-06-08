@@ -63,7 +63,7 @@ async def check_service_online(service: Service) -> tuple[bool, str | None]:
         return True, None
     protocol = (service.protocol or "http").lower()
     port = service.port if service.port is not None else 0
-    url = (service.url or "").strip()
+    url = sanitize_service_url((service.url or "").strip())
     if protocol in ("http", "https") and url:
         return await _check_http_url(url)
     if protocol == "host" or port == 0:

@@ -81,6 +81,10 @@ async def enrich_all_services() -> int:
             changed = False
             if _repair_http_error_name(svc):
                 changed = True
+            safe_url = sanitize_service_url(svc.url)
+            if safe_url and svc.url != safe_url:
+                svc.url = safe_url
+                changed = True
             icon = resolve_brand_icon(svc.name, svc.description)
             if icon and svc.icon_url != icon:
                 svc.icon_url = icon
