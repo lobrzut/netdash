@@ -2675,6 +2675,11 @@ body.modal-open {
   color: var(--accent-bright);
 }
 
+.service-edit-btn {
+  font-size: 0.8125rem;
+  line-height: 1;
+}
+
 .service-pin-btn {
   font-size: 0.9375rem;
   line-height: 1;
@@ -3004,6 +3009,28 @@ body.modal-open {
 .icon-windows::after { content: '🪟'; }
 .icon-caddy::after { content: 'C'; font-weight: 700; }
 .icon-traefik::after { content: 'T'; font-weight: 700; color: var(--accent); }
+
+.field-icon-preview {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+}
+
+.service-edit-icon-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.service-edit-icon-preview .service-icon {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.25rem;
+}
 
 /* ── Responsive ── */
 @media (max-width: 1100px) {

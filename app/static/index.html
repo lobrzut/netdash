@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.18" />
-  <script src="/static/i18n.js?v=1.3.18"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.19" />
+  <script src="/static/i18n.js?v=1.3.19"></script>
 </head>
 <body>
   <div id="app">
@@ -793,25 +793,37 @@ sol --udp-port 9
   <!-- Edit Service Modal -->
   <div id="edit-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-content">
+    <div class="modal-content modal-wide">
       <h2 data-i18n="modal.edit.service">Edytuj serwis</h2>
       <input type="hidden" id="edit-id" />
       <div class="field">
-        <label for="edit-name" data-i18n="modal.add.name">Nazwa</label>
+        <label for="edit-name" data-i18n="modal.edit.displayName">Nazwa wyświetlana</label>
         <input type="text" id="edit-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
       </div>
       <div class="field">
         <label for="edit-url" data-i18n="modal.add.url">URL</label>
         <input type="url" id="edit-url" data-i18n-placeholder="modal.add.urlPlaceholder" placeholder="https://192.168.1.10:3000" />
       </div>
-      <div class="field">
-        <label for="edit-category" data-i18n="modal.add.category">Kategoria</label>
-        <input type="text" id="edit-category" />
+      <div class="field-row">
+        <div class="field">
+          <label for="edit-category" data-i18n="modal.add.category">Kategoria</label>
+          <input type="text" id="edit-category" list="service-category-suggestions" />
+          <datalist id="service-category-suggestions"></datalist>
+        </div>
+        <div class="field field-icon-preview">
+          <label data-i18n="modal.edit.icon">Ikona</label>
+          <div class="service-edit-icon-preview" id="edit-icon-preview"></div>
+        </div>
       </div>
-      <div class="field">
-        <label for="edit-icon" data-i18n="modal.edit.icon">Ikona</label>
-        <input type="text" id="edit-icon" placeholder="globe" />
-        <span class="hint" data-i18n="modal.edit.iconHint">np. globe, docker, chart, monitor, database</span>
+      <div class="field-row">
+        <div class="field">
+          <label for="edit-icon" data-i18n="modal.edit.iconPreset">Preset ikony</label>
+          <select id="edit-icon"></select>
+        </div>
+        <div class="field">
+          <label for="edit-icon-url" data-i18n="modal.edit.iconUrl">URL ikony (opcjonalnie)</label>
+          <input type="url" id="edit-icon-url" placeholder="https://..." />
+        </div>
       </div>
       <div class="field">
         <label for="edit-description" data-i18n="modal.edit.description">Opis (opcjonalnie)</label>
@@ -834,6 +846,9 @@ sol --udp-port 9
         <input type="text" id="edit-mac" placeholder="AA:BB:CC:DD:EE:FF" spellcheck="false" />
         <span class="hint" data-i18n="modal.edit.macHint">Wymagany do Wake-on-LAN i uśpienia</span>
       </div>
+      <p class="hint">
+        <button type="button" class="link-btn" id="edit-open-notes" data-i18n="modal.edit.openNotes">Notatki, MAC i WoL →</button>
+      </p>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="edit-cancel" data-i18n="modal.cancel">Anuluj</button>
         <button class="btn btn-primary" id="edit-save" data-i18n="modal.save">Zapisz</button>
@@ -866,6 +881,6 @@ sol --udp-port 9
   </div>
   </div>
 
-  <script src="/static/app.js?v=1.3.18"></script>
+  <script src="/static/app.js?v=1.3.19"></script>
 </body>
 </html>

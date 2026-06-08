@@ -121,6 +121,8 @@ def _migrate_db(sync_conn):
         for name, ddl in service_migrations:
             if name not in columns:
                 sync_conn.execute(text(f"ALTER TABLE services ADD COLUMN {name} {ddl}"))
+        if "customized" not in columns:
+            sync_conn.execute(text("ALTER TABLE services ADD COLUMN customized BOOLEAN DEFAULT 0"))
 
     if "app_settings" in tables:
         columns = {col["name"] for col in inspector.get_columns("app_settings")}
@@ -533,6 +535,11 @@ async def create_service(
     return service
 
 
+_SERVICE_CUSTOMIZE_FIELDS = frozenset(
+    {"name", "url", "category", "icon", "icon_url", "description", "pinned", "has_login"}
+)
+
+
 @app.patch("/api/services/{service_id}", response_model=ServiceOut)
 async def update_service(
     service_id: int,
@@ -540,14 +547,31 @@ async def update_service(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    from urllib.parse import urlparse
+
     result = await db.execute(select(Service).where(Service.id == service_id))
     service = result.scalar_one_or_none()
     if not service:
         raise HTTPException(status_code=404, detail="Serwis nie znaleziony")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    if _SERVICE_CUSTOMIZE_FIELDS.intersection(updates):
+        service.customized = True
+    for field, value in updates.items():
         if field == "mac_address" and value:
             value = normalize_mac(value)
         setattr(service, field, value)
+    if "url" in updates and updates["url"]:
+        parsed = urlparse(updates["url"])
+        if parsed.hostname:
+            service.host = parsed.hostname
+        if parsed.port:
+            service.port = parsed.port
+        elif parsed.scheme == "https":
+            service.port = 443
+        elif parsed.scheme == "http":
+            service.port = 80
+        if parsed.scheme:
+            service.protocol = parsed.scheme
     await db.commit()
     await db.refresh(service)
     return service
@@ -576,23 +600,24 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
         service = existing.scalar_one_or_none()
         now = datetime.now(timezone.utc)
         if service:
-            if is_http_error_name(item.name):
-                if not is_http_error_name(service.name) and not service.name.startswith("Port "):
-                    pass
+            if not service.customized:
+                if is_http_error_name(item.name):
+                    if is_http_error_name(service.name) or service.name.startswith("Port "):
+                        service.name = _fallback_service_name(item.host, item.port, item.name)
+                    if item.health_detail or is_http_error_name(item.name):
+                        service.health_detail = (item.health_detail or item.name)[:128]
                 else:
-                    service.name = _fallback_service_name(item.host, item.port, item.name)
-                if item.health_detail or is_http_error_name(item.name):
-                    service.health_detail = (item.health_detail or item.name)[:128]
-            else:
-                service.name = item.name
-                if item.health_detail:
-                    service.health_detail = item.health_detail[:128]
-            service.url = item.url
-            service.protocol = item.protocol
-            service.category = item.category
-            service.icon = item.icon
-            service.icon_url = item.icon_url
-            service.description = item.description
+                    service.name = item.name
+                    if item.health_detail:
+                        service.health_detail = item.health_detail[:128]
+                service.url = item.url
+                service.protocol = item.protocol
+                service.category = item.category
+                service.icon = item.icon
+                service.icon_url = item.icon_url
+                service.description = item.description
+            elif item.health_detail:
+                service.health_detail = item.health_detail[:128]
             service.has_login = item.has_login
             service.is_online = True
             service.last_seen = now

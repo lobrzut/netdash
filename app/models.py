@@ -29,6 +29,7 @@ class Service(Base):
     icon_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     auto_discovered: Mapped[bool] = mapped_column(Boolean, default=True)
+    customized: Mapped[bool] = mapped_column(Boolean, default=False)
     has_login: Mapped[bool] = mapped_column(Boolean, default=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     is_online: Mapped[bool] = mapped_column(Boolean, default=True)

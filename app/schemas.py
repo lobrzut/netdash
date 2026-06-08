@@ -33,6 +33,7 @@ class ServiceUpdate(BaseModel):
     url: str | None = None
     category: str | None = None
     icon: str | None = None
+    icon_url: str | None = None
     description: str | None = None
     pinned: bool | None = None
     has_login: bool | None = None
@@ -56,6 +57,7 @@ class ServiceOut(BaseModel):
     icon_url: str | None = None
     description: str | None
     auto_discovered: bool
+    customized: bool = False
     has_login: bool
     pinned: bool
     is_online: bool = True

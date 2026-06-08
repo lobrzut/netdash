@@ -17,6 +17,16 @@ let clockInterval = null;
 let revealedKeys = new Set();
 let currentPage = 'home';
 
+const SERVICE_ICON_PRESETS = [
+  'globe', 'lock', 'database', 'docker', 'chart', 'terminal', 'home', 'play', 'cloud', 'git',
+  'shield', 'router', 'code', 'api', 'folder', 'mail', 'dns', 'ftp', 'monitor', 'queue',
+  'search', 'storage', 'ai', 'dashboard', 'workflow', 'mqtt', 'nas', 'plug', 'download', 'tv',
+  'film', 'photo', 'doc', 'wifi', 'ci', 'nginx', 'apache', 'python', 'windows', 'caddy', 'traefik',
+];
+const DEFAULT_SERVICE_CATEGORIES = [
+  'Media', 'Monitoring', 'DevOps', 'Storage', 'Network', 'Home Automation', 'Urządzenie', 'Inne',
+];
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -340,6 +350,7 @@ function normalizeService(s) {
     is_online: s.is_online !== false,
     wol_enabled: !!s.wol_enabled,
     pinned: !!s.pinned,
+    customized: !!s.customized,
   };
 }
 
@@ -1110,7 +1121,7 @@ function bindServiceCards(root) {
   bindServiceDeletes(root);
   root.querySelectorAll('.service-card').forEach((card) => {
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.service-delete, .service-action')) return;
+      if (e.target.closest('.service-delete, .service-action, .service-edit-btn')) return;
       const url = card.dataset.url;
       if (url && url !== '#') window.open(url, '_blank', 'noopener');
     });
@@ -1289,6 +1300,37 @@ function renderServiceIcon(s) {
   return `<div class="service-icon ${getIconClass(s.icon)}"></div>`;
 }
 
+function populateServiceCategorySuggestions() {
+  const datalist = $('#service-category-suggestions');
+  if (!datalist) return;
+  const cats = new Set(DEFAULT_SERVICE_CATEGORIES);
+  services.forEach((s) => {
+    if (s.category) cats.add(s.category);
+  });
+  datalist.innerHTML = [...cats].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    .map((cat) => `<option value="${esc(cat)}"></option>`).join('');
+}
+
+function populateServiceIconSelect(selected = 'globe') {
+  const select = $('#edit-icon');
+  if (!select) return;
+  const safe = (selected || 'globe').toLowerCase();
+  const icons = new Set(SERVICE_ICON_PRESETS);
+  icons.add(safe);
+  select.innerHTML = [...icons].map((icon) => {
+    const label = icon.charAt(0).toUpperCase() + icon.slice(1);
+    return `<option value="${esc(icon)}" ${icon === safe ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+}
+
+function updateEditServiceIconPreview() {
+  const preview = $('#edit-icon-preview');
+  if (!preview) return;
+  const icon = $('#edit-icon')?.value || 'globe';
+  const iconUrl = $('#edit-icon-url')?.value.trim() || '';
+  preview.innerHTML = renderServiceIcon({ icon, icon_url: iconUrl || null });
+}
+
 const LETTER_WATERMARK_ICONS = new Set(['nginx', 'apache', 'caddy', 'traefik']);
 
 function renderServiceWatermark(s) {
@@ -1354,17 +1396,21 @@ function updateEditMacVisibility() {
 function openServiceEditModal(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
+  populateServiceCategorySuggestions();
+  populateServiceIconSelect(svc.icon || 'globe');
   $('#edit-id').value = id;
   $('#edit-name').value = svc.name;
-  $('#edit-url').value = svc.url;
-  $('#edit-category').value = svc.category;
-  $('#edit-icon').value = svc.icon || 'globe';
+  $('#edit-url').value = svc.protocol === 'host' ? '' : (svc.url || '');
+  $('#edit-category').value = svc.category || t('modal.key.other');
+  $('#edit-icon').value = (svc.icon || 'globe').toLowerCase();
+  $('#edit-icon-url').value = svc.icon_url || '';
   $('#edit-description').value = svc.description || '';
   $('#edit-pinned').checked = !!svc.pinned;
   $('#edit-has-login').checked = !!svc.has_login;
   $('#edit-wol-enabled').checked = !!svc.wol_enabled;
   $('#edit-mac').value = svc.mac_address || '';
   updateEditMacVisibility();
+  updateEditServiceIconPreview();
   openModal('edit-modal');
 }
 
@@ -1373,19 +1419,25 @@ async function saveServiceEdit() {
   const name = $('#edit-name').value.trim();
   const url = $('#edit-url').value.trim();
   const category = $('#edit-category').value.trim() || t('modal.key.other');
-  const icon = ($('#edit-icon').value.trim() || 'globe').toLowerCase();
+  const icon = ($('#edit-icon').value || 'globe').toLowerCase();
+  const iconUrlRaw = $('#edit-icon-url').value.trim();
   const description = $('#edit-description').value.trim() || null;
   const pinned = $('#edit-pinned').checked;
   const has_login = $('#edit-has-login').checked;
   const wol_enabled = $('#edit-wol-enabled').checked;
   const mac_address = wol_enabled ? ($('#edit-mac').value.trim() || null) : null;
-  if (!name || !url) return alert(t('alert.serviceFields'));
+  const svc = services.find((s) => s.id === id);
+  const isHostOnly = svc?.protocol === 'host' || svc?.port === 0;
+  if (!name) return alert(t('alert.serviceFields'));
+  if (!isHostOnly && !url) return alert(t('alert.serviceFields'));
   if (wol_enabled && !mac_address) return alert(t('modal.edit.macRequired'));
+  const payload = {
+    name, category, icon, icon_url: iconUrlRaw || null, description, pinned, has_login, wol_enabled, mac_address,
+  };
+  if (!isHostOnly) payload.url = url;
   const updated = await api(`/api/services/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({
-      name, url, category, icon, description, pinned, has_login, wol_enabled, mac_address,
-    }),
+    body: JSON.stringify(payload),
   });
   const idx = services.findIndex((s) => s.id === id);
   if (idx >= 0) services[idx] = normalizeService(updated);
@@ -2416,6 +2468,14 @@ $('#scan-start').addEventListener('click', () => {
 
 $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
+$('#edit-icon')?.addEventListener('change', updateEditServiceIconPreview);
+$('#edit-icon-url')?.addEventListener('input', updateEditServiceIconPreview);
+$('#edit-open-notes')?.addEventListener('click', () => {
+  const id = $('#edit-id').value;
+  if (!id) return;
+  closeModal('edit-modal');
+  openServiceNotesModal(Number(id));
+});
 $('#edit-wol-enabled')?.addEventListener('change', updateEditMacVisibility);
 $('#edit-save').addEventListener('click', async () => {
   try {
