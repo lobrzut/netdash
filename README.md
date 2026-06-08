@@ -7,16 +7,19 @@
 
 **Homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer) — with automatic LAN service discovery.**
 
-![NetDash Dashboard](docs/screenshots/dashboard.png)
+## Screenshots
 
-<details>
-<summary>More screenshots</summary>
+Dark-theme homelab dashboard with pinned services, API key vault, notes, and network filters.
 
-| Login | Services | Settings |
-|-------|----------|----------|
-| ![Login](docs/screenshots/login.png) | ![Services](docs/screenshots/services.png) | ![Settings](docs/screenshots/settings.png) |
+| Dashboard | Serwisy |
+|-----------|---------|
+| ![Dashboard — widgets and pinned services](docs/screenshots/dashboard.png) | ![Serwisy — filters and service cards](docs/screenshots/services.png) |
 
-</details>
+| Settings | Login |
+|----------|-------|
+| ![Settings — sidebar and general options](docs/screenshots/settings.png) | ![Login — JWT authentication](docs/screenshots/login.png) |
+
+> Screenshots use generic demo hostnames (`*.local`) and masked API keys. Regenerate locally: `python scripts/capture_screenshots.py` (requires Playwright).
 
 ## Why NetDash?
 
