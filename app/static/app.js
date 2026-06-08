@@ -1436,11 +1436,96 @@ function updateEditMacVisibility() {
   wrap.classList.toggle('hidden', !$('#edit-wol-enabled')?.checked);
 }
 
+function clearEditIdentifyStatus() {
+  const status = $('#edit-identify-status');
+  if (!status) return;
+  status.classList.add('hidden');
+  status.textContent = '';
+  status.classList.remove('identify-status--ok', 'identify-status--warn');
+}
+
+function formatIdentifyConfidence(confidence) {
+  const key = `modal.edit.identifyConfidence.${confidence || 'low'}`;
+  const translated = t(key);
+  return translated === key ? confidence : translated;
+}
+
+async function identifyServiceEdit() {
+  const name = $('#edit-name')?.value.trim() || '';
+  const url = $('#edit-url')?.value.trim() || '';
+  if (!name && !url) {
+    alert(t('modal.edit.identifyNeedInput'));
+    return;
+  }
+
+  const btn = $('#edit-identify');
+  const status = $('#edit-identify-status');
+  const prevLabel = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t('modal.edit.identifyRunning');
+  }
+
+  try {
+    const result = await api('/api/services/identify', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: name || null,
+        url: url || null,
+        category: $('#edit-category')?.value.trim() || null,
+        icon: ($('#edit-icon')?.value || 'globe').toLowerCase(),
+        icon_url: $('#edit-icon-url')?.value.trim() || null,
+        description: $('#edit-description')?.value.trim() || null,
+        has_login: $('#edit-has-login')?.checked,
+      }),
+    });
+
+    const s = result.suggestion || {};
+    if (s.name) $('#edit-name').value = s.name;
+    if (s.url) $('#edit-url').value = s.url;
+    if (s.category) $('#edit-category').value = s.category;
+    if (s.icon) {
+      populateServiceIconSelect(s.icon);
+      $('#edit-icon').value = s.icon.toLowerCase();
+    }
+    if (s.icon_url !== undefined && s.icon_url !== null) $('#edit-icon-url').value = s.icon_url;
+    else if (s.icon_url === null && result.matched) $('#edit-icon-url').value = '';
+    if (s.description) $('#edit-description').value = s.description;
+    if (s.has_login !== undefined && s.has_login !== null) {
+      $('#edit-has-login').checked = !!s.has_login;
+    }
+    updateEditServiceIconPreview();
+
+    if (status) {
+      status.classList.remove('hidden', 'identify-status--ok', 'identify-status--warn');
+      if (result.matched) {
+        const fields = (result.changed_fields || []).join(', ') || '—';
+        status.textContent = t('modal.edit.identifySuccess', {
+          confidence: formatIdentifyConfidence(result.confidence),
+          fields,
+        });
+        status.classList.add('identify-status--ok');
+      } else {
+        status.textContent = t('modal.edit.identifyNoMatch');
+        status.classList.add('identify-status--warn');
+      }
+    }
+  } catch (err) {
+    alert(err.message || t('modal.edit.identifyError'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevLabel || t('modal.edit.identify');
+    }
+  }
+}
+
 function openServiceEditModal(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
   populateServiceCategorySuggestions();
   populateServiceIconSelect(svc.icon || 'globe');
+  clearEditIdentifyStatus();
   $('#edit-id').value = id;
   $('#edit-name').value = svc.name;
   $('#edit-url').value = svc.protocol === 'host' ? '' : (svc.url || '');
@@ -2511,6 +2596,7 @@ $('#scan-start').addEventListener('click', () => {
 
 $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
+$('#edit-identify')?.addEventListener('click', () => identifyServiceEdit());
 $('#edit-icon')?.addEventListener('change', updateEditServiceIconPreview);
 $('#edit-icon-url')?.addEventListener('input', updateEditServiceIconPreview);
 $('#edit-open-notes')?.addEventListener('click', () => {

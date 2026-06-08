@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.20" />
-  <script src="/static/i18n.js?v=1.3.20"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.21" />
+  <script src="/static/i18n.js?v=1.3.21"></script>
 </head>
 <body>
   <div id="app">
@@ -798,7 +798,11 @@ sol --udp-port 9
       <input type="hidden" id="edit-id" />
       <div class="field">
         <label for="edit-name" data-i18n="modal.edit.displayName">Nazwa wyświetlana</label>
-        <input type="text" id="edit-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
+        <div class="field-with-action">
+          <input type="text" id="edit-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
+          <button type="button" class="btn btn-ghost btn-sm" id="edit-identify" data-i18n="modal.edit.identify">Identyfikuj</button>
+        </div>
+        <p class="hint hidden" id="edit-identify-status" role="status"></p>
       </div>
       <div class="field">
         <label for="edit-url" data-i18n="modal.add.url">URL</label>
@@ -881,6 +885,6 @@ sol --udp-port 9
   </div>
   </div>
 
-  <script src="/static/app.js?v=1.3.20"></script>
+  <script src="/static/app.js?v=1.3.21"></script>
 </body>
 </html>

@@ -2341,11 +2341,12 @@ body.modal-open {
   user-select: none;
   background: none;
   border: none;
+  opacity: var(--card-watermark-opacity);
   transform: rotate(-8deg);
-  transform-origin: 100% 100%;
-  -webkit-mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
-  mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
-  font-size: clamp(4rem, 40%, 9rem);
+  transform-origin: 85% 85%;
+  -webkit-mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, transparent 60%);
+  mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, transparent 60%);
+  font-size: clamp(4rem, 90%, 9rem);
 }
 
 .service-card-watermark--img {
@@ -2356,16 +2357,18 @@ body.modal-open {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: var(--card-watermark-opacity);
+  object-position: 100% 100%;
+  background: none;
+  border: none;
+  display: block;
 }
 
 .service-card-watermark--letter {
   font-family: var(--font);
-  font-size: clamp(3.5rem, 36%, 8rem);
+  font-size: clamp(3.5rem, 90%, 8rem);
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.04em;
-  opacity: var(--card-watermark-opacity);
 }
 
 .service-card-watermark[class*="icon-"]::after {

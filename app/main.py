@@ -30,6 +30,7 @@ from app.scanner import (
     resolve_scan_cidr,
     parse_host_scan_ports,
     scan_network,
+    suggest_service_identity,
 )
 from app.arp_scan import lookup_mac_for_ip, scan_arp_network
 from app.wol import normalize_mac, send_magic_packet
@@ -60,6 +61,9 @@ from app.schemas import (
     ScanRequest,
     ScanStatus,
     ServiceCreate,
+    ServiceIdentifyRequest,
+    ServiceIdentifyResponse,
+    ServiceIdentifySuggestion,
     ServiceOut,
     ServiceUpdate,
     Token,
@@ -513,6 +517,32 @@ async def enrich_services(_: User = Depends(get_current_user)):
     mac_count = await enrich_mac_addresses()
     count = await enrich_all_services()
     return {"updated": count + mac_count}
+
+
+@app.post("/api/services/identify", response_model=ServiceIdentifyResponse)
+async def identify_service(
+    data: ServiceIdentifyRequest,
+    _: User = Depends(get_current_user),
+):
+    result = suggest_service_identity(
+        name=data.name,
+        url=data.url,
+        description=data.description,
+        category=data.category,
+        icon=data.icon,
+        icon_url=data.icon_url,
+        has_login=data.has_login,
+    )
+    return ServiceIdentifyResponse(
+        matched=bool(result["matched"]),
+        confidence=str(result["confidence"]),
+        matched_by=list(result["matched_by"]),
+        heuristics=list(result["heuristics"]),
+        changed_fields=list(result["changed_fields"]),
+        tags=list(result["tags"]),
+        note=result.get("note"),
+        suggestion=ServiceIdentifySuggestion(**result["suggestion"]),
+    )
 
 
 @app.get("/api/services", response_model=list[ServiceOut])
