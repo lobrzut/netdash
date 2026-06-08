@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.seed_demo_data import DEMO_KEYS, DEMO_NOTES, DEMO_SERVICES
 
-BASE = "http://127.0.0.1:8788"
+BASE = "http://127.0.0.1:8787"
 OUT_DIR = ROOT / "docs" / "screenshots"
 
 

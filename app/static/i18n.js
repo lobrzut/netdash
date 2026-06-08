@@ -1,11 +1,14 @@
 const SUPPORTED_LANGS = ['pl', 'en', 'de', 'uk'];
+const I18N_CACHE_BUST =
+  document.currentScript?.src?.split('v=')[1]?.split('&')[0] || Date.now();
 let translations = {};
 let currentLang = 'pl';
 
 async function loadLanguage(lang) {
   if (!SUPPORTED_LANGS.includes(lang)) lang = 'pl';
   if (!translations[lang]) {
-    const res = await fetch(`/static/i18n/${lang}.json`);
+    const res = await fetch(`/static/i18n/${lang}.json?v=${I18N_CACHE_BUST}`);
+    if (!res.ok) throw new Error(`i18n load failed: ${lang} (${res.status})`);
     translations[lang] = await res.json();
   }
   currentLang = lang;
