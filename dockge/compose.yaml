@@ -1,0 +1,33 @@
+# NetDash — Dockge stack compose
+# Repository: https://github.com/lobrzut/netdash
+#
+# Deploy (recommended):
+#   1. git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
+#   2. cp .env.example .env  &&  edit .env (secrets)
+#   3. Dockge → Scan Stacks Folder → stack "netdash" → Deploy
+#
+# Dockge auto-detects compose.yaml or docker-compose.yml in the stack folder.
+# This file mirrors the root compose with Dockge-oriented comments.
+#
+# IMPORTANT — Linux host only:
+#   network_mode: host is required for LAN scanning (ping/ARP on your /24).
+#   Do NOT add a ports: section — Docker refuses to start (host + ports conflict).
+#   On Windows/Mac Docker Desktop, host mode does not work; use docker-compose.dev.yml instead.
+
+services:
+  netdash:
+    build: .
+    container_name: netdash
+    restart: always
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    cap_add:
+      - NET_RAW
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

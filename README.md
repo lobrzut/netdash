@@ -66,6 +66,18 @@ Default login: values from `.env` → `NETDASH_DEFAULT_ADMIN_USER` / `NETDASH_DE
 
 Full step-by-step guide: **[DEPLOYMENT.md](DEPLOYMENT.md)**
 
+### Dockge (homelab)
+
+On a Linux host with [Dockge](https://github.com/louislam/dockge):
+
+```bash
+git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
+cd /opt/stacks/netdash && cp .env.example .env   # edit secrets
+```
+
+Dockge → **Scan Stacks Folder** → deploy stack **netdash**.  
+Requires `network_mode: host` (Linux only) for LAN scan — see **[dockge/README.md](dockge/README.md)**.
+
 ## Quick start
 
 ### Docker (recommended)
@@ -177,6 +189,7 @@ netdash/
 │   ├── vault.py      # Key encryption
 │   └── static/       # Frontend
 ├── deploy/           # install scripts, systemd, watchdog
+├── dockge/           # Dockge stack compose + deploy guide
 ├── docker-compose.yml
 ├── Dockerfile
 └── run.py

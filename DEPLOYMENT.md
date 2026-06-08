@@ -47,6 +47,40 @@ Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 
 ---
 
+## Deploy with Dockge
+
+[Dockge](https://github.com/louislam/dockge) manages compose stacks from `/opt/stacks`. NetDash includes a Dockge-ready compose in [`dockge/`](dockge/).
+
+**Requirements:** Linux Docker host (Dockge does not run on Windows). NetDash needs **`network_mode: host`** for LAN scanning — do not add a `ports:` section.
+
+### Step-by-step (GitHub clone)
+
+1. **Clone** into the Dockge stacks directory:
+   ```bash
+   git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
+   cd /opt/stacks/netdash
+   ```
+2. **Configure** secrets:
+   ```bash
+   cp .env.example .env
+   nano .env   # NETDASH_SECRET_KEY, NETDASH_DEFAULT_ADMIN_PASSWORD
+   ```
+3. **Dockge UI** → ⋮ → **Scan Stacks Folder** → open stack **netdash** → **Deploy**
+4. Open **http://&lt;server-ip&gt;:8787** and change the default password after login.
+
+Dockge auto-detects `docker-compose.yml` at the repo root. Optional Dockge filename: `cp dockge/compose.yaml compose.yaml`.
+
+### Alternative: new stack in Dockge UI
+
+1. Dockge → **+ Compose** → name: `netdash`
+2. Paste contents of [`dockge/compose.yaml`](dockge/compose.yaml)
+3. Create `/opt/stacks/netdash/.env` from [`.env.example`](.env.example)
+4. Clone the repo into `/opt/stacks/netdash/` so `build: .` resolves, then **Deploy**
+
+Details and caveats: **[dockge/README.md](dockge/README.md)**
+
+---
+
 ## Production stability
 
 NetDash on a Linux server includes several resilience layers:
@@ -184,6 +218,7 @@ Environment variables (also supported as `BRAIN_SSH_*` for backward compatibilit
 | `run.py` | ✓ | (in image) |
 | `start.ps1` / `start.sh` | ✓ | — |
 | `docker-compose.yml` | — | ✓ production (`network_mode: host`) |
+| `dockge/compose.yaml` | — | ✓ Dockge stack (same as production) |
 | `docker-compose.dev.yml` | optional (bridge test) | — |
 | `.env` | local secrets (gitignored) | separate secrets on server |
 | `data/netdash.db` | local database | volume `./data` |

@@ -1,0 +1,21 @@
+# Alias for Dockge / docker compose -f dockge/docker-compose.yml
+# Prefer compose.yaml in this folder (Dockge default filename).
+# See dockge/README.md and ../DEPLOYMENT.md
+
+services:
+  netdash:
+    build: .
+    container_name: netdash
+    restart: always
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    cap_add:
+      - NET_RAW
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
