@@ -9,32 +9,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from scripts.seed_demo_data import DEMO_KEYS, DEMO_NOTES, DEMO_SERVICES
+
 BASE = "http://127.0.0.1:8788"
 OUT_DIR = ROOT / "docs" / "screenshots"
 
-DEMO_SERVICES = [
-    {"name": "Jellyfin", "url": "http://media.local:8096", "host": "media.local", "port": 8096, "category": "Media", "icon": "jellyfin", "pinned": True, "has_login": True, "protocol": "http", "is_online": True, "auto_discovered": True},
-    {"name": "Grafana", "url": "http://monitor.local:3000", "host": "monitor.local", "port": 3000, "category": "Monitoring", "icon": "grafana", "pinned": True, "has_login": False, "protocol": "http", "is_online": True, "auto_discovered": True},
-    {"name": "Plex", "url": "http://media.local:32400", "host": "media.local", "port": 32400, "category": "Media", "icon": "plex", "pinned": True, "has_login": True, "protocol": "http", "is_online": False, "auto_discovered": True},
-    {"name": "n8n", "url": "http://automation.local:5678", "host": "automation.local", "port": 5678, "category": "Automation", "icon": "n8n", "pinned": True, "has_login": True, "protocol": "http", "is_online": True, "auto_discovered": True},
-    {"name": "Portainer", "url": "http://docker.local:9000", "host": "docker.local", "port": 9000, "category": "Docker", "icon": "docker", "pinned": False, "has_login": True, "protocol": "http", "is_online": True, "auto_discovered": True},
-    {"name": "Home Assistant", "url": "http://smart.local:8123", "host": "smart.local", "port": 8123, "category": "Smart Home", "icon": "homeassistant", "pinned": False, "has_login": True, "protocol": "http", "is_online": True, "auto_discovered": True},
-    {"name": "Proxmox", "url": "https://hypervisor.local:8006", "host": "hypervisor.local", "port": 8006, "category": "Virtualization", "icon": "proxmox", "pinned": False, "has_login": True, "protocol": "https", "is_online": True, "auto_discovered": True},
-]
-
-DEMO_KEYS = [
-    {"name": "Grafana API", "secret": "glsa_demo_key_masked_value", "service": "Grafana", "username": "admin", "notes": "Read-only dashboard", "pinned": True},
-    {"name": "Home Assistant", "secret": "eyJ_demo_token_value_here", "service": "HA", "notes": "Long-lived token", "pinned": False},
-]
-
-DEMO_NOTES = [
-    {"title": "Router config", "content": "**Gateway:** 192.168.1.1\n- WiFi: WPA3\n- VLAN 10: IoT", "color": "blue", "pinned": True},
-    {"title": "Backup schedule", "content": "Daily at 03:00 — NAS + cloud", "color": "green", "pinned": False},
-]
-
 
 async def seed_database() -> str:
-    from sqlalchemy import delete, select
+    from sqlalchemy import delete
 
     from app.auth import create_access_token
     from app.database import async_session
@@ -76,24 +58,27 @@ def capture_with_playwright(token: str) -> None:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     viewport = {"width": 1280, "height": 800}
+    init_script = f"""
+        window.localStorage.setItem('netdash_token', {json.dumps(token)});
+        window.localStorage.setItem('netdash_page', 'home');
+    """
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(viewport=viewport)
-        context.add_init_script(
-            f"window.localStorage.setItem('netdash_token', {json.dumps(token)});"
-        )
+        context.add_init_script(init_script)
         page = context.new_page()
         page.goto(BASE, wait_until="networkidle")
+        page.wait_for_selector("#dashboard-view:not(.hidden)", timeout=15000)
         page.wait_for_function(
             "() => document.querySelector('#nav-home-btn span')?.textContent !== 'nav.home'",
             timeout=15000,
         )
-        page.wait_for_selector("#dashboard-view:not(.hidden)", timeout=15000)
-        page.wait_for_timeout(1000)
+        page.wait_for_timeout(1500)
         page.screenshot(path=str(OUT_DIR / "dashboard.png"))
 
         page.click("#nav-services-btn")
+        page.wait_for_selector("#page-services", state="visible", timeout=5000)
         page.wait_for_timeout(800)
         page.screenshot(path=str(OUT_DIR / "services.png"))
 
@@ -102,11 +87,13 @@ def capture_with_playwright(token: str) -> None:
         page.wait_for_timeout(500)
         page.screenshot(path=str(OUT_DIR / "settings.png"))
 
-        context.clear_cookies()
-        page.evaluate("localStorage.removeItem('netdash_token')")
-        page.reload(wait_until="networkidle")
-        page.wait_for_timeout(500)
-        page.screenshot(path=str(OUT_DIR / "login.png"))
+        login_context = browser.new_context(viewport=viewport)
+        login_page = login_context.new_page()
+        login_page.goto(BASE, wait_until="networkidle")
+        login_page.wait_for_selector("#login-view:not(.hidden)", timeout=10000)
+        login_page.wait_for_timeout(500)
+        login_page.screenshot(path=str(OUT_DIR / "login.png"))
+        login_context.close()
 
         browser.close()
 

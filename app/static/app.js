@@ -311,21 +311,26 @@ function updateDockerScanWarning(netRes, settings) {
   el.classList.remove('hidden');
 }
 
-async function loadServices() {
-  const fresh = await api('/api/services');
-  services = fresh.map((s) => ({
+function normalizeService(s) {
+  return {
     ...s,
     has_login: !!s.has_login,
     is_online: s.is_online !== false,
     wol_enabled: !!s.wol_enabled,
-  }));
+    pinned: !!s.pinned,
+  };
+}
+
+async function loadServices() {
+  const fresh = await api('/api/services');
+  services = fresh.map(normalizeService);
   refreshServiceViews();
 }
 
 function refreshServiceViews() {
   updateStats();
   renderPinnedServices();
-  renderServices();
+  if (currentPage === 'services') renderServices();
 }
 
 async function loadDashboard() {
@@ -345,12 +350,7 @@ async function loadDashboard() {
   if (notesRes?.error) errors.push(`${t('error.api.notes')}: ${notesRes.error.message}`);
   if (errors.length === 4) throw new Error(errors.join('; '));
 
-  services = (svcRes?.error ? [] : svcRes).map((s) => ({
-    ...s,
-    has_login: !!s.has_login,
-    is_online: s.is_online !== false,
-    wol_enabled: !!s.wol_enabled,
-  }));
+  services = (svcRes?.error ? [] : svcRes).map(normalizeService);
   apiKeys = keysRes?.error ? [] : keysRes;
   notes = notesRes?.error ? [] : notesRes;
   appSettings = settings;
@@ -386,12 +386,7 @@ function startHealthPolling() {
     try {
       await api('/api/services/health-check', { method: 'POST' });
       const fresh = await api('/api/services');
-      services = fresh.map((s) => ({
-        ...s,
-        has_login: !!s.has_login,
-        is_online: s.is_online !== false,
-        wol_enabled: !!s.wol_enabled,
-      }));
+      services = fresh.map(normalizeService);
       refreshServiceViews();
     } catch {
       /* ignore background refresh errors */
@@ -1246,6 +1241,7 @@ function renderServiceIcon(s) {
 function renderPinnedServices() {
   const container = $('#pinned-container');
   const empty = $('#pinned-empty-state');
+  const title = $('#pinned-section-title');
   if (!container) return;
 
   const pinned = services
@@ -1254,10 +1250,12 @@ function renderPinnedServices() {
 
   if (pinned.length === 0) {
     container.innerHTML = '';
+    title?.classList.add('hidden');
     empty?.classList.remove('hidden');
     return;
   }
 
+  title?.classList.remove('hidden');
   empty?.classList.add('hidden');
   const gridClass = `services-grid services-grid--compact ${gridDensityClass()}`.trim();
   container.innerHTML = `<div class="${gridClass}">${pinned.map((s) => serviceCardHtml(s, { context: 'home' })).join('')}</div>`;
@@ -1271,11 +1269,7 @@ async function toggleServicePin(id) {
     method: 'PATCH',
     body: JSON.stringify({ pinned: !svc.pinned }),
   });
-  Object.assign(svc, updated, {
-    has_login: !!updated.has_login,
-    is_online: updated.is_online !== false,
-    wol_enabled: !!updated.wol_enabled,
-  });
+  Object.assign(svc, normalizeService(updated));
   refreshServiceViews();
 }
 
