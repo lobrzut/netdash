@@ -52,6 +52,7 @@
   "badge.login": "login",
   "badge.pin": "pin",
   "badge.offline": "offline",
+  "badge.error": "error",
   "action.pin": "Pin to home",
   "action.unpin": "Unpin from home",
   "modal.scan.title": "Network scan",

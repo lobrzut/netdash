@@ -18,6 +18,7 @@ from app.enrich import enrich_all_services, enrich_mac_addresses, should_auto_wo
 from app.health import check_all_services
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
+from app.url_utils import sanitize_service_url
 from app.scanner import (
     DiscoveredService,
     _fallback_service_name,
@@ -203,6 +204,20 @@ async def _ensure_local_host_service() -> None:
             await db.commit()
 
 
+async def _sanitize_stored_urls() -> None:
+    """Fix URLs corrupted with Python bytes repr (e.g. ?b'next=%2F')."""
+    async with async_session() as db:
+        result = await db.execute(select(Service))
+        changed = False
+        for svc in result.scalars().all():
+            clean = sanitize_service_url(svc.url)
+            if clean and svc.url != clean:
+                svc.url = clean
+                changed = True
+        if changed:
+            await db.commit()
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -221,6 +236,7 @@ async def init_db():
         await _get_or_create_settings(db)
 
     await _ensure_local_host_service()
+    await _sanitize_stored_urls()
     await enrich_mac_addresses()
     await enrich_all_services()
 
@@ -502,7 +518,16 @@ async def enrich_services(_: User = Depends(get_current_user)):
 @app.get("/api/services", response_model=list[ServiceOut])
 async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     result = await db.execute(select(Service).order_by(Service.pinned.desc(), Service.name))
-    return result.scalars().all()
+    services = result.scalars().all()
+    dirty = False
+    for svc in services:
+        clean = sanitize_service_url(svc.url)
+        if clean and svc.url != clean:
+            svc.url = clean
+            dirty = True
+    if dirty:
+        await db.commit()
+    return services
 
 
 @app.post("/api/services", response_model=ServiceOut)
@@ -610,7 +635,7 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
                     service.name = item.name
                     if item.health_detail:
                         service.health_detail = item.health_detail[:128]
-                service.url = item.url
+                service.url = sanitize_service_url(item.url)
                 service.protocol = item.protocol
                 service.category = item.category
                 service.icon = item.icon
@@ -634,7 +659,7 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
             db.add(
                 Service(
                     name=new_name,
-                    url=item.url,
+                    url=sanitize_service_url(item.url),
                     host=item.host,
                     port=item.port,
                     protocol=item.protocol,

@@ -5,12 +5,14 @@ import re
 import socket
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Awaitable, Callable
 
 import httpx
 
 from app.config import settings
 from app.icons import resolve_brand_icon, resolve_icon_url
+from app.url_utils import ensure_str, sanitize_service_url
 
 WEB_PORTS = [
     80, 81, 443, 3000, 4000, 4200, 4443, 5000, 5001, 8000, 8008,
@@ -125,7 +127,12 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
     (r"nextcloud", "Nextcloud", "cloud", "Pliki"),
     (r"synology", "Synology DSM", "nas", "NAS"),
     (r"truenas", "TrueNAS", "nas", "NAS"),
+    (r"qnap|qts|quts", "QNAP", "nas", "NAS"),
+    (r"unraid", "Unraid", "nas", "NAS"),
+    (r"open\s*media\s*vault|\bomv\b", "OpenMediaVault", "nas", "NAS"),
     (r"unifi", "UniFi", "wifi", "Sieć"),
+    (r"opnsense", "OPNsense", "router", "Sieć"),
+    (r"pfsense", "pfSense", "router", "Sieć"),
     (r"router", "Router", "router", "Sieć"),
     (r"openwrt", "OpenWrt", "router", "Sieć"),
     (r"gitlab", "GitLab", "git", "DevOps"),
@@ -148,7 +155,14 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
     (r"adguard", "AdGuard", "shield", "Sieć"),
     (r"n8n", "n8n", "workflow", "Automatyzacja"),
     (r"homebridge", "Homebridge", "home", "Smart Home"),
+    (r"esphome", "ESPHome", "home", "Smart Home"),
+    (r"zigbee2mqtt|zigbee", "Zigbee2MQTT", "home", "Smart Home"),
     (r"proxmox", "Proxmox", "server", "DevOps"),
+    (r"uptime\s*kuma", "Uptime Kuma", "chart", "Monitoring"),
+    (r"frigate", "Frigate", "home", "Smart Home"),
+    (r"audiobookshelf", "Audiobookshelf", "play", "Media"),
+    (r"photoprism", "PhotoPrism", "photo", "Media"),
+    (r"mosquitto", "Eclipse Mosquitto", "mqtt", "Automatyzacja"),
     (r"code-server", "code-server", "code", "Development"),
     (r"ollama", "Ollama", "ai", "AI"),
     (r"openwebui", "Open WebUI", "ai", "AI"),
@@ -175,11 +189,36 @@ PASSWORD_FIELD_RE = re.compile(
 LOGIN_KNOWN_SERVICES = {
     "Grafana", "Portainer", "Prometheus", "Home Assistant", "Plex", "Jellyfin",
     "Sonarr", "Radarr", "Prowlarr", "Nextcloud", "Synology DSM", "TrueNAS",
+    "QNAP", "Unraid", "OpenMediaVault",
     "UniFi", "GitLab", "GitHub Enterprise", "Gitea", "Jenkins", "HashiCorp Vault",
     "Vaultwarden", "Bitwarden", "Immich", "Paperless", "Pi-hole", "AdGuard",
-    "n8n", "Homebridge", "Proxmox", "code-server", "Ollama", "Open WebUI",
+    "n8n", "Homebridge", "ESPHome", "Zigbee2MQTT", "OPNsense", "pfSense",
+    "Proxmox", "Uptime Kuma", "Frigate", "code-server", "Ollama", "Open WebUI",
     "phpMyAdmin", "Adminer", "pgAdmin", "NetDash", "Homer", "qBittorrent",
     "Transmission", "MinIO",
+}
+
+SERVICE_HINT_TAGS: dict[str, list[str]] = {
+    "QNAP": ["nas", "storage", "qts"],
+    "Synology DSM": ["nas", "storage", "dsm"],
+    "TrueNAS": ["nas", "storage", "zfs"],
+    "OpenMediaVault": ["nas", "storage", "omv"],
+    "Unraid": ["nas", "docker", "storage"],
+    "OPNsense": ["firewall", "router", "network"],
+    "pfSense": ["firewall", "router", "network"],
+    "Zigbee2MQTT": ["smarthome", "zigbee", "mqtt"],
+    "ESPHome": ["smarthome", "iot"],
+    "Uptime Kuma": ["monitoring", "uptime"],
+}
+
+SERVICE_HINT_NOTES: dict[str, str] = {
+    "QNAP": "Panel zarządzania NAS (QTS/QuTS hero).",
+    "Synology DSM": "Panel zarządzania NAS Synology (DSM).",
+    "TrueNAS": "Panel zarządzania pamięcią masową TrueNAS.",
+    "OpenMediaVault": "Panel zarządzania NAS OpenMediaVault.",
+    "Unraid": "Panel serwera Unraid z usługami Docker/VM.",
+    "OPNsense": "Panel firewall/router OPNsense.",
+    "pfSense": "Panel firewall/router pfSense.",
 }
 
 
@@ -417,6 +456,126 @@ def _match_hints(text: str, hints: list[tuple[str, str, str, str]]) -> tuple[str
     return None
 
 
+def suggest_service_identity(
+    *,
+    name: str | None = None,
+    url: str | None = None,
+    description: str | None = None,
+    category: str | None = None,
+    icon: str | None = None,
+    icon_url: str | None = None,
+    has_login: bool | None = None,
+) -> dict[str, object]:
+    """Best-effort service identification from user-provided fields."""
+
+    raw_name = (name or "").strip()
+    raw_url = (url or "").strip()
+    raw_description = (description or "").strip()
+    safe_url = sanitize_service_url(raw_url)
+    parsed = urlparse(safe_url or raw_url)
+    host = (parsed.hostname or "").strip()
+    path = parsed.path or ""
+
+    probe_text = " ".join(
+        part for part in (raw_name, raw_description, safe_url, host, path, parsed.query) if part
+    )
+    hint = _match_hints(probe_text, TITLE_HINTS) if probe_text else None
+    matched_by: list[str] = []
+    heuristics: list[str] = []
+
+    suggested_name = raw_name
+    suggested_icon = (icon or "globe").lower()
+    suggested_category = (category or "Inne").strip() or "Inne"
+
+    if hint:
+        suggested_name, suggested_icon, suggested_category = hint
+        matched_by.append("title_or_url_signature")
+        heuristics.append("signature matching against known homelab brands")
+    elif raw_name:
+        suggested_name = re.sub(r"\s+", " ", raw_name).strip()
+        heuristics.append("input name normalization")
+
+    normalized_url = safe_url or raw_url
+    if normalized_url and normalized_url != raw_url:
+        matched_by.append("url_sanitization")
+        heuristics.append("URL cleanup via sanitize_service_url")
+
+    suggested_icon_url = icon_url
+    brand_icon = resolve_brand_icon(
+        suggested_name,
+        raw_name,
+        raw_description,
+        normalized_url,
+        host,
+    )
+    if brand_icon:
+        suggested_icon_url = brand_icon
+        matched_by.append("brand_icon_mapping")
+        heuristics.append("icon mapping from known brand slugs")
+
+    inferred_login = bool(has_login)
+    if (
+        suggested_name in LOGIN_KNOWN_SERVICES
+        or LOGIN_TITLE_RE.search(probe_text)
+        or LOGIN_PATH_RE.search(path)
+    ):
+        inferred_login = True
+        matched_by.append("login_inference")
+        heuristics.append("login inference from known services and auth patterns")
+
+    tags = SERVICE_HINT_TAGS.get(suggested_name, [])
+    note = SERVICE_HINT_NOTES.get(suggested_name)
+
+    suggested_description = raw_description or None
+    if note and not suggested_description:
+        suggested_description = note
+        matched_by.append("brand_note_template")
+        heuristics.append("brand-specific description template")
+
+    suggestion = {
+        "name": suggested_name or raw_name or None,
+        "url": normalized_url or None,
+        "category": suggested_category,
+        "icon": suggested_icon,
+        "icon_url": suggested_icon_url,
+        "description": suggested_description,
+        "has_login": inferred_login,
+    }
+
+    changed_fields: list[str] = []
+    if suggestion["name"] and suggestion["name"] != (raw_name or None):
+        changed_fields.append("name")
+    if suggestion["url"] and suggestion["url"] != (raw_url or None):
+        changed_fields.append("url")
+    if suggestion["category"] and suggestion["category"] != (category or "Inne"):
+        changed_fields.append("category")
+    if suggestion["icon"] and suggestion["icon"] != (icon or "globe").lower():
+        changed_fields.append("icon")
+    if suggestion["icon_url"] != icon_url:
+        changed_fields.append("icon_url")
+    if suggestion["description"] != (raw_description or None):
+        changed_fields.append("description")
+    if bool(suggestion["has_login"]) != bool(has_login):
+        changed_fields.append("has_login")
+
+    confidence = "low"
+    if "title_or_url_signature" in matched_by and "brand_icon_mapping" in matched_by:
+        confidence = "high"
+    elif hint or len(matched_by) >= 2:
+        confidence = "medium"
+
+    return {
+        "matched": bool(hint or brand_icon),
+        "confidence": confidence,
+        "matched_by": sorted(set(matched_by)),
+        "heuristics": heuristics,
+        "changed_fields": changed_fields,
+        "tags": tags,
+        "note": note,
+        "suggestion": suggestion,
+    }
+
+
 def _base_from_port(port: int) -> tuple[str, str, str]:
     return PORT_SIGNATURES.get(port, (f"Port {port}", "plug", "Inne"))
 
@@ -469,11 +628,13 @@ def _canonical_url(host: str, port: int, response: httpx.Response) -> str:
     final = response.url
     final_port = final.port or (443 if final.scheme == "https" else 80)
     if final_port == port:
-        path = str(final.path or "/")
-        if final.query:
-            path += f"?{final.query}"
+        path = ensure_str(final.path or "/")
+        query = ensure_str(final.query) if final.query else ""
+        if query:
+            path += f"?{query}"
         base = _build_url(host, port, final.scheme)
-        return base if path == "/" else f"{base}{path}"
+        url = base if path == "/" else f"{base}{path}"
+        return sanitize_service_url(url)
     return _build_url(host, port, final.scheme)
 
 

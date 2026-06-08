@@ -52,6 +52,7 @@
   "badge.login": "login",
   "badge.pin": "pin",
   "badge.offline": "offline",
+  "badge.error": "błąd",
   "action.pin": "Przypnij na pulpicie",
   "action.unpin": "Odepnij z pulpitu",
   "modal.scan.title": "Skanowanie sieci",

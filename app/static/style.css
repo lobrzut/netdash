@@ -55,7 +55,7 @@
   --glass-blur: blur(16px);
   --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --card-watermark-opacity: 0.06;
+  --card-watermark-opacity: 0.08;
 }
 
 [data-theme="ocean"] {
@@ -2328,60 +2328,60 @@ body.modal-open {
 
 .service-card-watermark {
   position: absolute;
-  right: -0.85rem;
-  bottom: -0.85rem;
-  width: 7.25rem;
-  height: 7.25rem;
+  right: -8%;
+  bottom: -8%;
+  width: 110%;
+  height: 110%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: calc(var(--card-watermark-opacity) + 0.01);
+  align-items: flex-end;
+  justify-content: flex-end;
   pointer-events: none;
   z-index: 0;
-  font-size: 5.9rem;
   line-height: 1;
   user-select: none;
-  transform: rotate(-18deg);
-  transform-origin: center;
-  mix-blend-mode: soft-light;
-  filter: saturate(0.85) contrast(1.05);
+  background: none;
+  border: none;
+  transform: rotate(-8deg);
+  transform-origin: 100% 100%;
+  -webkit-mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
+  mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
+  font-size: clamp(4rem, 40%, 9rem);
 }
 
 .service-card-watermark--img {
-  width: 6.65rem;
-  height: 6.65rem;
-  right: -0.25rem;
-  bottom: -0.25rem;
+  padding: 0;
 }
 
 .service-card-watermark--img img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0.95;
+  opacity: var(--card-watermark-opacity);
 }
 
 .service-card-watermark--letter {
   font-family: var(--font);
-  font-size: 5rem;
+  font-size: clamp(3.5rem, 36%, 8rem);
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.04em;
+  opacity: var(--card-watermark-opacity);
+}
+
+.service-card-watermark[class*="icon-"]::after {
+  opacity: var(--card-watermark-opacity);
 }
 
 .service-card--compact .service-card-watermark {
-  width: 5.2rem;
-  height: 5.2rem;
-  font-size: 4.2rem;
-}
-
-.service-card--compact .service-card-watermark--img {
-  width: 4.6rem;
-  height: 4.6rem;
+  width: 100%;
+  height: 100%;
+  right: -6%;
+  bottom: -6%;
+  font-size: clamp(3rem, 38%, 6.5rem);
 }
 
 .service-card--compact .service-card-watermark--letter {
-  font-size: 3.8rem;
+  font-size: clamp(2.75rem, 34%, 5.5rem);
 }
 
 .service-card.pinned {
@@ -2431,8 +2431,10 @@ body.modal-open {
   align-self: stretch;
   gap: 0.25rem;
   min-height: 1.125rem;
-  padding-right: 1.5rem;
+  padding-right: 2rem;
   box-sizing: border-box;
+  position: relative;
+  z-index: 2;
 }
 
 .badge {
@@ -2461,6 +2463,17 @@ body.modal-open {
   background: var(--blue-soft);
   color: #60a5fa;
   border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.badge-error,
+.service-error-badge {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .service-card.has-login {
@@ -2580,6 +2593,7 @@ body.modal-open {
   border-radius: 4px;
   font-size: 1rem;
   line-height: 1;
+  z-index: 3;
 }
 
 .service-card:hover .service-delete { opacity: 1; }
@@ -2623,6 +2637,15 @@ body.modal-open {
   background: rgba(107, 114, 128, 0.15);
   color: #9ca3af;
   border: 1px solid rgba(107, 114, 128, 0.25);
+}
+
+.service-card.has-auth-error {
+  border-color: rgba(239, 68, 68, 0.28);
+  box-shadow: var(--shadow-sm), inset 0 0 0 1px rgba(239, 68, 68, 0.1);
+}
+
+.service-card.has-auth-error:hover {
+  border-color: rgba(239, 68, 68, 0.38);
 }
 
 .service-actions {

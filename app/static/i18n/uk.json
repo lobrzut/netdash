@@ -52,6 +52,7 @@
   "badge.login": "login",
   "badge.pin": "pin",
   "badge.offline": "offline",
+  "badge.error": "помилка",
   "action.pin": "Закріпити на панелі",
   "action.unpin": "Відкріпити з панелі",
   "modal.scan.title": "Сканування мережі",

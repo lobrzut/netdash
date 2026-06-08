@@ -1071,6 +1071,45 @@ function serviceHealthError(s) {
   return '';
 }
 
+function serviceHealthBadge(s) {
+  const err = serviceHealthError(s);
+  if (!err) return '';
+  const code = err.match(/^(\d{3})\b/);
+  return code ? code[1] : t('badge.error');
+}
+
+function hasServiceAuthError(s) {
+  return !!(s.health_detail || isHttpErrorName(s.name));
+}
+
+function sanitizeServiceUrl(url) {
+  if (!url || url === '#') return url || '';
+  return String(url)
+    .replace(/\?b'([^']*)'/g, '?$1')
+    .replace(/\?b"([^"]*)"/g, '?$1')
+    .replace(/b'([^']*)'/g, '$1')
+    .replace(/b"([^"]*)"/g, '$1');
+}
+
+function formatServiceUrlDisplay(url) {
+  const full = sanitizeServiceUrl(url);
+  if (!full || full === '#') return { display: full, full };
+  try {
+    const u = new URL(full);
+    const base = `${u.protocol}//${u.host}${u.pathname}`;
+    if (u.search && u.search.length > 24) {
+      return { display: base, full };
+    }
+    return { display: full.replace(/\/$/, '') || full, full };
+  } catch {
+    const q = full.indexOf('?');
+    if (q > 0 && full.length - q > 24) {
+      return { display: full.slice(0, q), full };
+    }
+    return { display: full, full };
+  }
+}
+
 function serviceCardHtml(s, opts = {}) {
   const { context = 'services' } = opts;
   const compact = context === 'home' || appSettings.card_style === 'compact';
@@ -1082,15 +1121,19 @@ function serviceCardHtml(s, opts = {}) {
   const hasNotes = !!(s.service_notes && s.service_notes.trim());
   const canPower = isWolDevice(s);
   const powerContext = accessFilter === 'wol';
-  const cardUrl = isHostOnly ? '' : s.url;
-  const urlLabel = isHostOnly ? s.host : s.url;
+  const cardUrl = isHostOnly ? '' : sanitizeServiceUrl(s.url);
+  const urlInfo = isHostOnly ? { display: s.host, full: s.host } : formatServiceUrlDisplay(s.url);
   const pinTitle = s.pinned ? t('action.unpin') : t('action.pin');
+  const healthErr = serviceHealthError(s);
+  const hasAuthError = hasServiceAuthError(s);
+  const healthBadge = serviceHealthBadge(s);
   return `
-    <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}">
+    <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}">
       ${renderServiceWatermark(s)}
       <button class="service-delete" data-id="${s.id}" title="${t('modal.delete')}">&times;</button>
       <div class="service-top">
         <div class="service-badges">
+          ${hasAuthError ? `<span class="badge badge-error service-error-badge" title="${esc(healthErr)}">${esc(healthBadge)}</span>` : ''}
           ${s.has_login ? `<span class="badge badge-login">${t('badge.login')}</span>` : ''}
           ${!compact && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
           ${s.pinned ? `<span class="badge badge-pin">${t('badge.pin')}</span>` : ''}
@@ -1102,7 +1145,7 @@ function serviceCardHtml(s, opts = {}) {
         </div>
       </div>
       <div class="service-name">${esc(displayServiceName(s))}</div>
-      ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}">${esc(urlLabel)}</div>` : ''}
+      ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}" title="${esc(urlInfo.full)}">${esc(urlInfo.display)}</div>` : ''}
       ${showMeta ? `<div class="service-meta">
         ${!compact ? `<span class="service-category">${esc(s.category)}</span>` : ''}
         ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}

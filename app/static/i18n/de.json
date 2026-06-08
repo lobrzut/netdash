@@ -52,6 +52,7 @@
   "badge.login": "login",
   "badge.pin": "pin",
   "badge.offline": "offline",
+  "badge.error": "Fehler",
   "action.pin": "Auf Dashboard pinnen",
   "action.unpin": "Vom Dashboard lösen",
   "modal.scan.title": "Netzwerk-Scan",

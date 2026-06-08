@@ -45,6 +45,37 @@ class ServiceUpdate(BaseModel):
     broadcast_ip: str | None = None
 
 
+class ServiceIdentifyRequest(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    category: str | None = None
+    icon: str | None = None
+    icon_url: str | None = None
+    description: str | None = None
+    has_login: bool | None = None
+
+
+class ServiceIdentifySuggestion(BaseModel):
+    name: str | None = None
+    url: str | None = None
+    category: str | None = None
+    icon: str | None = None
+    icon_url: str | None = None
+    description: str | None = None
+    has_login: bool | None = None
+
+
+class ServiceIdentifyResponse(BaseModel):
+    matched: bool
+    confidence: str
+    matched_by: list[str] = Field(default_factory=list)
+    heuristics: list[str] = Field(default_factory=list)
+    changed_fields: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    note: str | None = None
+    suggestion: ServiceIdentifySuggestion
+
+
 class ServiceOut(BaseModel):
     id: int
     name: str
