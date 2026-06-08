@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.7" />
-  <script src="/static/i18n.js?v=1.3.4"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.9" />
+  <script src="/static/i18n.js?v=1.3.9"></script>
 </head>
 <body>
   <div id="app">
@@ -61,6 +61,14 @@
           <span id="app-subtitle" class="network-badge">—</span>
         </div>
       </div>
+      <nav class="header-nav" role="navigation" aria-label="Main">
+        <button type="button" id="nav-home-btn" class="header-nav-btn active" data-page="home">
+          <span data-i18n="nav.home">Pulpit</span>
+        </button>
+        <button type="button" id="nav-services-btn" class="header-nav-btn" data-page="services">
+          <span data-i18n="nav.services">Serwisy</span>
+        </button>
+      </nav>
       <div class="header-actions">
         <select id="lang-quick" class="lang-select" title="Language">
           <option value="pl">PL</option>
@@ -68,15 +76,15 @@
           <option value="de">DE</option>
           <option value="uk">UK</option>
         </select>
-        <button id="settings-btn" class="btn btn-ghost" data-i18n="nav.settings">⚙</button>
-        <button id="scan-btn" class="btn btn-accent">
+        <button id="settings-btn" class="btn btn-ghost btn-nav-settings"><span aria-hidden="true">⚙</span> <span data-i18n="nav.settings">Ustawienia</span></button>
+        <button id="scan-btn" class="btn btn-accent header-services-only">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
             <path d="M21 12a9 9 0 11-6.22-8.56"/>
             <polyline points="21 3 21 9 15 9"/>
           </svg>
           <span data-i18n="nav.scan">Skanuj sieć</span>
         </button>
-        <button id="add-btn" class="btn btn-ghost"><span data-i18n="nav.add">+ Dodaj</span></button>
+        <button id="add-btn" class="btn btn-ghost header-services-only"><span data-i18n="nav.add">+ Dodaj</span></button>
         <button id="logout-btn" class="btn btn-ghost" data-i18n="nav.logout">Wyloguj</button>
       </div>
     </header>
@@ -87,87 +95,103 @@
     </div>
 
     <main class="main">
-      <section class="widgets-row">
-        <div class="widget widget-clock" id="widget-clock">
-          <div class="widget-clock-time" id="clock-time">--:--</div>
-          <div class="widget-clock-date" id="clock-date">—</div>
-          <div class="widget-clock-net" id="clock-network">—</div>
-        </div>
+      <section id="page-home" class="app-page">
+        <section class="widgets-row">
+          <div class="widget widget-clock" id="widget-clock">
+            <div class="widget-clock-time" id="clock-time">--:--</div>
+            <div class="widget-clock-date" id="clock-date">—</div>
+            <div class="widget-clock-net" id="clock-network">—</div>
+          </div>
 
-        <div class="widget widget-vault" id="widget-vault">
-          <div class="widget-header">
-            <div class="widget-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-              <span data-i18n="widget.vault">Sejf API Keys</span>
+          <div class="widget widget-vault" id="widget-vault">
+            <div class="widget-header">
+              <div class="widget-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <span data-i18n="widget.vault">Sejf API Keys</span>
+              </div>
+              <button class="btn-icon" id="add-key-btn" data-i18n-title="widget.addKey" title="Dodaj klucz">+</button>
             </div>
-            <button class="btn-icon" id="add-key-btn" title="Dodaj klucz">+</button>
+            <div class="widget-search">
+              <input type="search" id="keys-search" data-i18n-placeholder="widget.search.keys" placeholder="Szukaj kluczy..." />
+            </div>
+            <div class="widget-body" id="keys-list"></div>
           </div>
-          <div class="widget-search">
-            <input type="search" id="keys-search" data-i18n-placeholder="widget.search.keys" placeholder="Szukaj kluczy..." />
-          </div>
-          <div class="widget-body" id="keys-list"></div>
-        </div>
 
-        <div class="widget widget-notes" id="widget-notes">
-          <div class="widget-header">
-            <div class="widget-title">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-              <span data-i18n="widget.notes">Notatki</span>
-              <span class="widget-count hidden" id="notes-count" aria-label="Liczba notatek"></span>
+          <div class="widget widget-notes" id="widget-notes">
+            <div class="widget-header">
+              <div class="widget-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                <span data-i18n="widget.notes">Notatki</span>
+                <span class="widget-count hidden" id="notes-count" aria-label="Liczba notatek"></span>
+              </div>
+              <button class="btn-icon" id="add-note-btn" data-i18n-title="widget.addNote" title="Dodaj notatkę">+</button>
             </div>
-            <button class="btn-icon" id="add-note-btn" title="Dodaj notatkę">+</button>
+            <div class="widget-search">
+              <input type="search" id="notes-search" data-i18n-placeholder="widget.search.notes" placeholder="Szukaj notatek..." />
+            </div>
+            <div class="widget-body notes-grid" id="notes-list"></div>
           </div>
-          <div class="widget-search">
-            <input type="search" id="notes-search" data-i18n-placeholder="widget.search.notes" placeholder="Szukaj notatek..." />
+        </section>
+
+        <h2 class="section-title" data-i18n="section.pinned">Przypięte serwisy</h2>
+        <div id="pinned-container"></div>
+        <div id="pinned-empty-state" class="empty-state empty-state--compact hidden">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
           </div>
-          <div class="widget-body notes-grid" id="notes-list"></div>
+          <h2 data-i18n="empty.pinned">Brak przypiętych serwisów</h2>
+          <p data-i18n="empty.pinned.hint">Przypnij serwisy klikając ★ na karcie w zakładce Serwisy.</p>
+          <button type="button" class="btn btn-ghost" id="goto-services-btn" data-i18n="empty.pinned.go">Przejdź do Serwisów</button>
         </div>
       </section>
 
-      <div id="stats" class="stats">
-        <div class="stat-card">
-          <span class="stat-value" id="stat-total">0</span>
-          <span class="stat-label" data-i18n="stat.services">Serwisy</span>
+      <section id="page-services" class="app-page hidden">
+        <div id="stats" class="stats stats-compact">
+          <div class="stat-card">
+            <span class="stat-value" id="stat-total">0</span>
+            <span class="stat-label" data-i18n="stat.services">Serwisy</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-online">0</span>
+            <span class="stat-label" data-i18n="stat.online">Online</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-login">0</span>
+            <span class="stat-label" data-i18n="stat.login">Z logowaniem</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-keys">0</span>
+            <span class="stat-label" data-i18n="stat.keys">Klucze API</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-notes">0</span>
+            <span class="stat-label" data-i18n="stat.notes">Notatki</span>
+          </div>
         </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-online">0</span>
-          <span class="stat-label" data-i18n="stat.online">Online</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-login">0</span>
-          <span class="stat-label" data-i18n="stat.login">Z logowaniem</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-keys">0</span>
-          <span class="stat-label" data-i18n="stat.keys">Klucze API</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-notes">0</span>
-          <span class="stat-label" data-i18n="stat.notes">Notatki</span>
-        </div>
-      </div>
 
-      <h2 class="section-title" data-i18n="section.services">Serwisy</h2>
-      <div class="filters-toolbar">
-        <div class="services-search">
-          <input type="search" id="services-search" data-i18n-placeholder="services.search" placeholder="Szukaj serwisów..." autocomplete="off" aria-label="Szukaj serwisów" />
+        <div class="filters-toolbar">
+          <div class="services-search">
+            <input type="search" id="services-search" data-i18n-placeholder="services.search" placeholder="Szukaj serwisów..." autocomplete="off" aria-label="Szukaj serwisów" />
+          </div>
+          <div id="access-filters" class="filters access-filters filters-segmented" role="group" aria-label="Access filter"></div>
+          <div id="category-filters" class="filters category-filters"></div>
+          <div id="network-filters" class="filters network-filters hidden" role="group" aria-label="Network filter"></div>
         </div>
-        <div id="access-filters" class="filters access-filters filters-segmented" role="group" aria-label="Access filter"></div>
-        <div id="category-filters" class="filters category-filters"></div>
-        <div id="network-filters" class="filters network-filters hidden" role="group" aria-label="Network filter"></div>
-      </div>
 
-      <div id="services-container"></div>
-      <div id="empty-state" class="empty-state hidden">
-        <div class="empty-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 12h8M12 8v8"/>
-          </svg>
+        <div id="services-container"></div>
+        <div id="empty-state" class="empty-state hidden">
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 12h8M12 8v8"/>
+            </svg>
+          </div>
+          <h2 id="empty-title" data-i18n="empty.services">Brak serwisów</h2>
+          <p id="empty-hint" data-i18n="empty.services.hint">Kliknij Skanuj sieć aby automatycznie wykryć serwisy w Twojej sieci lokalnej.</p>
         </div>
-        <h2 id="empty-title" data-i18n="empty.services">Brak serwisów</h2>
-        <p id="empty-hint" data-i18n="empty.services.hint">Kliknij Skanuj sieć aby automatycznie wykryć serwisy w Twojej sieci lokalnej.</p>
-      </div>
+      </section>
     </main>
     <footer class="footer">
       <span>NetDash <span id="app-version">—</span></span>
@@ -529,20 +553,20 @@ sol --udp-port 9
   <div id="scan-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
-      <h2>Skanowanie sieci</h2>
-      <p class="modal-desc">Podaj zakres sieci w formacie CIDR lub zostaw puste aby skanować lokalną sieć.</p>
+      <h2 data-i18n="modal.scan.title">Skanowanie sieci</h2>
+      <p class="modal-desc" data-i18n="modal.scan.desc">Podaj zakres sieci w formacie CIDR lub zostaw puste aby skanować lokalną sieć.</p>
       <div class="field">
-        <label for="cidr-input">Sieć (CIDR)</label>
-        <input type="text" id="cidr-input" placeholder="np. 192.168.1.0/24" />
+        <label for="cidr-input" data-i18n="modal.scan.cidr">Sieć (CIDR)</label>
+        <input type="text" id="cidr-input" data-i18n-placeholder="modal.scan.cidrPlaceholder" placeholder="np. 192.168.1.0/24" />
         <span class="hint" id="local-network-hint"></span>
       </div>
       <label class="checkbox-row">
         <input type="checkbox" id="full-scan" />
-        <span>Pełny skan (wszystkie porty — wolniejszy, więcej wyników)</span>
+        <span data-i18n="modal.scan.fullLong">Pełny skan (wszystkie porty — wolniejszy, więcej wyników)</span>
       </label>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="scan-cancel">Anuluj</button>
-        <button class="btn btn-accent" id="scan-start">Rozpocznij skan</button>
+        <button class="btn btn-ghost" id="scan-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button class="btn btn-accent" id="scan-start" data-i18n="modal.scan.start">Rozpocznij skan</button>
       </div>
     </div>
   </div>
@@ -551,16 +575,16 @@ sol --udp-port 9
   <div id="key-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
-      <h2 id="key-modal-title">Dodaj klucz API</h2>
+      <h2 id="key-modal-title" data-i18n="modal.add.key">Dodaj klucz API</h2>
       <input type="hidden" id="key-edit-id" />
       <div class="field-row">
         <div class="field">
-          <label for="key-name">Nazwa</label>
-          <input type="text" id="key-name" placeholder="np. OpenAI Production" />
+          <label for="key-name" data-i18n="modal.key.name">Nazwa</label>
+          <input type="text" id="key-name" data-i18n-placeholder="modal.key.namePlaceholder" placeholder="np. OpenAI Production" />
         </div>
         <div class="field">
-          <label for="key-service">Serwis</label>
-          <input type="text" id="key-service" placeholder="np. OpenAI" list="service-suggestions" />
+          <label for="key-service" data-i18n="modal.key.service">Serwis</label>
+          <input type="text" id="key-service" data-i18n-placeholder="modal.key.servicePlaceholder" placeholder="np. OpenAI" list="service-suggestions" />
           <datalist id="service-suggestions">
             <option value="OpenAI"><option value="Anthropic"><option value="GitHub">
             <option value="GitLab"><option value="Docker Hub"><option value="Cloudflare">
@@ -570,31 +594,31 @@ sol --udp-port 9
         </div>
       </div>
       <div class="field">
-        <label for="key-secret">Klucz / Token</label>
+        <label for="key-secret" data-i18n="modal.key.secret">Klucz / Token</label>
         <input type="password" id="key-secret" placeholder="sk-..." autocomplete="off" />
-        <span class="hint" id="key-secret-hint">Przy edycji zostaw puste aby nie zmieniać</span>
+        <span class="hint" id="key-secret-hint" data-i18n="modal.key.secretHint">Przy edycji zostaw puste aby nie zmieniać</span>
       </div>
       <div class="field-row">
         <div class="field">
-          <label for="key-username">Użytkownik (opcjonalnie)</label>
+          <label for="key-username" data-i18n="modal.key.username">Użytkownik (opcjonalnie)</label>
           <input type="text" id="key-username" placeholder="login / client id" />
         </div>
         <div class="field">
-          <label for="key-url">URL (opcjonalnie)</label>
+          <label for="key-url" data-i18n="modal.key.url">URL (opcjonalnie)</label>
           <input type="url" id="key-url" placeholder="https://..." />
         </div>
       </div>
       <div class="field">
-        <label for="key-notes">Notatka</label>
-        <textarea id="key-notes" rows="2" placeholder="Do czego służy ten klucz..."></textarea>
+        <label for="key-notes" data-i18n="modal.key.notes">Notatka</label>
+        <textarea id="key-notes" rows="2" placeholder=""></textarea>
       </div>
       <label class="checkbox-row">
         <input type="checkbox" id="key-pinned" />
-        <span>Przypnij na górze</span>
+        <span data-i18n="modal.key.pin">Przypnij na górze</span>
       </label>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="key-cancel">Anuluj</button>
-        <button class="btn btn-primary" id="key-save">Zapisz</button>
+        <button class="btn btn-ghost" id="key-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button class="btn btn-primary" id="key-save" data-i18n="modal.save">Zapisz</button>
       </div>
     </div>
   </div>
@@ -603,37 +627,37 @@ sol --udp-port 9
   <div id="note-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-wide">
-      <h2 id="note-modal-title">Nowa notatka</h2>
+      <h2 id="note-modal-title" data-i18n="modal.add.note">Nowa notatka</h2>
       <input type="hidden" id="note-edit-id" />
       <div class="field-row">
         <div class="field field-grow">
-          <label for="note-title">Tytuł</label>
-          <input type="text" id="note-title" placeholder="np. Konfiguracja NAS" />
+          <label for="note-title" data-i18n="modal.note.title">Tytuł</label>
+          <input type="text" id="note-title" data-i18n-placeholder="modal.note.titlePlaceholder" placeholder="np. Konfiguracja NAS" />
         </div>
         <div class="field field-color">
-          <label for="note-color">Kolor</label>
+          <label for="note-color" data-i18n="modal.note.color">Kolor</label>
           <select id="note-color">
-            <option value="green">Zielony</option>
-            <option value="red">Czerwony</option>
-            <option value="blue">Niebieski</option>
-            <option value="yellow">Żółty</option>
-            <option value="purple">Fioletowy</option>
+            <option value="green" data-i18n="modal.note.color.green">Zielony</option>
+            <option value="red" data-i18n="modal.note.color.red">Czerwony</option>
+            <option value="blue" data-i18n="modal.note.color.blue">Niebieski</option>
+            <option value="yellow" data-i18n="modal.note.color.yellow">Żółty</option>
+            <option value="purple" data-i18n="modal.note.color.purple">Fioletowy</option>
           </select>
         </div>
       </div>
       <div class="field">
-        <label for="note-content">Treść</label>
-        <textarea id="note-content" rows="8" placeholder="Komendy, hasła do infrastruktury, TODO...&#10;&#10;Obsługiwany prosty markdown: **pogrubienie**, `kod`, listy -"></textarea>
+        <label for="note-content" data-i18n="modal.note.content">Treść</label>
+        <textarea id="note-content" rows="8" data-i18n-placeholder="modal.note.contentPlaceholder" placeholder=""></textarea>
       </div>
       <label class="checkbox-row">
         <input type="checkbox" id="note-pinned" />
-        <span>Przypnij</span>
+        <span data-i18n="modal.note.pin">Przypnij</span>
       </label>
       <div class="modal-actions">
-        <button class="btn btn-ghost hidden" id="note-delete">Usuń</button>
+        <button class="btn btn-ghost hidden" id="note-delete" data-i18n="modal.delete">Usuń</button>
         <div style="flex:1"></div>
-        <button class="btn btn-ghost" id="note-cancel">Anuluj</button>
-        <button class="btn btn-primary" id="note-save">Zapisz</button>
+        <button class="btn btn-ghost" id="note-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button class="btn btn-primary" id="note-save" data-i18n="modal.save">Zapisz</button>
       </div>
     </div>
   </div>
@@ -707,7 +731,7 @@ sol --udp-port 9
       <p class="hint sol-script-security" data-i18n="settings.sol.scripts.security">Wymaga uprawnień administratora. Zapora musi zezwalać na UDP z podsieci serwera NetDash. W BIOS włącz Wake-on-LAN (dla przycisku ⚡).</p>
       <div class="modal-actions">
         <div style="flex:1"></div>
-        <button type="button" class="btn btn-ghost" id="sol-script-modal-close" data-i18n="modal.cancel">Zamknij</button>
+        <button type="button" class="btn btn-ghost" id="sol-script-modal-close" data-i18n="modal.close">Zamknij</button>
       </div>
     </div>
   </div>
@@ -716,27 +740,27 @@ sol --udp-port 9
   <div id="add-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
-      <h2>Dodaj serwis</h2>
+      <h2 data-i18n="modal.add.service">Dodaj serwis</h2>
       <div class="field">
-        <label for="add-name">Nazwa</label>
-        <input type="text" id="add-name" placeholder="np. Grafana" />
+        <label for="add-name" data-i18n="modal.add.name">Nazwa</label>
+        <input type="text" id="add-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
       </div>
       <div class="field">
-        <label for="add-url">URL</label>
-        <input type="url" id="add-url" placeholder="https://192.168.1.10:3000" />
+        <label for="add-url" data-i18n="modal.add.url">URL</label>
+        <input type="url" id="add-url" data-i18n-placeholder="modal.add.urlPlaceholder" placeholder="https://192.168.1.10:3000" />
       </div>
       <div class="field">
-        <label for="add-category">Kategoria</label>
-        <input type="text" id="add-category" value="Inne" />
+        <label for="add-category" data-i18n="modal.add.category">Kategoria</label>
+        <input type="text" id="add-category" />
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" id="add-cancel">Anuluj</button>
-        <button class="btn btn-primary" id="add-save">Zapisz</button>
+        <button class="btn btn-ghost" id="add-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button class="btn btn-primary" id="add-save" data-i18n="modal.save">Zapisz</button>
       </div>
     </div>
   </div>
   </div>
 
-  <script src="/static/app.js?v=1.3.4"></script>
+  <script src="/static/app.js?v=1.3.9"></script>
 </body>
 </html>

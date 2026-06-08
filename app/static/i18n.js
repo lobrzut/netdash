@@ -22,6 +22,35 @@ function t(key, vars = {}) {
   return str;
 }
 
+const API_ERROR_MAP = {
+  'Błędny login lub hasło': 'login.error',
+  'Nieprawidłowe dane logowania': 'login.error',
+  'Błędne aktualne hasło': 'settings.password.error.wrong',
+  'Nieprawidłowy format pliku kopii zapasowej': 'settings.backup.error.invalidFormat',
+  'Serwis nie znaleziony': 'error.serviceNotFound',
+  'Klucz nie znaleziony': 'error.keyNotFound',
+  'Notatka nie znaleziona': 'error.noteNotFound',
+  'Skanowanie już trwa — poczekaj na zakończenie': 'error.scanInProgress',
+  'Skan nie znaleziony': 'error.scanNotFound',
+  'WoL nie jest skonfigurowane dla tego serwisu': 'error.wolNotConfigured',
+  'Sleep-on-LAN nie jest skonfigurowane dla tego serwisu': 'error.solNotConfigured',
+  'Skan ARP jest wyłączony w ustawieniach': 'error.arpDisabled',
+};
+
+function translateApiDetail(detail) {
+  if (!detail || typeof detail !== 'string') return detail;
+  const exact = API_ERROR_MAP[detail];
+  if (exact) return t(exact);
+  if (detail.startsWith('Nieobsługiwana wersja kopii zapasowej:')) {
+    const version = detail.slice('Nieobsługiwana wersja kopii zapasowej:'.length).trim();
+    return t('error.backupUnsupportedVersion', { version });
+  }
+  if (detail.startsWith('Nie udało się wysłać pakietu WoL:')) return t('action.wolFailed');
+  if (detail.startsWith('Nie udało się wysłać pakietu SOL:')) return t('action.sleepFailed');
+  if (detail.startsWith('Skan ARP nie powiódł się:')) return t('settings.arpScan.failed');
+  return detail;
+}
+
 function applyI18n() {
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     const key = el.dataset.i18n;
@@ -32,5 +61,8 @@ function applyI18n() {
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
   });
 }

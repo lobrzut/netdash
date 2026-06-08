@@ -15,6 +15,7 @@ let scanPollInterval = null;
 let healthPollInterval = null;
 let clockInterval = null;
 let revealedKeys = new Set();
+let currentPage = 'home';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -33,7 +34,7 @@ async function api(path, options = {}) {
     if (Array.isArray(detail)) {
       detail = detail.map((d) => d.msg || d).join(', ');
     }
-    throw new Error(detail || `HTTP ${res.status}`);
+    throw new Error(translateApiDetail(detail) || `HTTP ${res.status}`);
   }
   if (res.status === 204) return null;
   return res.json();
@@ -75,10 +76,10 @@ function handleDashboardLoadError(err) {
   token = null;
   localStorage.removeItem('netdash_token');
   showView('login-view');
-  showLoginError(
-    `Nie udało się załadować dashboardu: ${err?.message || 'nieznany błąd'}. ` +
-    `Użyj http://${location.hostname}:8787 i odśwież stronę (Ctrl+Shift+R).`
-  );
+  showLoginError(t('error.dashboardLoad', {
+    detail: err?.message || t('error.unknown'),
+    host: location.hostname,
+  }));
 }
 
 function formatVersion(version) {
@@ -115,7 +116,7 @@ async function checkServerHealth() {
     const res = await fetch('/api/health');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    if (!data.ok) throw new Error('Serwer nie odpowiada poprawnie');
+    if (!data.ok) throw new Error(t('error.serverHealth'));
     appVersion = data.version || null;
     buildDate = data.build_date || null;
     if (data.github) githubRepo = data.github;
@@ -123,10 +124,7 @@ async function checkServerHealth() {
     $('#login-error').classList.add('hidden');
     return data;
   } catch (err) {
-    showLoginError(
-      `Brak połączenia z NetDash na tym adresie. Sprawdź czy serwer działa ` +
-      `(http://${location.hostname}:8787) — ${err.message}`
-    );
+    showLoginError(t('error.noConnection', { host: location.hostname, detail: err.message }));
     return null;
   }
 }
@@ -148,7 +146,8 @@ async function setLanguage(lang) {
   $('#lang-quick').value = lang;
   $('#settings-language').value = lang;
   renderAccessFilters();
-  renderServices();
+  if (currentPage === 'home') renderPinnedServices();
+  else renderServices();
   renderKeys();
   renderNotes();
 }
@@ -194,9 +193,26 @@ function applyLayout() {
   $('#widget-clock')?.classList.toggle('hidden', appSettings.show_clock === false);
   $('#widget-vault')?.classList.toggle('hidden', appSettings.show_vault === false);
   $('#widget-notes')?.classList.toggle('hidden', appSettings.show_notes === false);
-  $('#stats')?.classList.toggle('hidden', appSettings.show_stats === false);
+  const showStats = appSettings.show_stats !== false && currentPage === 'services';
+  $('#stats')?.classList.toggle('hidden', !showStats);
   $('#category-filters')?.classList.toggle('hidden', appSettings.show_category_filters === false);
+  document.querySelectorAll('.header-services-only').forEach((el) => {
+    el.classList.toggle('hidden', currentPage !== 'services');
+  });
   updateFooterNetwork();
+}
+
+function navigateTo(page) {
+  if (page !== 'home' && page !== 'services') return;
+  currentPage = page;
+  localStorage.setItem('netdash_page', page);
+  $('#page-home')?.classList.toggle('hidden', page !== 'home');
+  $('#page-services')?.classList.toggle('hidden', page !== 'services');
+  $('#nav-home-btn')?.classList.toggle('active', page === 'home');
+  $('#nav-services-btn')?.classList.toggle('active', page === 'services');
+  applyLayout();
+  if (page === 'home') renderPinnedServices();
+  else renderServices();
 }
 
 function updateAboutPreview() {
@@ -237,7 +253,7 @@ function updateAccentHex() {
 function applyTheme() {
   const hex = appSettings.accent_color || '#22c55e';
   setAccentColor(hex);
-  document.title = `${appSettings.title || 'NetDash'} — Network Dashboard`;
+  document.title = `${appSettings.title || 'NetDash'} — ${t('app.titleSuffix')}`;
   $('#app-title').textContent = appSettings.title || 'NetDash';
   $('#login-title').textContent = appSettings.title || 'NetDash';
   $('#app-subtitle').textContent = appSettings.subtitle || t('app.tagline');
@@ -303,7 +319,12 @@ async function loadServices() {
     is_online: s.is_online !== false,
     wol_enabled: !!s.wol_enabled,
   }));
+  refreshServiceViews();
+}
+
+function refreshServiceViews() {
   updateStats();
+  renderPinnedServices();
   renderServices();
 }
 
@@ -318,10 +339,10 @@ async function loadDashboard() {
   ]);
 
   const errors = [];
-  if (svcRes?.error) errors.push(`serwisy: ${svcRes.error.message}`);
-  if (netRes?.error) errors.push(`sieć: ${netRes.error.message}`);
-  if (keysRes?.error) errors.push(`klucze: ${keysRes.error.message}`);
-  if (notesRes?.error) errors.push(`notatki: ${notesRes.error.message}`);
+  if (svcRes?.error) errors.push(`${t('error.api.services')}: ${svcRes.error.message}`);
+  if (netRes?.error) errors.push(`${t('error.api.network')}: ${netRes.error.message}`);
+  if (keysRes?.error) errors.push(`${t('error.api.keys')}: ${keysRes.error.message}`);
+  if (notesRes?.error) errors.push(`${t('error.api.notes')}: ${notesRes.error.message}`);
   if (errors.length === 4) throw new Error(errors.join('; '));
 
   services = (svcRes?.error ? [] : svcRes).map((s) => ({
@@ -338,23 +359,21 @@ async function loadDashboard() {
   applyTheme();
 
   if (netRes?.error) {
-    showDashboardError(`Częściowy błąd API: ${errors.join('; ')}`);
+    showDashboardError(t('error.partialApi', { errors: errors.join('; ') }));
   } else {
     window.__netdashNetwork = netRes;
     const netLabel = `${netRes.local_ip} · ${netRes.local_network}`;
     updateFooterNetwork(netLabel);
     $('#clock-network').textContent = netLabel;
-    $('#local-network-hint').textContent = `Lokalna sieć: ${netRes.local_network}`;
+    $('#local-network-hint').textContent = t('hint.localNetwork', { network: netRes.local_network });
     $('#cidr-input').placeholder = netRes.local_network;
     updateDockerScanWarning(netRes, settings);
   }
 
   $('#full-scan').checked = !!settings.full_scan_default;
   if (settings.scan_cidr_default) $('#cidr-input').placeholder = settings.scan_cidr_default;
-  renderServices();
-  renderKeys();
-  renderNotes();
   updateStats();
+  navigateTo(localStorage.getItem('netdash_page') || 'home');
   startClock();
   startHealthPolling();
 }
@@ -373,8 +392,7 @@ function startHealthPolling() {
         is_online: s.is_online !== false,
         wol_enabled: !!s.wol_enabled,
       }));
-      updateStats();
-      renderServices();
+      refreshServiceViews();
     } catch {
       /* ignore background refresh errors */
     }
@@ -393,8 +411,9 @@ function startClock() {
   if (clockInterval) clearInterval(clockInterval);
   const tick = () => {
     const now = new Date();
-    $('#clock-time').textContent = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    $('#clock-date').textContent = now.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const locale = DATE_LOCALES[currentLang] || 'en-GB';
+    $('#clock-time').textContent = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    $('#clock-date').textContent = now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   };
   tick();
   clockInterval = setInterval(tick, 1000);
@@ -484,10 +503,10 @@ function renderKeys() {
         ${k.notes ? `<div class="key-meta">${esc(k.notes)}</div>` : ''}
       </div>
       <div class="key-actions">
-        <button class="btn-icon btn-icon-sm key-copy" title="Kopiuj" data-id="${k.id}">⎘</button>
-        <button class="btn-icon btn-icon-sm key-reveal" title="${revealed ? 'Ukryj' : 'Pokaż'}" data-id="${k.id}">${revealed ? '◉' : '◎'}</button>
-        <button class="btn-icon btn-icon-sm key-edit" title="Edytuj" data-id="${k.id}">✎</button>
-        <button class="btn-icon btn-icon-sm key-delete" title="Usuń" data-id="${k.id}">×</button>
+        <button class="btn-icon btn-icon-sm key-copy" title="${t('action.copy')}" data-id="${k.id}">⎘</button>
+        <button class="btn-icon btn-icon-sm key-reveal" title="${revealed ? t('action.hide') : t('action.show')}" data-id="${k.id}">${revealed ? '◉' : '◎'}</button>
+        <button class="btn-icon btn-icon-sm key-edit" title="${t('action.edit')}" data-id="${k.id}">✎</button>
+        <button class="btn-icon btn-icon-sm key-delete" title="${t('modal.delete')}" data-id="${k.id}">×</button>
       </div>
     </div>`;
   }).join('');
@@ -597,7 +616,7 @@ function renderNotes() {
 
 function openKeyModal(editId = null) {
   $('#key-edit-id').value = editId || '';
-  $('#key-modal-title').textContent = editId ? 'Edytuj klucz API' : 'Dodaj klucz API';
+  $('#key-modal-title').textContent = editId ? t('modal.edit.key') : t('modal.add.key');
   $('#key-secret-hint').classList.toggle('hidden', !editId);
 
   if (editId) {
@@ -625,7 +644,7 @@ function openKeyModal(editId = null) {
 
 function openNoteModal(editId = null) {
   $('#note-edit-id').value = editId || '';
-  $('#note-modal-title').textContent = editId ? 'Edytuj notatkę' : 'Nowa notatka';
+  $('#note-modal-title').textContent = editId ? t('modal.edit.note') : t('modal.add.note');
   $('#note-delete').classList.toggle('hidden', !editId);
 
   if (editId) {
@@ -648,7 +667,7 @@ async function saveKey() {
   const editId = $('#key-edit-id').value;
   const payload = {
     name: $('#key-name').value.trim(),
-    service: $('#key-service').value.trim() || 'Inne',
+    service: $('#key-service').value.trim() || t('modal.key.other'),
     username: $('#key-username').value.trim() || null,
     url: $('#key-url').value.trim() || null,
     notes: $('#key-notes').value.trim() || null,
@@ -1003,8 +1022,9 @@ function statusTooltip(s) {
   return since ? t('status.offlineSince', { time: since }) : t('status.offline');
 }
 
-function serviceCardHtml(s) {
-  const compact = appSettings.card_style === 'compact';
+function serviceCardHtml(s, opts = {}) {
+  const { context = 'services' } = opts;
+  const compact = context === 'home' || appSettings.card_style === 'compact';
   const isHostOnly = s.protocol === 'host' || s.port === 0;
   const showUrl = appSettings.show_service_urls !== false;
   const showPort = appSettings.show_ports !== false && !isHostOnly;
@@ -1015,6 +1035,7 @@ function serviceCardHtml(s) {
   const powerContext = accessFilter === 'wol';
   const cardUrl = isHostOnly ? '' : s.url;
   const urlLabel = isHostOnly ? s.host : s.url;
+  const pinTitle = s.pinned ? t('action.unpin') : t('action.pin');
   return `
     <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}">
       <button class="service-delete" data-id="${s.id}" title="${t('modal.delete')}">&times;</button>
@@ -1037,6 +1058,7 @@ function serviceCardHtml(s) {
         ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
       </div>` : ''}
       <div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
+        <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
         <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
         <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
         <button type="button" class="service-action service-sleep-btn ${canPower && s.is_online !== false ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && s.is_online !== false ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>
@@ -1053,6 +1075,12 @@ function bindServiceCards(root) {
       if (url && url !== '#') window.open(url, '_blank', 'noopener');
     });
   });
+  root.querySelectorAll('.service-pin-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await toggleServicePin(Number(btn.dataset.id));
+    });
+  });
   root.querySelectorAll('.service-notes-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1064,7 +1092,7 @@ function bindServiceCards(root) {
       e.stopPropagation();
       try {
         const res = await api(`/api/services/${btn.dataset.id}/wol`, { method: 'POST' });
-        alert(res.message || t('action.wolSent'));
+        alert(t('action.wolSent'));
       } catch (err) {
         alert(err.message || t('action.wolFailed'));
       }
@@ -1076,7 +1104,7 @@ function bindServiceCards(root) {
       if (!confirm(t('confirm.sleep'))) return;
       try {
         const res = await api(`/api/services/${btn.dataset.id}/sleep`, { method: 'POST' });
-        alert(res.message || t('action.sleepSent'));
+        alert(t('action.sleepSent'));
         await loadDashboard();
       } catch (err) {
         alert(err.message || t('action.sleepFailed'));
@@ -1215,6 +1243,42 @@ function renderServiceIcon(s) {
   return `<div class="service-icon ${getIconClass(s.icon)}"></div>`;
 }
 
+function renderPinnedServices() {
+  const container = $('#pinned-container');
+  const empty = $('#pinned-empty-state');
+  if (!container) return;
+
+  const pinned = services
+    .filter((s) => s.pinned)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  if (pinned.length === 0) {
+    container.innerHTML = '';
+    empty?.classList.remove('hidden');
+    return;
+  }
+
+  empty?.classList.add('hidden');
+  const gridClass = `services-grid services-grid--compact ${gridDensityClass()}`.trim();
+  container.innerHTML = `<div class="${gridClass}">${pinned.map((s) => serviceCardHtml(s, { context: 'home' })).join('')}</div>`;
+  bindServiceCards(container);
+}
+
+async function toggleServicePin(id) {
+  const svc = services.find((s) => s.id === id);
+  if (!svc) return;
+  const updated = await api(`/api/services/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pinned: !svc.pinned }),
+  });
+  Object.assign(svc, updated, {
+    has_login: !!updated.has_login,
+    is_online: updated.is_online !== false,
+    wol_enabled: !!updated.wol_enabled,
+  });
+  refreshServiceViews();
+}
+
 function renderServices() {
   normalizeFilterState();
   renderAccessFilters();
@@ -1325,18 +1389,18 @@ function closeModal(id) {
   unlockPageScroll();
 }
 
-const PHASE_LABELS = {
-  ping: 'Wykrywanie hostów',
-  ports: 'Skanowanie portów',
-  identify: 'Identyfikacja serwisów',
-  done: 'Zakończono',
+const SCAN_PHASE_KEYS = {
+  ping: 'scan.phase.ping',
+  ports: 'scan.phase.ports',
+  identify: 'scan.phase.identify',
+  done: 'scan.phase.done',
 };
 
 function formatScanStatus(status) {
-  const phase = PHASE_LABELS[status.progress_phase] || 'Skanowanie';
-  const network = status.cidr || 'lokalnej sieci';
+  const phase = t(SCAN_PHASE_KEYS[status.progress_phase] || 'scan.phase.default');
+  const network = status.cidr || t('scan.localNetwork');
   if (status.found_count > 0) {
-    return `${phase} · ${network} · znaleziono ${status.found_count}`;
+    return `${phase} · ${network} · ${t('scan.foundCount', { count: status.found_count })}`;
   }
   if (status.progress_total > 0 && status.progress_phase === 'ping') {
     const pct = Math.round((status.progress_current / status.progress_total) * 100);
@@ -1353,7 +1417,7 @@ async function startScan(cidr, fullScan = false) {
   closeModal('scan-modal');
   $('#scan-bar').classList.remove('hidden');
   $('#scan-btn').disabled = true;
-  $('#scan-status-text').textContent = `Rozpoczynanie skanu ${cidr || 'lokalnej sieci'}...`;
+  $('#scan-status-text').textContent = t('scan.starting', { network: cidr || t('scan.localNetwork') });
 
   let job;
   try {
@@ -1408,13 +1472,19 @@ $('#login-form').addEventListener('submit', async (e) => {
   try {
     await login($('#username').value, $('#password').value);
   } catch (err) {
-    showLoginError(err.message || 'Błąd logowania');
+    showLoginError(err.message || t('error.login'));
   }
 });
 
 $('#logout-btn').addEventListener('click', logout);
+$('#nav-home-btn')?.addEventListener('click', () => navigateTo('home'));
+$('#nav-services-btn')?.addEventListener('click', () => navigateTo('services'));
+$('#goto-services-btn')?.addEventListener('click', () => navigateTo('services'));
 $('#scan-btn').addEventListener('click', () => openModal('scan-modal'));
-$('#add-btn').addEventListener('click', () => openModal('add-modal'));
+$('#add-btn').addEventListener('click', () => {
+  $('#add-category').value = t('modal.key.other');
+  openModal('add-modal');
+});
 $('#services-search').addEventListener('input', (e) => {
   serviceSearch = e.target.value;
   renderServices();
@@ -1510,7 +1580,7 @@ function previewSettingsFromForm() {
   applyFavicon(appSettings.favicon_url);
   applyLayout();
   accessFilter = appSettings.default_access_filter || 'all';
-  renderServices();
+  refreshServiceViews();
 }
 
 ['settings-about-project', 'settings-author-name', 'settings-author-url'].forEach((id) => {
@@ -1631,7 +1701,7 @@ async function changePassword(currentPassword, newPassword) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `HTTP ${res.status}`);
+    throw new Error(translateApiDetail(err.detail) || `HTTP ${res.status}`);
   }
 }
 
@@ -2129,7 +2199,7 @@ $('#settings-cancel').addEventListener('click', () => {
     accessFilter = appSettings.default_access_filter || 'all';
   }
   applyTheme();
-  renderServices();
+  refreshServiceViews();
   closeModal('settings-modal');
   settingsSnapshot = null;
 });
@@ -2180,7 +2250,7 @@ $('#settings-save').addEventListener('click', async () => {
   if (newLang !== currentLang) await setLanguage(newLang);
   accessFilter = appSettings.default_access_filter || 'all';
   applyTheme();
-  renderServices();
+  refreshServiceViews();
   startHealthPolling();
   closeModal('settings-modal');
   settingsSnapshot = null;
@@ -2228,7 +2298,7 @@ $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#add-save').addEventListener('click', async () => {
   const name = $('#add-name').value.trim();
   const url = $('#add-url').value.trim();
-  const category = $('#add-category').value.trim() || 'Inne';
+  const category = $('#add-category').value.trim() || t('modal.key.other');
   if (!name || !url) return alert(t('alert.serviceFields'));
   await api('/api/services', {
     method: 'POST',
