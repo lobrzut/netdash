@@ -104,6 +104,7 @@ class NetworkInfo(BaseModel):
 class AppSettingsOut(BaseModel):
     title: str
     subtitle: str
+    theme: str = "midnight"
     accent_color: str
     language: str = "pl"
     author_name: str = "lobrzut"
@@ -145,6 +146,7 @@ class AppSettingsOut(BaseModel):
 class AppSettingsUpdate(BaseModel):
     title: str | None = None
     subtitle: str | None = None
+    theme: str | None = None
     accent_color: str | None = None
     language: str | None = None
     author_name: str | None = None

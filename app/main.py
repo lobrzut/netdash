@@ -122,6 +122,7 @@ def _migrate_db(sync_conn):
     if "app_settings" in tables:
         columns = {col["name"] for col in inspector.get_columns("app_settings")}
         settings_migrations = [
+            ("theme", "VARCHAR(16) DEFAULT 'midnight'"),
             ("language", "VARCHAR(8) DEFAULT 'pl'"),
             ("author_name", "VARCHAR(64) DEFAULT 'lobrzut'"),
             ("author_bio", "TEXT DEFAULT ''"),

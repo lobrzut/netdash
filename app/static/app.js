@@ -222,33 +222,43 @@ function navigateTo(page) {
   else renderServices();
 }
 
-function updateAboutPreview() {
-  const project = $('#settings-about-project')?.value?.trim() || '';
-  const author = $('#settings-author-name')?.value?.trim() || '';
-  const url = $('#settings-author-url')?.value?.trim() || '';
-  const projectEl = $('#settings-preview-project');
-  const authorEl = $('#settings-preview-author');
-  const linkEl = $('#settings-preview-url');
-  if (!projectEl) return;
-  projectEl.textContent = project || '—';
-  authorEl.textContent = author || '—';
-  if (url) {
-    linkEl.href = url;
-    linkEl.textContent = url;
-    linkEl.classList.remove('hidden');
-  } else {
-    linkEl.href = '#';
-    linkEl.textContent = '';
-    linkEl.classList.add('hidden');
-  }
-}
-
 function setAccentColor(hex) {
   document.documentElement.style.setProperty('--accent', hex);
   document.documentElement.style.setProperty('--accent-bright', hex);
   document.documentElement.style.setProperty('--accent-soft', `${hex}1f`);
   document.documentElement.style.setProperty('--accent-glow', `${hex}4d`);
   document.documentElement.style.setProperty('--highlight', hex);
+}
+
+const VALID_THEMES = ['midnight', 'ocean', 'ember', 'nord', 'light', 'homer'];
+const DEFAULT_THEME = 'midnight';
+
+function normalizeTheme(theme) {
+  return VALID_THEMES.includes(theme) ? theme : DEFAULT_THEME;
+}
+
+function applyDataTheme(theme) {
+  const t = normalizeTheme(theme);
+  document.documentElement.setAttribute('data-theme', t);
+  try {
+    localStorage.setItem('netdash_theme', t);
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
+function getSelectedTheme() {
+  const active = $('#settings-theme-picker .theme-card.active');
+  return normalizeTheme(active?.dataset.theme || appSettings.theme || DEFAULT_THEME);
+}
+
+function updateThemePickerSelection(theme) {
+  const t = normalizeTheme(theme);
+  $$('#settings-theme-picker .theme-card').forEach((btn) => {
+    const active = btn.dataset.theme === t;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
 }
 
 function updateAccentHex() {
@@ -258,6 +268,7 @@ function updateAccentHex() {
 }
 
 function applyTheme() {
+  applyDataTheme(appSettings.theme || DEFAULT_THEME);
   const hex = appSettings.accent_color || '#22c55e';
   setAccentColor(hex);
   document.title = `${appSettings.title || 'NetDash'} — ${t('app.titleSuffix')}`;
@@ -274,6 +285,7 @@ const DEFAULT_SETTINGS = {
   title: 'NetDash',
   subtitle: '',
   language: 'pl',
+  theme: 'midnight',
   accent_color: '#22c55e',
   show_vault: true,
   show_notes: true,
@@ -1495,6 +1507,7 @@ function readSettingsFromForm() {
   return {
     title: $('#settings-title').value.trim() || 'NetDash',
     subtitle: $('#settings-subtitle').value.trim(),
+    theme: getSelectedTheme(),
     accent_color: $('#settings-accent').value,
     footer_text: $('#settings-footer').value.trim(),
     language: $('#settings-language').value,
@@ -1533,6 +1546,7 @@ function readSettingsFromForm() {
 function fillSettingsForm() {
   $('#settings-title').value = appSettings.title || '';
   $('#settings-subtitle').value = appSettings.subtitle || '';
+  updateThemePickerSelection(appSettings.theme || DEFAULT_THEME);
   $('#settings-accent').value = appSettings.accent_color || '#22c55e';
   updateAccentHex();
   $('#settings-footer').value = appSettings.footer_text || '';
@@ -1542,7 +1556,6 @@ function fillSettingsForm() {
   $('#settings-author-name').value = appSettings.author_name || '';
   $('#settings-author-url').value = appSettings.author_url || '';
   $('#settings-about-project').value = appSettings.about_project || '';
-  updateAboutPreview();
   $('#settings-scan-cidr').value = appSettings.scan_cidr_default || '';
   updateDockerScanWarning(window.__netdashNetwork || null, appSettings);
   $('#settings-full-scan').checked = !!appSettings.full_scan_default;
@@ -1573,6 +1586,7 @@ function fillSettingsForm() {
 
 function previewSettingsFromForm() {
   appSettings = { ...appSettings, ...readSettingsFromForm() };
+  applyDataTheme(appSettings.theme || DEFAULT_THEME);
   setAccentColor(appSettings.accent_color || '#22c55e');
   updateAccentHex();
   $('#app-title').textContent = appSettings.title || 'NetDash';
@@ -1583,10 +1597,6 @@ function previewSettingsFromForm() {
   accessFilter = appSettings.default_access_filter || 'all';
   refreshServiceViews();
 }
-
-['settings-about-project', 'settings-author-name', 'settings-author-url'].forEach((id) => {
-  $('#' + id)?.addEventListener('input', updateAboutPreview);
-});
 
 let settingsSnapshot = null;
 
@@ -2193,6 +2203,14 @@ SETTINGS_PREVIEW_IDS.forEach((id) => {
 });
 
 $('#settings-accent')?.addEventListener('input', updateAccentHex);
+
+$('#settings-theme-picker')?.addEventListener('click', (e) => {
+  const card = e.target.closest('.theme-card');
+  if (!card) return;
+  updateThemePickerSelection(card.dataset.theme);
+  if ($('#settings-modal').classList.contains('hidden')) return;
+  previewSettingsFromForm();
+});
 
 $('#settings-cancel').addEventListener('click', () => {
   if (settingsSnapshot) {

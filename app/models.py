@@ -85,6 +85,7 @@ class AppSettings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String(64), default="NetDash")
     subtitle: Mapped[str] = mapped_column(String(256), default="Homelab dashboard z auto-wykrywaniem sieci")
+    theme: Mapped[str] = mapped_column(String(16), default="midnight")
     accent_color: Mapped[str] = mapped_column(String(16), default="#22c55e")
     language: Mapped[str] = mapped_column(String(8), default="pl")
     author_name: Mapped[str] = mapped_column(String(64), default="lobrzut")
