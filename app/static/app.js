@@ -196,8 +196,13 @@ function applyLayout() {
   const showStats = appSettings.show_stats !== false && currentPage === 'services';
   $('#stats')?.classList.toggle('hidden', !showStats);
   $('#category-filters')?.classList.toggle('hidden', appSettings.show_category_filters === false);
+  const onServices = currentPage === 'services';
+  const servicesSlot = document.querySelector('.header-actions-services');
+  if (servicesSlot) {
+    servicesSlot.setAttribute('aria-hidden', onServices ? 'false' : 'true');
+  }
   document.querySelectorAll('.header-services-only').forEach((el) => {
-    el.classList.toggle('hidden', currentPage !== 'services');
+    el.tabIndex = onServices ? 0 : -1;
   });
   updateFooterNetwork();
 }
@@ -206,11 +211,13 @@ function navigateTo(page) {
   if (page !== 'home' && page !== 'services') return;
   currentPage = page;
   localStorage.setItem('netdash_page', page);
+  $('#dashboard-view')?.setAttribute('data-page', page);
   $('#page-home')?.classList.toggle('hidden', page !== 'home');
   $('#page-services')?.classList.toggle('hidden', page !== 'services');
   $('#nav-home-btn')?.classList.toggle('active', page === 'home');
   $('#nav-services-btn')?.classList.toggle('active', page === 'services');
   applyLayout();
+  window.scrollTo(0, 0);
   if (page === 'home') renderPinnedServices();
   else renderServices();
 }

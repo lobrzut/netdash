@@ -7,7 +7,7 @@ One codebase, two runtime profiles. Repository: [lobrzut/netdash](https://github
 | **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
 | **Server / Docker** | Linux homelab server | `docker compose up -d` | http://&lt;server-ip&gt;:8787 |
 
-Application version: **1.3.10** (`app/config.py` → `VERSION`).
+Application version: **1.3.11** (`app/config.py` → `VERSION`).
 
 ---
 
@@ -102,7 +102,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:8787/api/health          # {"ok":true,"version":"1.3.10",...}
+curl -s http://127.0.0.1:8787/api/health          # {"ok":true,"version":"1.3.11",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```
