@@ -34,7 +34,7 @@ DEMO_NOTES = [
 
 
 async def seed_database() -> str:
-    from sqlalchemy import select
+    from sqlalchemy import delete, select
 
     from app.auth import create_access_token
     from app.database import async_session
@@ -42,16 +42,14 @@ async def seed_database() -> str:
     from app.vault import encrypt_secret
 
     async with async_session() as db:
-        existing = {s.name for s in (await db.execute(select(Service))).scalars()}
+        await db.execute(delete(Service))
+        await db.execute(delete(ApiKey))
+        await db.execute(delete(Note))
+
         for svc in DEMO_SERVICES:
-            if svc["name"] in existing:
-                continue
             db.add(Service(**svc))
 
-        existing_keys = {k.name for k in (await db.execute(select(ApiKey))).scalars()}
         for key in DEMO_KEYS:
-            if key["name"] in existing_keys:
-                continue
             secret = key["secret"]
             db.add(
                 ApiKey(
@@ -65,10 +63,7 @@ async def seed_database() -> str:
                 )
             )
 
-        existing_notes = {n.title for n in (await db.execute(select(Note))).scalars()}
         for note in DEMO_NOTES:
-            if note["title"] in existing_notes:
-                continue
             db.add(Note(**note))
 
         await db.commit()
@@ -90,6 +85,10 @@ def capture_with_playwright(token: str) -> None:
         )
         page = context.new_page()
         page.goto(BASE, wait_until="networkidle")
+        page.wait_for_function(
+            "() => document.querySelector('#nav-home-btn span')?.textContent !== 'nav.home'",
+            timeout=15000,
+        )
         page.wait_for_selector("#dashboard-view:not(.hidden)", timeout=15000)
         page.wait_for_timeout(1000)
         page.screenshot(path=str(OUT_DIR / "dashboard.png"))

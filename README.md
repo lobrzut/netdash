@@ -7,22 +7,16 @@
 
 **Homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer) — with automatic LAN service discovery.**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  NetDash                                    [Scan] [Settings]│
-├─────────────────────────────────────────────────────────────┤
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐    │
-│  │ Jellyfin │  │ Grafana  │  │  Plex    │  │  n8n     │    │
-│  │  :8096   │  │  :3000   │  │  :32400  │  │  :5678   │    │
-│  │  ● online│  │  ● online│  │  ○ offline│ │  ● online│    │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘    │
-│  Notes · API vault · Wake-on-LAN · i18n (EN/PL/DE/UK)       │
-└─────────────────────────────────────────────────────────────┘
-```
+![NetDash Dashboard](docs/screenshots/dashboard.png)
 
-> Add a real screenshot: save as `docs/screenshot.png` and uncomment the image line below.
->
-> `![NetDash Dashboard](docs/screenshot.png)`
+<details>
+<summary>More screenshots</summary>
+
+| Login | Services | Settings |
+|-------|----------|----------|
+| ![Login](docs/screenshots/login.png) | ![Services](docs/screenshots/services.png) | ![Settings](docs/screenshots/settings.png) |
+
+</details>
 
 ## Why NetDash?
 
