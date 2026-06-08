@@ -214,8 +214,11 @@ function navigateTo(page) {
   $('#dashboard-view')?.setAttribute('data-page', page);
   $('#page-home')?.classList.toggle('hidden', page !== 'home');
   $('#page-services')?.classList.toggle('hidden', page !== 'services');
-  $('#nav-home-btn')?.classList.toggle('active', page === 'home');
-  $('#nav-services-btn')?.classList.toggle('active', page === 'services');
+  document.querySelectorAll('.nav-segment-btn').forEach((btn) => {
+    const active = btn.dataset.page === page;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
   applyLayout();
   window.scrollTo(0, 0);
   if (page === 'home') renderPinnedServices();
@@ -1052,6 +1055,7 @@ function serviceCardHtml(s, opts = {}) {
   const pinTitle = s.pinned ? t('action.unpin') : t('action.pin');
   return `
     <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}">
+      ${renderServiceWatermark(s)}
       <button class="service-delete" data-id="${s.id}" title="${t('modal.delete')}">&times;</button>
       <div class="service-top">
         <div class="service-icon-wrap">
@@ -1072,6 +1076,7 @@ function serviceCardHtml(s, opts = {}) {
         ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
       </div>` : ''}
       <div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
+        ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
         <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
         <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
@@ -1087,6 +1092,12 @@ function bindServiceCards(root) {
       if (e.target.closest('.service-delete, .service-action')) return;
       const url = card.dataset.url;
       if (url && url !== '#') window.open(url, '_blank', 'noopener');
+    });
+  });
+  root.querySelectorAll('.service-edit-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openServiceEditModal(Number(btn.dataset.id));
     });
   });
   root.querySelectorAll('.service-pin-btn').forEach((btn) => {
@@ -1257,6 +1268,21 @@ function renderServiceIcon(s) {
   return `<div class="service-icon ${getIconClass(s.icon)}"></div>`;
 }
 
+function renderServiceWatermark(s) {
+  if (s.icon_url) {
+    return `<div class="service-card-watermark service-card-watermark--img" aria-hidden="true"><img src="${esc(s.icon_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`;
+  }
+  const icon = (s.icon || '').trim();
+  if (icon && icon !== 'globe') {
+    return `<div class="service-card-watermark ${getIconClass(icon)}" aria-hidden="true"></div>`;
+  }
+  const letter = (s.name || '').trim().charAt(0);
+  if (letter) {
+    return `<div class="service-card-watermark service-card-watermark--letter" aria-hidden="true">${esc(letter.toUpperCase())}</div>`;
+  }
+  return `<div class="service-card-watermark icon-globe" aria-hidden="true"></div>`;
+}
+
 function renderPinnedServices() {
   const container = $('#pinned-container');
   const empty = $('#pinned-empty-state');
@@ -1289,6 +1315,40 @@ async function toggleServicePin(id) {
     body: JSON.stringify({ pinned: !svc.pinned }),
   });
   Object.assign(svc, normalizeService(updated));
+  refreshServiceViews();
+}
+
+function openServiceEditModal(id) {
+  const svc = services.find((s) => s.id === id);
+  if (!svc) return;
+  $('#edit-id').value = id;
+  $('#edit-name').value = svc.name;
+  $('#edit-url').value = svc.url;
+  $('#edit-category').value = svc.category;
+  $('#edit-icon').value = svc.icon || 'globe';
+  $('#edit-description').value = svc.description || '';
+  $('#edit-pinned').checked = !!svc.pinned;
+  $('#edit-has-login').checked = !!svc.has_login;
+  openModal('edit-modal');
+}
+
+async function saveServiceEdit() {
+  const id = Number($('#edit-id').value);
+  const name = $('#edit-name').value.trim();
+  const url = $('#edit-url').value.trim();
+  const category = $('#edit-category').value.trim() || t('modal.key.other');
+  const icon = ($('#edit-icon').value.trim() || 'globe').toLowerCase();
+  const description = $('#edit-description').value.trim() || null;
+  const pinned = $('#edit-pinned').checked;
+  const has_login = $('#edit-has-login').checked;
+  if (!name || !url) return alert(t('alert.serviceFields'));
+  const updated = await api(`/api/services/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name, url, category, icon, description, pinned, has_login }),
+  });
+  const idx = services.findIndex((s) => s.id === id);
+  if (idx >= 0) services[idx] = normalizeService(updated);
+  closeModal('edit-modal');
   refreshServiceViews();
 }
 
@@ -2314,6 +2374,14 @@ $('#scan-start').addEventListener('click', () => {
 });
 
 $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
+$('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
+$('#edit-save').addEventListener('click', async () => {
+  try {
+    await saveServiceEdit();
+  } catch (err) {
+    alert(err.message || t('error.api.services'));
+  }
+});
 $('#add-save').addEventListener('click', async () => {
   const name = $('#add-name').value.trim();
   const url = $('#add-url').value.trim();

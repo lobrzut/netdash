@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.12" />
-  <script src="/static/i18n.js?v=1.3.12"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.16" />
+  <script src="/static/i18n.js?v=1.3.16"></script>
 </head>
 <body>
   <div id="app">
@@ -71,12 +71,14 @@
         </div>
       </div>
       <nav class="header-nav" role="navigation" aria-label="Main">
-        <button type="button" id="nav-home-btn" class="header-nav-btn active" data-page="home">
-          <span data-i18n="nav.home">Pulpit</span>
-        </button>
-        <button type="button" id="nav-services-btn" class="header-nav-btn" data-page="services">
-          <span data-i18n="nav.services">Serwisy</span>
-        </button>
+        <div class="nav-segment" role="tablist">
+          <button type="button" id="nav-home-btn" class="nav-segment-btn active" role="tab" aria-selected="true" data-page="home">
+            <span data-i18n="nav.home">Pulpit</span>
+          </button>
+          <button type="button" id="nav-services-btn" class="nav-segment-btn" role="tab" aria-selected="false" data-page="services">
+            <span data-i18n="nav.services">Serwisy</span>
+          </button>
+        </div>
       </nav>
       <div class="header-actions">
         <select id="lang-quick" class="lang-select" title="Language">
@@ -788,6 +790,48 @@ sol --udp-port 9
     </div>
   </div>
 
+  <!-- Edit Service Modal -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2 data-i18n="modal.edit.service">Edytuj serwis</h2>
+      <input type="hidden" id="edit-id" />
+      <div class="field">
+        <label for="edit-name" data-i18n="modal.add.name">Nazwa</label>
+        <input type="text" id="edit-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
+      </div>
+      <div class="field">
+        <label for="edit-url" data-i18n="modal.add.url">URL</label>
+        <input type="url" id="edit-url" data-i18n-placeholder="modal.add.urlPlaceholder" placeholder="https://192.168.1.10:3000" />
+      </div>
+      <div class="field">
+        <label for="edit-category" data-i18n="modal.add.category">Kategoria</label>
+        <input type="text" id="edit-category" />
+      </div>
+      <div class="field">
+        <label for="edit-icon" data-i18n="modal.edit.icon">Ikona</label>
+        <input type="text" id="edit-icon" placeholder="globe" />
+        <span class="hint" data-i18n="modal.edit.iconHint">np. globe, docker, chart, monitor, database</span>
+      </div>
+      <div class="field">
+        <label for="edit-description" data-i18n="modal.edit.description">Opis (opcjonalnie)</label>
+        <input type="text" id="edit-description" />
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="edit-pinned" />
+        <span data-i18n="modal.edit.pinned">Przypnij na pulpicie</span>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="edit-has-login" />
+        <span data-i18n="modal.edit.hasLogin">Wymaga logowania</span>
+      </label>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="edit-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button class="btn btn-primary" id="edit-save" data-i18n="modal.save">Zapisz</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Modal -->
   <div id="add-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -813,6 +857,6 @@ sol --udp-port 9
   </div>
   </div>
 
-  <script src="/static/app.js?v=1.3.12"></script>
+  <script src="/static/app.js?v=1.3.16"></script>
 </body>
 </html>
