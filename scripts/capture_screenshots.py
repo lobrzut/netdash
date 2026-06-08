@@ -3,53 +3,23 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from scripts.seed_demo_data import DEMO_KEYS, DEMO_NOTES, DEMO_SERVICES
-
-BASE = "http://127.0.0.1:8787"
+BASE = os.environ.get("NETDASH_SCREENSHOT_URL", "http://127.0.0.1:8787")
 OUT_DIR = ROOT / "docs" / "screenshots"
 
 
-async def seed_database() -> str:
-    from sqlalchemy import delete
-
+async def get_auth_token() -> str:
     from app.auth import create_access_token
-    from app.database import async_session
-    from app.models import ApiKey, Note, Service
-    from app.vault import encrypt_secret
 
-    async with async_session() as db:
-        await db.execute(delete(Service))
-        await db.execute(delete(ApiKey))
-        await db.execute(delete(Note))
+    from scripts.seed_demo_data import seed_demo_data
 
-        for svc in DEMO_SERVICES:
-            db.add(Service(**svc))
-
-        for key in DEMO_KEYS:
-            secret = key["secret"]
-            db.add(
-                ApiKey(
-                    name=key["name"],
-                    secret_encrypted=encrypt_secret(secret),
-                    secret_hint=secret[-4:] if len(secret) >= 4 else secret,
-                    service=key["service"],
-                    username=key.get("username"),
-                    notes=key.get("notes"),
-                    pinned=key.get("pinned", False),
-                )
-            )
-
-        for note in DEMO_NOTES:
-            db.add(Note(**note))
-
-        await db.commit()
-
+    await seed_demo_data()
     return create_access_token("admin")
 
 
@@ -58,40 +28,38 @@ def capture_with_playwright(token: str) -> None:
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     viewport = {"width": 1280, "height": 800}
-    init_script = f"""
-        window.localStorage.setItem('netdash_token', {json.dumps(token)});
-        window.localStorage.setItem('netdash_page', 'home');
-    """
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
         context = browser.new_context(viewport=viewport)
-        context.add_init_script(init_script)
+        context.add_init_script(
+            f"window.localStorage.setItem('netdash_token', {json.dumps(token)});"
+        )
         page = context.new_page()
         page.goto(BASE, wait_until="networkidle")
-        page.wait_for_selector("#dashboard-view:not(.hidden)", timeout=15000)
         page.wait_for_function(
             "() => document.querySelector('#nav-home-btn span')?.textContent !== 'nav.home'",
             timeout=15000,
         )
-        page.wait_for_timeout(1500)
+        page.wait_for_selector("#dashboard-view:not(.hidden)", timeout=15000)
+        page.wait_for_timeout(1200)
         page.screenshot(path=str(OUT_DIR / "dashboard.png"))
 
         page.click("#nav-services-btn")
-        page.wait_for_selector("#page-services", state="visible", timeout=5000)
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(1000)
         page.screenshot(path=str(OUT_DIR / "services.png"))
 
         page.click("#settings-btn")
         page.wait_for_selector("#settings-modal:not(.hidden)", timeout=5000)
-        page.wait_for_timeout(500)
+        page.click('.settings-tab[data-tab="backup"]')
+        page.wait_for_timeout(600)
         page.screenshot(path=str(OUT_DIR / "settings.png"))
 
         login_context = browser.new_context(viewport=viewport)
         login_page = login_context.new_page()
         login_page.goto(BASE, wait_until="networkidle")
-        login_page.wait_for_selector("#login-view:not(.hidden)", timeout=10000)
-        login_page.wait_for_timeout(500)
+        login_page.wait_for_selector("#login-view:not(.hidden)", timeout=15000)
+        login_page.wait_for_timeout(600)
         login_page.screenshot(path=str(OUT_DIR / "login.png"))
         login_context.close()
 
@@ -99,16 +67,23 @@ def capture_with_playwright(token: str) -> None:
 
 
 def main() -> int:
+    os.environ.setdefault("NETDASH_DEMO_MODE", "1")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    token = asyncio.run(seed_database())
+    token = asyncio.run(get_auth_token())
 
     try:
         capture_with_playwright(token)
     except ImportError:
-        print("playwright not installed; run: pip install playwright && playwright install chromium", file=sys.stderr)
+        print(
+            "playwright not installed; run: pip install playwright && playwright install chromium",
+            file=sys.stderr,
+        )
+        return 1
+    except Exception as exc:
+        print(f"capture failed: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps({"ok": True, "out": str(OUT_DIR)}))
+    print(json.dumps({"ok": True, "out": str(OUT_DIR), "base": BASE}))
     return 0
 
 

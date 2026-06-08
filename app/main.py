@@ -300,6 +300,13 @@ async def change_password(
 
 @app.get("/api/network", response_model=NetworkInfo)
 async def network_info(_: User = Depends(get_current_user)):
+    if settings.demo_mode:
+        return NetworkInfo(
+            local_network="10.0.0.0/24",
+            local_ip="10.0.0.5",
+            docker_bridge=False,
+            scan_cidr_configured=True,
+        )
     return NetworkInfo(
         local_network=get_local_network(),
         local_ip=get_local_ip(),

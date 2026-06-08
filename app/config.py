@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     default_admin_password: str = "CHANGE-ME-set-NETDASH_DEFAULT_ADMIN_PASSWORD"
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
     scan_cidr: str | None = None
+    # Mask real LAN IP in /api/network (for README screenshots only)
+    demo_mode: bool = False
 
     class Config:
         env_prefix = "NETDASH_"

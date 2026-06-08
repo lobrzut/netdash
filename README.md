@@ -19,7 +19,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 |----------|-------|
 | ![Settings — sidebar and general options](docs/screenshots/settings.png) | ![Login — JWT authentication](docs/screenshots/login.png) |
 
-> Screenshots use generic demo hostnames (`*.local`) and masked API keys. Regenerate locally: `python scripts/capture_screenshots.py` (requires Playwright).
+> **Screenshots use demo data only** (`*.demo.local`, `10.0.0.x`, masked keys like `sk-demo-…`). Regenerate: `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py` (requires Playwright + running app on port 8787).
 
 ## Why NetDash?
 
