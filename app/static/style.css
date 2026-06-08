@@ -55,7 +55,7 @@
   --glass-blur: blur(16px);
   --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --card-watermark-opacity: 0.08;
+  --card-watermark-opacity: 0.10;
 }
 
 [data-theme="ocean"] {
@@ -199,7 +199,7 @@
   --shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
   --shadow-sm: 0 2px 12px rgba(15, 23, 42, 0.06);
   --shadow-glow: 0 0 32px rgba(22, 163, 74, 0.08);
-  --card-watermark-opacity: 0.04;
+  --card-watermark-opacity: 0.06;
 }
 
 [data-theme="homer"] {
@@ -2363,8 +2363,8 @@ body.modal-open {
   opacity: var(--card-watermark-opacity);
   transform: rotate(-8deg);
   transform-origin: 85% 85%;
-  -webkit-mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, transparent 60%);
-  mask-image: linear-gradient(135deg, rgba(0, 0, 0, 0.4) 0%, transparent 60%);
+  -webkit-mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
+  mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
   font-size: clamp(4rem, 90%, 9rem);
 }
 
@@ -2391,7 +2391,7 @@ body.modal-open {
 }
 
 .service-card-watermark[class*="icon-"]::after {
-  opacity: var(--card-watermark-opacity);
+  opacity: 1;
 }
 
 .service-card--compact .service-card-watermark {
