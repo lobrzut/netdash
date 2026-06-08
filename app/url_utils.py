@@ -4,6 +4,17 @@ import re
 from urllib.parse import quote, unquote, urlparse, urlunparse
 
 _CONTROL_BYTES_RE = re.compile(r"[\x00-\x1f\x7f]")
+_WHOLE_BYTES_LITERAL_RE = re.compile(r"""^[bB](["'])(.*)\1$""", re.DOTALL)
+_QUERY_BYTES_LITERAL_RE = re.compile(r"""([?&][^=&?#]+=)[bB](["'])(.*?)\2""")
+
+
+def _strip_bytes_literal(value: str) -> str:
+    """Normalize Python bytes-literal strings accidentally persisted as text."""
+    cleaned = value.strip()
+    whole_match = _WHOLE_BYTES_LITERAL_RE.match(cleaned)
+    if whole_match:
+        cleaned = whole_match.group(2).strip()
+    return _QUERY_BYTES_LITERAL_RE.sub(r"\1\3", cleaned)
 
 
 def sanitize_service_url(url: str | None) -> str:
@@ -11,6 +22,7 @@ def sanitize_service_url(url: str | None) -> str:
     if not url:
         return ""
     cleaned = _CONTROL_BYTES_RE.sub("", str(url).strip())
+    cleaned = _strip_bytes_literal(cleaned)
     if not cleaned:
         return ""
     try:
