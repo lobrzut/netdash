@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.56
+
+- **Pulpit — ★ odpinanie**: gwiazdka w lewym górnym rogu karty/chipa na hover (classic, classic-sm, medium, compact). Badge AUTO/LOGIN pozostają po prawej; compact — dodatkowy padding przy hover, żeby nie nachodzić na ikonę.
+
 ## v1.3.55
 
 - **Pulpit — scroll**: naprawione blokowanie przewijania pionowego przy wielu przypiętych kategoriach/serwisach (`overflow-y: visible` na `#dashboard-view` / `#app`, `flex: 1 0 auto` na `.main`). Modal ustawień bez zmian.
