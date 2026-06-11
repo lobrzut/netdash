@@ -328,7 +328,17 @@ function applyCustomLogo() {
   });
 }
 
+function pinnedCardSize() {
+  const size = appSettings.pinned_card_size || 'compact';
+  return ['compact', 'normal', 'large'].includes(size) ? size : 'compact';
+}
+
+function applyPinnedCardSize() {
+  document.body.setAttribute('data-pinned-size', pinnedCardSize());
+}
+
 function applyLayout() {
+  applyPinnedCardSize();
   $('#widget-clock')?.classList.toggle('hidden', appSettings.show_clock === false);
   $('#widget-vault')?.classList.toggle('hidden', appSettings.show_vault === false);
   $('#widget-notes')?.classList.toggle('hidden', appSettings.show_notes === false);
@@ -441,6 +451,7 @@ const DEFAULT_SETTINGS = {
   services_columns: 'normal',
   default_access_filter: 'all',
   card_style: 'detailed',
+  pinned_card_size: 'compact',
   show_about: false,
   full_scan_default: false,
   host_scan_ports: '22,445,3389,5900',
@@ -1420,9 +1431,11 @@ function serviceCardHtml(s, opts = {}) {
   const isPinnedCard = context === 'pinned';
   const compact = !isPinnedCard && appSettings.card_style === 'compact';
   const isHostOnly = s.protocol === 'host' || s.port === 0;
-  const showUrl = appSettings.show_service_urls !== false;
+  const showUrl = appSettings.show_service_urls !== false && !isPinnedCard;
   const showPort = appSettings.show_ports !== false && !isHostOnly;
-  const showMeta = !compact || isPinnedCard || showPort || (showUrl && isHostOnly);
+  const showMeta = isPinnedCard
+    ? showPort
+    : (!compact || showPort || (showUrl && isHostOnly));
   const offline = s.is_online === false;
   const hasNotes = !!(s.service_notes && s.service_notes.trim());
   const canPower = isWolDevice(s);
@@ -1437,6 +1450,9 @@ function serviceCardHtml(s, opts = {}) {
   const accent = categoryAccentColor(s.category);
   const uptimeLabel = serviceUptimeLabel(s);
   const displayName = displayServiceName(s);
+  const pinnedNameTitle = isPinnedCard && urlInfo.full
+    ? `${displayName} — ${urlInfo.full}`
+    : displayName;
   return `
     <div class="service-card ${isPinnedCard ? 'service-card--pinned' : ''} ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
       ${renderServiceWatermark(s)}
@@ -1446,7 +1462,7 @@ function serviceCardHtml(s, opts = {}) {
           ${hasAuthError ? `<span class="badge badge-error service-error-badge" title="${esc(healthErr)}">${esc(healthBadge)}</span>` : ''}
           ${s.has_login ? `<span class="badge badge-login">${t('badge.login')}</span>` : ''}
           ${(!compact || isPinnedCard) && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
-          ${s.pinned ? `<span class="badge badge-pin">${t('badge.pin')}</span>` : ''}
+          ${s.pinned && !isPinnedCard ? `<span class="badge badge-pin">${t('badge.pin')}</span>` : ''}
           ${offline ? `<span class="badge badge-offline">${t('badge.offline')}</span>` : ''}
         </div>
         <div class="service-icon-wrap">
@@ -1455,13 +1471,13 @@ function serviceCardHtml(s, opts = {}) {
         </div>
       </div>
       <div class="service-body">
-        <div class="service-name" title="${esc(displayName)}">${esc(displayName)}</div>
+        <div class="service-name" title="${esc(pinnedNameTitle)}">${esc(displayName)}</div>
         ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}" title="${esc(urlInfo.full)}">${esc(urlInfo.display)}</div>` : ''}
         ${showMeta ? `<div class="service-meta">
-          ${(!compact || isPinnedCard) ? `<span class="service-category" title="${esc(s.category)}">${esc(s.category)}</span>` : ''}
+          ${(!compact && !isPinnedCard) ? `<span class="service-category" title="${esc(s.category)}">${esc(s.category)}</span>` : ''}
           ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
         </div>` : ''}
-        ${uptimeLabel ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
+        ${uptimeLabel && !isPinnedCard ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
       </div>
       <div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
         ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
@@ -2579,6 +2595,7 @@ function readSettingsFromForm() {
     default_access_filter: $('#settings-default-access').value,
     services_columns: $('#settings-services-columns').value,
     card_style: $('#settings-card-style').value,
+    pinned_card_size: $('#settings-pinned-card-size').value,
     custom_css: $('#settings-custom-css').value,
     favicon_url: $('#settings-favicon').value.trim() || null,
     show_about: false,
@@ -2622,6 +2639,7 @@ function fillSettingsForm() {
   $('#settings-default-access').value = appSettings.default_access_filter || 'all';
   $('#settings-services-columns').value = appSettings.services_columns || 'normal';
   $('#settings-card-style').value = appSettings.card_style || 'detailed';
+  $('#settings-pinned-card-size').value = pinnedCardSize();
   solScriptContext = { mac: null, port: null };
   refreshSolScriptPreviews();
 }
@@ -3287,6 +3305,7 @@ const SETTINGS_PREVIEW_IDS = [
   'settings-show-notes', 'settings-show-stats', 'settings-show-category-filters',
   'settings-show-service-urls', 'settings-show-ports', 'settings-services-grouped',
   'settings-default-access', 'settings-services-columns', 'settings-card-style',
+  'settings-pinned-card-size',
   'settings-about-project', 'settings-author-name', 'settings-author-url',
 ];
 

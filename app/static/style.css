@@ -2864,127 +2864,155 @@ body.modal-open {
   padding: 0.125rem 0.375rem;
 }
 
-/* Pinned dashboard cards — same Homer layout as Serwisy, scaled down */
+/* Pinned dashboard — compact horizontal rows grouped by category */
 #pinned-container {
   width: 100%;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .pinned-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
-  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.5rem;
   align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .pinned-groups {
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  }
 }
 
 .pinned-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.3125rem;
   min-width: 0;
-  padding: 0.625rem 0.75rem 0.75rem;
+  padding: 0.375rem 0.4375rem 0.4375rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
 }
 
 .pinned-group-label {
   margin: 0;
-  padding: 0 0.125rem;
-  font-size: 0.625rem;
+  padding: 0 0.0625rem;
+  font-size: 0.5625rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   color: var(--text-dim);
   flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .services-grid--pinned {
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: 0.625rem;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.3125rem;
+}
+
+@media (min-width: 640px) {
+  .services-grid--pinned {
+    grid-template-columns: repeat(auto-fill, minmax(8.25rem, 1fr));
+  }
 }
 
 .service-card--pinned {
-  aspect-ratio: 22 / 19;
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+  aspect-ratio: unset;
   min-height: unset;
-  padding: 0.75rem 0.625rem 0.5625rem;
-  gap: 0.25rem;
+  max-height: 3.625rem;
+  padding: 0.3125rem 0.375rem 0.3125rem 0.3125rem;
+  gap: 0.375rem;
+  border-left-width: 2px;
+  border-radius: var(--radius);
+  box-shadow: none;
+}
+
+.service-card--pinned::before {
+  height: 1px;
+}
+
+.service-card--pinned:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm), 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
 .service-card--pinned .service-top {
+  flex-direction: column;
+  align-items: center;
   margin-bottom: 0;
-  gap: 0.25rem;
+  gap: 0;
   flex-shrink: 0;
+  width: auto;
 }
 
 .service-card--pinned .service-badges {
-  min-height: 0.875rem;
-  padding-right: 1.5rem;
+  position: absolute;
+  top: 0.125rem;
+  right: 1.375rem;
+  left: auto;
+  align-self: auto;
+  min-height: 0;
+  padding: 0;
+  gap: 0.125rem;
+  z-index: 3;
+  max-width: calc(100% - 2.75rem);
 }
 
 .service-card--pinned .service-badges .badge {
-  font-size: 0.5rem;
-  padding: 0.1rem 0.3rem;
+  font-size: 0.4375rem;
+  padding: 0.0625rem 0.25rem;
+  letter-spacing: 0.04em;
 }
 
 .service-card--pinned .service-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 9px;
-  font-size: 1rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  font-size: 0.8125rem;
 }
 
 .service-card--pinned .service-icon-brand {
-  padding: 4px;
+  padding: 3px;
 }
 
 .service-card--pinned .service-body {
   flex: 1 1 auto;
+  align-items: flex-start;
+  text-align: left;
   min-height: 0;
   min-width: 0;
-  gap: 0.1875rem;
-  padding: 0 0.125rem;
+  gap: 0.0625rem;
+  padding: 0;
 }
 
 .service-card--pinned .service-name {
-  font-size: 0.8125rem;
+  font-size: 0.71875rem;
   margin-bottom: 0;
-  line-height: 1.25;
-  flex-shrink: 0;
+  line-height: 1.2;
+  flex-shrink: 1;
 }
 
-.service-card--pinned .service-url {
-  font-size: 0.5625rem;
-  margin-bottom: 0;
-  line-height: 1.3;
-  flex-shrink: 0;
-  color: var(--text-muted);
+.service-card--pinned .service-url,
+.service-card--pinned .service-category,
+.service-card--pinned .service-uptime {
+  display: none;
 }
 
 .service-card--pinned .service-meta {
-  gap: 0.25rem;
+  justify-content: flex-start;
+  gap: 0.1875rem;
   flex-shrink: 0;
-  line-height: 1.2;
+  line-height: 1;
   overflow: visible;
 }
 
-.service-card--pinned .service-category {
-  font-size: 0.625rem;
-  max-width: 100%;
-  flex-shrink: 1;
-  min-width: 0;
-}
-
 .service-card--pinned .service-port {
-  font-size: 0.5625rem;
-  padding: 0.1rem 0.35rem;
-}
-
-.service-card--pinned .service-uptime {
   font-size: 0.5rem;
-  margin-top: 0;
-  line-height: 1.2;
-  flex-shrink: 0;
+  padding: 0.0625rem 0.25rem;
 }
 
 .service-card--pinned .service-body > * {
@@ -2993,46 +3021,66 @@ body.modal-open {
 }
 
 .service-card--pinned .service-card-watermark {
-  right: -6%;
-  bottom: -6%;
-  font-size: clamp(2.25rem, 38%, 5rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.55);
+  right: -4%;
+  bottom: -10%;
+  width: 70%;
+  height: 90%;
+  font-size: clamp(1.25rem, 55%, 2rem);
+  opacity: calc(var(--card-watermark-opacity) * 0.32);
+  transform: rotate(-6deg);
+  -webkit-mask-image: linear-gradient(135deg, black 0%, black 18%, transparent 48%);
+  mask-image: linear-gradient(135deg, black 0%, black 18%, transparent 48%);
 }
 
 .service-card--pinned .service-card-watermark--letter {
-  font-size: clamp(2rem, 34%, 4.25rem);
+  font-size: clamp(1.125rem, 50%, 1.75rem);
 }
 
 .service-card--pinned .service-delete {
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 20px;
-  height: 20px;
-  font-size: 0.875rem;
+  top: 0.1875rem;
+  right: 0.1875rem;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 0.75rem;
+  border-radius: 4px;
 }
 
 .service-card--pinned .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
+  bottom: -1px;
+  right: -1px;
 }
 
 .service-card--pinned .service-actions {
-  padding-top: 0.375rem;
-  min-height: 1.5rem;
-  gap: 0.25rem;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0 0.25rem;
+  min-height: unset;
+  gap: 0.1875rem;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--bg-card) 88%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-radius: inherit;
+  z-index: 4;
 }
 
 .service-card--pinned .service-action {
-  flex: 0 0 1.375rem;
-  width: 1.375rem;
-  height: 1.375rem;
-  min-width: 1.375rem;
-  font-size: 0.625rem;
-  border-radius: 5px;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-width: 1.25rem;
+  font-size: 0.5625rem;
+  border-radius: 4px;
 }
 
 .service-card--pinned .service-pin-btn {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
 }
 
 .category-filters.hidden {
@@ -4234,7 +4282,11 @@ button.service-edit-icon-preview.icon-preview-btn[aria-expanded="true"] {
   .services-grid--compact,
   .services-grid--comfortable { grid-template-columns: 1fr; }
   .pinned-groups { grid-template-columns: 1fr; }
-  .services-grid--pinned { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+  .services-grid--pinned { grid-template-columns: 1fr; }
+  .service-card--pinned {
+    max-height: 3.75rem;
+    padding: 0.375rem 0.4375rem;
+  }
   .field-row { flex-direction: column; gap: 0; }
   .icon-picker-popover {
     position: fixed;
