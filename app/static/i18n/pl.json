@@ -279,10 +279,13 @@
   "settings.favicon": "Favicon (URL)",
   "settings.faviconHint": "Pozostaw puste dla domyślnej ikony NetDash",
   "about.title": "O projekcie",
+  "about.tagline": "Homelab dashboard z auto-wykrywaniem sieci",
   "about.author": "Autor",
   "about.version": "Wersja",
-  "about.buildDate": "Data buildu",
+  "about.buildDate": "Build",
   "about.github": "Repozytorium GitHub",
+  "about.githubChip": "GitHub",
+  "about.techStack": "Technologie",
   "confirm.delete.service": "Usunąć ten serwis?",
   "confirm.delete.key": "Usunąć ten klucz?",
   "confirm.delete.note": "Usunąć tę notatkę?",
@@ -369,4 +372,8 @@
   "error.noteNotFound": "Notatka nie znaleziona",
   "error.scanInProgress": "Skanowanie już trwa — poczekaj na zakończenie",
   "error.scanNotFound": "Skan nie znaleziony",
-  "error.wolNotConfigured": "WoL nie jest skonfigurowane dla tego se
+  "error.wolNotConfigured": "WoL nie jest skonfigurowane dla tego serwisu",
+  "error.solNotConfigured": "Sleep-on-LAN nie jest skonfigurowane dla tego serwisu",
+  "error.arpDisabled": "Skan ARP jest wyłączony w ustawieniach",
+  "error.backupUnsupportedVersion": "Nieobsługiwana wersja kopii zapasowej: {version}"
+}

@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.30"
+VERSION = "1.3.31"
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
 
 

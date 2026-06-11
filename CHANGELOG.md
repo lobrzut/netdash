@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.31
+
+- Redesigned **Settings → About**: hero layout, version badge, GitHub chip, read-only author card, tech stack chips.
+- Editable author/description in **General → Branding**; Save hidden on read-only tabs (About, Backup, Account).
+- Build date set at Docker deploy (`NETDASH_BUILD_DATE`); i18n pl/en/de/uk for About strings.
+
 ## v1.3.30
 
 - Fix service card **delete (×) button**: was pulled into flex flow by `position: relative` on card children — now anchored top-right with 28px hit target, hover-only like other actions; DELETE `/api/services/{id}` unchanged.
