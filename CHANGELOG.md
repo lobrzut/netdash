@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.70
+
+- **Ustawienia → Pulpit — fix listy motywów**: przeglądarka mogła trzymać w cache stary `index.html` (bez `?v=`), przez co w selectcie widać było tylko jedną opcję (np. „Kompaktowy (duży)”) mimo że serwer serwuje 5 układów. `syncDashboardLayoutSelect()` odbudowuje opcje z JS przy starcie i otwarciu ustawień; `Cache-Control: no-cache` na `/` + meta tag.
+
 ## v1.3.69
 
 - **Pulpit — układ Kompaktowy (mniejszy)**: zmniejszone kafelki (~178px × min. 48px, ikona 32px) z rozwijanym paskiem akcji na dole przy hover — więcej serwisów na ekranie przy zachowaniu czytelności.

@@ -327,6 +327,26 @@ function applyCustomLogo() {
   });
 }
 
+const DASHBOARD_LAYOUT_OPTIONS = [
+  { value: 'classic', i18n: 'settings.dashboardLayoutClassic' },
+  { value: 'classic-sm', i18n: 'settings.dashboardLayoutClassicSm' },
+  { value: 'medium', i18n: 'settings.dashboardLayoutMedium' },
+  { value: 'compact', i18n: 'settings.dashboardLayoutCompact' },
+  { value: 'compact-big', i18n: 'settings.dashboardLayoutCompactBig' },
+];
+
+function syncDashboardLayoutSelect() {
+  const sel = $('#settings-pinned-card-size');
+  if (!sel) return;
+  const values = [...sel.options].map((o) => o.value);
+  const expected = DASHBOARD_LAYOUT_OPTIONS.map((o) => o.value);
+  const stale = values.length !== expected.length || expected.some((v, i) => values[i] !== v);
+  if (!stale) return;
+  sel.innerHTML = DASHBOARD_LAYOUT_OPTIONS.map(
+    (o) => `<option value="${o.value}" data-i18n="${o.i18n}">${t(o.i18n)}</option>`,
+  ).join('');
+}
+
 function isPinnedClassicLayout(layout) {
   return layout === 'classic' || layout === 'classic-sm';
 }
@@ -2976,6 +2996,7 @@ function fillSettingsForm() {
   $('#settings-default-access').value = appSettings.default_access_filter || 'all';
   $('#settings-services-columns').value = appSettings.services_columns || 'normal';
   $('#settings-card-style').value = appSettings.card_style || 'detailed';
+  syncDashboardLayoutSelect();
   $('#settings-pinned-card-size').value = dashboardLayout();
   solScriptContext = { mac: null, port: null };
   refreshSolScriptPreviews();
@@ -3952,6 +3973,7 @@ window.addEventListener('pageshow', reconcilePageScrollLock);
 // Init
 (async () => {
   await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
+  syncDashboardLayoutSelect();
   applyI18n();
   ['edit', 'add'].forEach((prefix) => {
     refreshIconPickerTabs(prefix);

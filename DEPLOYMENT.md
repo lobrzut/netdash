@@ -7,7 +7,7 @@ One codebase, two runtime profiles. Repository: [lobrzut/netdash](https://github
 | **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
 | **Server / Docker** | Linux homelab server | `docker compose up -d` | http://&lt;server-ip&gt;:8787 |
 
-Application version: **1.3.69** (`app/config.py` → `VERSION`).
+Application version: **1.3.70** (`app/config.py` → `VERSION`).
 
 ---
 

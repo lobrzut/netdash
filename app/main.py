@@ -335,7 +335,10 @@ app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 @app.get("/")
 async def index():
-    return FileResponse(BASE_DIR / "app" / "static" / "index.html")
+    return FileResponse(
+        BASE_DIR / "app" / "static" / "index.html",
+        headers={"Cache-Control": "no-cache, must-revalidate"},
+    )
 
 
 @app.get("/api/health")
