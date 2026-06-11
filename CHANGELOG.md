@@ -2,7 +2,7 @@
 
 ## v1.3.42
 
-- **Serwisy — filtr Offline/Online (kombinowalny)**: pigułki dostępności obok filtrów dostępu; Offline = `is_online === false` lub błąd health (`serviceHealthState` offline/error). Łączy się z Z logowaniem, kategorią i siecią (toggle — klik ponownie wyłącza). Usunięto błędny filtr Przypięte z paska dostępu. i18n pl/en/de/uk.
+- **Serwisy — filtry Offline + Przypięte ★ (jeden pasek)**: Wszystkie | Z logowaniem | Publiczne | WoL | Offline | Przypięte ★ w jednym segmented control. Offline = `serviceHealthState` offline/error; Przypięte = `pinned === true`. Liczniki kombinowalne z kategorią/siecią/wyszukiwaniem. i18n pl/en/de/uk.
 
 ## v1.3.41
 

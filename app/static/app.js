@@ -254,7 +254,6 @@ async function setLanguage(lang) {
   $('#lang-quick').value = lang;
   $('#settings-language').value = lang;
   renderAccessFilters();
-  renderAvailabilityFilters();
   if (currentPage === 'home') renderPinnedServices();
   else renderServices();
   renderKeys();
@@ -2140,7 +2139,6 @@ async function saveServiceEdit() {
 function renderServices() {
   normalizeFilterState();
   renderAccessFilters();
-  renderAvailabilityFilters();
   if (appSettings.show_category_filters !== false) {
     renderFilters();
   } else {
@@ -2167,7 +2165,7 @@ function renderServices() {
   renderSearchFilterHint(hiddenByFilter);
 
   const grouped = appSettings.services_grouped !== false;
-  const showGrouped = grouped && accessFilter === 'all' && availabilityFilter === 'all' && activeFilter === 'all' && networkFilter === 'all';
+  const showGrouped = grouped && accessFilter === 'all' && activeFilter === 'all' && networkFilter === 'all';
   const withLogin = filtered.filter((s) => s.has_login === true);
   const withoutLogin = filtered.filter((s) => !s.has_login);
 
