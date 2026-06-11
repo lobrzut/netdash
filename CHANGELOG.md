@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.57
+
+- **Pulpit — ★ odpinanie (fix)**: większy inset gwiazdki od krawędzi karty/chipa (`0.5rem`), przycisk 24px — nie nachodzi na zaokrąglony róg ani border przy `overflow: hidden`. Classic-sm i compact — proporcjonalnie mniejszy przycisk/inset; compact — padding przy hover pod ★.
+
 ## v1.3.56
 
 - **Pulpit — ★ odpinanie**: gwiazdka w lewym górnym rogu karty/chipa na hover (classic, classic-sm, medium, compact). Badge AUTO/LOGIN pozostają po prawej; compact — dodatkowy padding przy hover, żeby nie nachodzić na ikonę.
