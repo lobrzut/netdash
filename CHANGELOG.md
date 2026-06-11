@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.64
+
+- **Pulpit — układ Kompaktowy (mini-karty)**: wyraźnie większe kafelki przypiętych serwisów (~210px+, min. 60px wysokości) — ikona 38px, czytelna nazwa (13px, semibold) i port jako podtytuł. Siatka `auto-fill` wypełnia szerokość wiersza zamiast zostawiać pustą przestrzeń po prawej. Akcje (★, edycja, notatki, WoL, sleep) w prawym górnym rogu na hover (Homer/Dashy) — bez rozszerzania karty w dół. Lepsze wyrównanie etykiet kategorii z wierszem kafelków.
+
 ## v1.3.63
 
 - **Pulpit — układ Kompaktowy (polish)**: większe chipy przypiętych serwisów (152–184px × min. 48px) z czytelniejszą etykietą (2 linie, 12px), lepszym paddingiem i wyrównaniem ikony. Pasek akcji (★, edycja, notatki, WoL, sleep) w dedykowanym wierszu pod treścią — bez nachodzenia na ikonę/nazwę. Szersze etykiety kategorii (2 linie), wyrównanie wierszy `flex-start`.
