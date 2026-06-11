@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.47
+
+- **Service modal — upload icon file**: „Wgraj plik” / Upload icon button in add/edit modals (Wygląd). Uploads PNG/JPEG/WebP/SVG (max 2 MB) via `POST /api/services/upload-icon`; preview and `icon_url` update immediately; filename/thumbnail shown for uploaded icons. Works alongside preset grid and URL field. Auth + mime/size validation. i18n pl/en/de/uk.
+
 ## v1.3.46
 
 - **Dashboard — przypięte serwisy w grupach kategorii**: karty przypięte na pulpicie są zgrupowane w większe panele (Homer/Dashy) z dyskretną etykietą kategorii serwisu (DevOps, Web, Inne…). Grupy układają się w siatce na desktopie i jednej kolumnie na mobile. Pin, akcje kart i watermark bez zmian.

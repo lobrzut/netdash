@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
@@ -66,6 +67,7 @@ from app.schemas import (
     ScanStatus,
     ServiceCreate,
     ServiceIdentifyRequest,
+    IconUploadResponse,
     ServiceIdentifyResponse,
     ServiceIdentifySuggestion,
     ServiceOut,
@@ -78,17 +80,22 @@ health_task: asyncio.Task | None = None
 logger = logging.getLogger("netdash")
 
 UPLOADS_DIR = DATA_DIR / "uploads"
+ICONS_DIR = UPLOADS_DIR / "icons"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+ICONS_DIR.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_LOGO_TYPES = {
+ALLOWED_IMAGE_TYPES = {
     "image/png": ".png",
     "image/svg+xml": ".svg",
     "image/webp": ".webp",
     "image/jpeg": ".jpg",
     "image/gif": ".gif",
 }
-LOGO_EXT_BY_SUFFIX = {".png", ".svg", ".webp", ".jpg", ".jpeg", ".gif"}
+IMAGE_EXT_BY_SUFFIX = {".png", ".svg", ".webp", ".jpg", ".jpeg", ".gif"}
+ALLOWED_ICON_TYPES = {k: v for k, v in ALLOWED_IMAGE_TYPES.items() if k != "image/gif"}
+ICON_EXT_BY_SUFFIX = IMAGE_EXT_BY_SUFFIX - {".gif"}
 MAX_LOGO_SIZE = 2 * 1024 * 1024
+MAX_ICON_SIZE = 2 * 1024 * 1024
 
 PHASE_LABELS = {
     "ping": "Wykrywanie aktywnych hostów",
@@ -389,17 +396,42 @@ async def update_settings(
     return app_settings
 
 
-def _logo_extension(content_type: str | None, filename: str | None) -> str | None:
+def _image_extension(
+    content_type: str | None,
+    filename: str | None,
+    *,
+    allowed_types: dict[str, str],
+    allowed_suffixes: set[str],
+) -> str | None:
     ct = (content_type or "").split(";")[0].strip().lower()
-    if ct in ALLOWED_LOGO_TYPES:
-        return ALLOWED_LOGO_TYPES[ct]
+    if ct in allowed_types:
+        return allowed_types[ct]
     if filename:
-        suffix = Path(filename).suffix.lower()
+        safe_name = Path(filename).name
+        suffix = Path(safe_name).suffix.lower()
         if suffix == ".jpeg":
             suffix = ".jpg"
-        if suffix in LOGO_EXT_BY_SUFFIX:
+        if suffix in allowed_suffixes:
             return suffix
     return None
+
+
+def _logo_extension(content_type: str | None, filename: str | None) -> str | None:
+    return _image_extension(
+        content_type,
+        filename,
+        allowed_types=ALLOWED_IMAGE_TYPES,
+        allowed_suffixes=IMAGE_EXT_BY_SUFFIX,
+    )
+
+
+def _icon_extension(content_type: str | None, filename: str | None) -> str | None:
+    return _image_extension(
+        content_type,
+        filename,
+        allowed_types=ALLOWED_ICON_TYPES,
+        allowed_suffixes=ICON_EXT_BY_SUFFIX,
+    )
 
 
 @app.post("/api/settings/logo", response_model=AppSettingsOut)
@@ -662,6 +694,30 @@ async def create_service(
     await db.commit()
     await db.refresh(service)
     return service
+
+
+@app.post("/api/services/upload-icon", response_model=IconUploadResponse)
+async def upload_service_icon(
+    file: UploadFile = File(...),
+    _: User = Depends(get_current_user),
+):
+    ext = _icon_extension(file.content_type, file.filename)
+    if not ext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nieobsługiwany format. Dozwolone: PNG, SVG, WebP, JPEG.",
+        )
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pusty plik.")
+    if len(content) > MAX_ICON_SIZE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Plik za duży (max 2 MB).")
+    ICONS_DIR.mkdir(parents=True, exist_ok=True)
+    dest = ICONS_DIR / f"{uuid.uuid4().hex}{ext}"
+    if not dest.resolve().is_relative_to(ICONS_DIR.resolve()):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nieprawidłowa nazwa pliku.")
+    dest.write_bytes(content)
+    return IconUploadResponse(url=f"/uploads/icons/{dest.name}")
 
 
 @app.post("/api/services/import/homer", response_model=HomerImportResult)

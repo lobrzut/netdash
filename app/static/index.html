@@ -883,7 +883,13 @@ sol --udp-port 9
             <label for="edit-icon-url" data-i18n="modal.edit.iconUrl">URL ikony</label>
             <span class="field-optional" data-i18n="settings.optional">Opcjonalnie</span>
           </div>
-          <input type="url" id="edit-icon-url" placeholder="https://..." />
+          <div class="icon-url-row">
+            <input type="url" id="edit-icon-url" placeholder="https://..." />
+            <button type="button" class="btn btn-ghost btn-sm" id="edit-icon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj plik</button>
+            <input type="file" id="edit-icon-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
+          </div>
+          <p class="hint" data-i18n="modal.edit.uploadHint">PNG, JPEG, WebP lub SVG — maks. 2 MB</p>
+          <div class="icon-upload-status hidden" id="edit-icon-upload-status" aria-live="polite"></div>
         </div>
         <div class="field">
           <div class="field-label-wrap">
@@ -968,7 +974,13 @@ sol --udp-port 9
             <label for="add-icon-url" data-i18n="modal.edit.iconUrl">URL ikony</label>
             <span class="field-optional" data-i18n="settings.optional">Opcjonalnie</span>
           </div>
-          <input type="url" id="add-icon-url" placeholder="https://..." />
+          <div class="icon-url-row">
+            <input type="url" id="add-icon-url" placeholder="https://..." />
+            <button type="button" class="btn btn-ghost btn-sm" id="add-icon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj plik</button>
+            <input type="file" id="add-icon-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
+          </div>
+          <p class="hint" data-i18n="modal.edit.uploadHint">PNG, JPEG, WebP lub SVG — maks. 2 MB</p>
+          <div class="icon-upload-status hidden" id="add-icon-upload-status" aria-live="polite"></div>
         </div>
         <div class="field">
           <div class="field-label-wrap">

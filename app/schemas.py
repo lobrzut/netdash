@@ -31,6 +31,10 @@ class ServiceCreate(BaseModel):
     has_login: bool = False
 
 
+class IconUploadResponse(BaseModel):
+    url: str
+
+
 class ServiceUpdate(BaseModel):
     name: str | None = None
     url: str | None = None

@@ -43,6 +43,8 @@ const SERVICE_ICON_GROUPS = [
   },
 ];
 const iconPickerState = { edit: { group: 'all', query: '' }, add: { group: 'all', query: '' } };
+const MAX_ICON_UPLOAD_BYTES = 2 * 1024 * 1024;
+const ALLOWED_ICON_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']);
 const DEFAULT_SERVICE_CATEGORIES = [
   'Media', 'Monitoring', 'DevOps', 'Storage', 'Network', 'Home Automation', 'Urządzenie', 'Inne',
 ];
@@ -1828,7 +1830,10 @@ function populateServiceIconSelect(selected = 'globe', selectId = 'edit-icon') {
 }
 
 function initServiceIconPickers() {
-  ['edit', 'add'].forEach((prefix) => buildIconPicker(prefix));
+  ['edit', 'add'].forEach((prefix) => {
+    buildIconPicker(prefix);
+    setupServiceIconUpload(prefix);
+  });
 }
 
 function updateServiceIconPreview(prefix) {
@@ -1837,6 +1842,82 @@ function updateServiceIconPreview(prefix) {
   const icon = $(`#${prefix}-icon`)?.value || 'globe';
   const iconUrl = $(`#${prefix}-icon-url`)?.value.trim() || '';
   preview.innerHTML = renderServiceIcon({ icon, icon_url: iconUrl || null });
+  refreshIconUploadStatus(prefix);
+}
+
+function refreshIconUploadStatus(prefix) {
+  const status = $(`#${prefix}-icon-upload-status`);
+  if (!status) return;
+  const iconUrl = $(`#${prefix}-icon-url`)?.value.trim() || '';
+  if (!iconUrl.startsWith('/uploads/icons/')) {
+    status.classList.add('hidden');
+    status.innerHTML = '';
+    return;
+  }
+  const filename = iconUrl.split('/').pop() || iconUrl;
+  status.classList.remove('hidden');
+  status.innerHTML = `
+    <img class="icon-upload-thumb" src="${esc(iconUrl)}" alt="" loading="lazy" />
+    <span class="icon-upload-name" title="${esc(filename)}">${esc(filename)}</span>`;
+}
+
+function isAllowedIconFile(file) {
+  if (!file) return false;
+  const mime = (file.type || '').toLowerCase();
+  if (mime && ALLOWED_ICON_MIMES.has(mime)) return true;
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  return ext === 'svg' || ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'webp';
+}
+
+async function uploadServiceIcon(prefix, file) {
+  if (!file) return;
+  const btn = $(`#${prefix}-icon-upload-btn`);
+  if (!isAllowedIconFile(file)) {
+    showToast(t('modal.edit.uploadFailed'), 'error');
+    return;
+  }
+  if (file.size > MAX_ICON_UPLOAD_BYTES) {
+    showToast(t('modal.edit.uploadTooLarge'), 'error');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API}/api/services/upload-icon`, {
+      method: 'POST',
+      headers,
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(translateApiDetail(data.detail) || t('modal.edit.uploadFailed'));
+    }
+    const urlInput = $(`#${prefix}-icon-url`);
+    if (urlInput) {
+      urlInput.value = data.url;
+      urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    updateServiceIconPreview(prefix);
+    showToast(file.name, 'success');
+  } catch (err) {
+    showToast(err.message || t('modal.edit.uploadFailed'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setupServiceIconUpload(prefix) {
+  const fileInput = $(`#${prefix}-icon-file`);
+  const btn = $(`#${prefix}-icon-upload-btn`);
+  btn?.addEventListener('click', () => fileInput?.click());
+  fileInput?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (file) await uploadServiceIcon(prefix, file);
+    e.target.value = '';
+  });
 }
 
 function updateEditServiceIconPreview() {
