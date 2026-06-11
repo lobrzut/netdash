@@ -12,6 +12,8 @@ services:
     #   - "8787:8787"
     network_mode: host
     env_file: .env
+    environment:
+      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
     volumes:
       - ./data:/app/data
     cap_add:
