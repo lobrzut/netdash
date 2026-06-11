@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.45
+
+- **Serwisy — filtr dostępności (Wszystkie | Online | Offline)**: osobny pasek obok dostępu; Offline usunięty z paska dostępu (zostaje Przypięte ★). Klik „Wszystkie” w dostępie resetuje filtr Online/Offline; przy aktywnym Online/Offline pigułka dostępu „Wszystkie” jest przyciemniona. Liczniki wzajemnie wykluczające: online + offline + nieznane = wszystkie. i18n pl/en/de/uk.
+
 ## v1.3.44
 
 - **Service modal icon picker (inline)**: always-visible visual grid with search, category tabs, and emoji/SVG tiles in add/edit modals — replaces hidden popover and old text `<select>`. Recent icons (localStorage), keyboard arrows + Enter, selected-state highlight, live preview. i18n pl/en/de/uk.
