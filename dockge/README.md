@@ -87,7 +87,8 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 | **Host network** | Required for LAN scan. Container listens on host port **8787** directly — no `ports:` mapping. |
 | **ports + host** | Never combine `network_mode: host` with `ports:` — Docker will refuse to start. |
 | **Linux only** | `network_mode: host` on Docker Desktop (Windows/Mac) does not expose your LAN; use native `python run.py` or `docker-compose.dev.yml` with `NETDASH_SCAN_CIDR`. |
-| **Data** | SQLite at `./data/netdash.db` (bind mount `./data:/app/data`). Back up `/opt/stacks/netdash/data/`. |
+| **Data** | Bind mount `./data:/app/data` — SQLite `./data/netdash.db`, uploaded icons/logos `./data/uploads/`. Back up `/opt/stacks/netdash/data/`. |
+| **Build date** | Optional in `.env`: `NETDASH_BUILD_DATE=2026-06-11` (About panel; passed as Docker build arg). |
 | **Updates** | `cd /opt/stacks/netdash && git pull &&` redeploy from Dockge or `docker compose up -d --build`. |
 | **Secrets** | Never commit `.env`. Dockge stores compose on disk; keep `.env` gitignored. |
 

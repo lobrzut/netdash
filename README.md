@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.52-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.62-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -93,6 +93,9 @@ cd /opt/stacks/netdash && cp .env.example .env   # edit secrets
 ```
 
 Dockge → **Scan Stacks Folder** → deploy stack **netdash**.  
+
+Compose file: **[dockge/compose.yaml](dockge/compose.yaml)** (alias [dockge/docker-compose.yml](dockge/docker-compose.yml)). Copy or symlink into the stack root if Dockge expects `compose.yaml` at repo root.
+
 Requires `network_mode: host` (Linux only) for LAN scan — see **[dockge/README.md](dockge/README.md)**.
 
 ## Quick start

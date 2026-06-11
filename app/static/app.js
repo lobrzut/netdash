@@ -2132,10 +2132,14 @@ function normalizeUrlCompareKey(url) {
 }
 
 function pinnedServiceDedupeKey(s) {
+  if (s.protocol === 'host' || s.port === 0) {
+    return `host:${(s.host || '').toLowerCase()}`;
+  }
+  const normalized = normalizeUrlCompareKey(s.url || '');
+  if (normalized) return normalized;
   const host = (s.host || '').toLowerCase();
   const port = s.port ?? 0;
-  const url = sanitizeServiceUrl(s.url || '').toLowerCase();
-  return `${host}:${port}:${url}`;
+  return `${host}:${port}`;
 }
 
 function findDuplicateServicesByUrl(url, excludeId = null) {
@@ -2695,33 +2699,51 @@ function esc(str) {
   return d.innerHTML;
 }
 
-let modalOpenCount = 0;
 let scrollLockY = 0;
 
-function lockPageScroll() {
-  if (modalOpenCount === 0) {
-    scrollLockY = window.scrollY;
-    document.body.classList.add('modal-open');
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollLockY}px`;
-    document.body.style.left = '0';
-    document.body.style.right = '0';
-    document.body.style.width = '100%';
-  }
-  modalOpenCount += 1;
+function countOpenModals() {
+  return $$('.modal').filter((m) => !m.classList.contains('hidden')).length;
 }
 
-function unlockPageScroll() {
-  modalOpenCount = Math.max(0, modalOpenCount - 1);
-  if (modalOpenCount === 0) {
-    document.body.classList.remove('modal-open');
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    window.scrollTo(0, scrollLockY);
+function closeIconPopover() {
+  $$('.icon-picker-popover').forEach((el) => el.remove());
+}
+
+function isPageScrollLocked() {
+  return document.body.classList.contains('modal-open')
+    || document.body.style.position === 'fixed';
+}
+
+function setPageScrollLocked(locked) {
+  if (locked) {
+    if (!isPageScrollLocked()) {
+      scrollLockY = window.scrollY;
+      document.body.classList.add('modal-open');
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollLockY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+    }
+    return;
   }
+  document.body.classList.remove('modal-open');
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  window.scrollTo(0, scrollLockY);
+}
+
+function syncPageScrollLock() {
+  setPageScrollLocked(countOpenModals() > 0);
+}
+
+function reconcilePageScrollLock() {
+  const shouldLock = countOpenModals() > 0;
+  const locked = isPageScrollLocked();
+  if (shouldLock !== locked) setPageScrollLocked(shouldLock);
 }
 
 function guardLayoutWidth(label, fn) {
@@ -2739,15 +2761,18 @@ function openModal(id) {
   const el = $(`#${id}`);
   if (!el || !el.classList.contains('hidden')) return;
   el.classList.remove('hidden');
-  lockPageScroll();
+  syncPageScrollLock();
 }
 
 function closeModal(id) {
   const el = $(`#${id}`);
   if (!el || el.classList.contains('hidden')) return;
   el.classList.add('hidden');
-  closeIconPopover();
-  unlockPageScroll();
+  try {
+    closeIconPopover();
+  } finally {
+    syncPageScrollLock();
+  }
 }
 
 const SCAN_PHASE_KEYS = {
@@ -3912,6 +3937,9 @@ $('#power-link-save').addEventListener('click', async () => {
 initServiceIconPickers();
 setupSettingsFaviconUpload();
 
+document.addEventListener('visibilitychange', reconcilePageScrollLock);
+window.addEventListener('pageshow', reconcilePageScrollLock);
+
 // Init
 (async () => {
   await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
@@ -3921,6 +3949,7 @@ setupSettingsFaviconUpload();
     refreshIconPickerGrid(prefix);
   });
   await checkServerHealth();
+  reconcilePageScrollLock();
   if (token) {
     showView('dashboard-view');
     loadDashboard().catch(handleDashboardLoadError);

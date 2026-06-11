@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.3.62
+
+- **Pulpit — scroll (fix v3)**: naprawione trwałe blokowanie przewijania po zamknięciu modala — `closeIconPopover()` było wywoływane bez definicji (ReferenceError), więc `unlockPageScroll` nigdy nie działał i `body` zostawało z `position: fixed`. Blokada oparta na liczbie widocznych `.modal` w DOM (zamiast refcount), `reconcilePageScrollLock` przy starcie i `pageshow`. Jeden scrollport: `html { overflow-y: scroll }`, bez drugiego na `body`.
+
+## v1.3.61
+
+- **Pulpit — scroll (fix v2)**: jeden scrollport na `html` (`overflow-y: scroll`, bez `!important`); `body` rośnie z treścią (`overflow-y: visible`, `height: auto`). Usunięte `overflow-y: auto` z `html, body` (v1.3.58 zdjęło flex-trap, ale drugi scrollport na `body` nadal blokował kółko przy 17+ pinach / 8 kategoriach). Jawne `overflow: visible` / `max-height: none` na łańcuchu `#app` → `#dashboard-view` → `.main` → `.pinned-section` + guard `[data-theme]`. Układ Średni: `height: 100%` / `stretch` → `auto` / `start`. Klasyczny/Średni: max 3 kolumny grup od 1280px. Sticky header: `isolation: isolate`.
+- **Pulpit — dedup pinów**: `dedupePinnedServices` przez `normalizeUrlCompareKey` (jak duplikat URL w modalu) — jeden wpis na ten sam endpoint (np. podwójny AI-SIEM).
+
+## v1.3.60
+
+- **Pulpit — Klasyczny (mały)**: powiększenie układu `classic-sm` z ~50% do ~63% wymiarów Klasycznego (ikona 27px, karta min. 116px, czcionki/paddingi/watermark proporcjonalnie). Zachowany pionowy układ Homer i aspect 22:19.
+
+## v1.3.59
+
+- **Język — dropdown (fix)**: natywne opcje select (PL/EN/DE/UA) niewidoczne na białym popupie OS — `color-scheme: dark|light` per motyw, `option { background, color }` dla wszystkich `select` i `.lang-select`. Etykieta UK → UA w nagłówku.
+
 ## v1.3.58
 
 - **Pulpit — scroll (fix)**: usunięty flex-column trap na `#dashboard-view` oraz `overflow-x: hidden` na `#app` / `#dashboard-view` (CSS wymuszał `overflow-y: auto` na kontenerze o wysokości viewportu — kółko myszy nie przewijało dokumentu). Przewijanie strony działa przy 8+ grupach kategorii.
