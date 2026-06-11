@@ -8,6 +8,7 @@ let apiKeys = [];
 let notes = [];
 let activeFilter = 'all';
 let accessFilter = 'all';
+let availabilityFilter = 'all';
 let networkFilter = 'all';
 let serviceSearch = '';
 let appSettings = {};
@@ -23,8 +24,11 @@ const SERVICE_ICON_PRESETS = [
   'search', 'storage', 'ai', 'dashboard', 'workflow', 'mqtt', 'nas', 'plug', 'download', 'tv',
   'film', 'photo', 'doc', 'wifi', 'ci', 'nginx', 'apache', 'python', 'windows', 'caddy', 'traefik',
 ];
+const RECENT_ICONS_KEY = 'netdash_recent_icons';
+const MAX_RECENT_ICONS = 8;
 const SERVICE_ICON_GROUPS = [
   { id: 'all', labelKey: 'modal.edit.iconGroup.all' },
+  { id: 'recent', labelKey: 'modal.edit.iconGroup.recent' },
   { id: 'media', labelKey: 'modal.edit.iconGroup.media', icons: ['play', 'tv', 'film', 'photo', 'download'] },
   {
     id: 'infra',
@@ -39,7 +43,6 @@ const SERVICE_ICON_GROUPS = [
   },
 ];
 const iconPickerState = { edit: { group: 'all', query: '' }, add: { group: 'all', query: '' } };
-let activeIconPopover = null;
 const DEFAULT_SERVICE_CATEGORIES = [
   'Media', 'Monitoring', 'DevOps', 'Storage', 'Network', 'Home Automation', 'Urządzenie', 'Inne',
 ];
@@ -254,6 +257,7 @@ async function setLanguage(lang) {
   $('#lang-quick').value = lang;
   $('#settings-language').value = lang;
   renderAccessFilters();
+  renderAvailabilityFilters();
   if (currentPage === 'home') renderPinnedServices();
   else renderServices();
   renderKeys();
@@ -514,7 +518,7 @@ async function loadDashboard() {
   apiKeys = keysRes?.error ? [] : keysRes;
   notes = notesRes?.error ? [] : notesRes;
   appSettings = settings;
-  accessFilter = settings.default_access_filter || 'all';
+  applyDefaultAccessFilter(settings.default_access_filter);
   await setLanguage(settings.language || 'pl');
   applyTheme();
 
@@ -873,13 +877,34 @@ function syncServiceSearchFromDom() {
   if (input) serviceSearch = input.value;
 }
 
+function applyDefaultAccessFilter(value) {
+  const v = value || 'all';
+  if (v === 'offline') {
+    accessFilter = 'all';
+    availabilityFilter = 'offline';
+    return;
+  }
+  accessFilter = v;
+}
+
 function filterByAccess(list, access = accessFilter) {
   if (access === 'login') return list.filter((s) => s.has_login);
   if (access === 'public') return list.filter((s) => !s.has_login);
   if (access === 'wol') return list.filter(isWolDevice);
-  if (access === 'offline') return list.filter(serviceIsOffline);
   if (access === 'pinned') return list.filter((s) => s.pinned);
   return list;
+}
+
+function serviceAvailabilityBucket(s) {
+  const state = serviceHealthState(s);
+  if (state === 'offline' || state === 'error') return 'offline';
+  if (state === 'online') return 'online';
+  return 'unknown';
+}
+
+function filterByAvailability(list, availability = availabilityFilter) {
+  if (availability === 'all') return list;
+  return list.filter((s) => serviceAvailabilityBucket(s) === availability);
 }
 
 function filterByNetwork(list, network = networkFilter) {
@@ -901,12 +926,16 @@ function filterBySearch(list, q = serviceSearch) {
 function applyServiceFilters(list, opts = {}) {
   const {
     access = accessFilter,
+    availability = availabilityFilter,
     network = networkFilter,
     category = activeFilter,
     search = serviceSearch,
   } = opts;
   return filterByCategory(
-    filterByNetwork(filterByAccess(filterBySearch(list, search), access), network),
+    filterByNetwork(
+      filterByAvailability(filterByAccess(filterBySearch(list, search), access), availability),
+      network,
+    ),
     category,
   );
 }
@@ -929,15 +958,22 @@ function normalizeFilterState() {
     }
   }
 
-  if (accessFilter === 'offline' || accessFilter === 'pinned') {
+  if (accessFilter === 'pinned') {
     const accessBase = filterByCategory(
-      filterByNetwork(filterBySearch(services), networkFilter),
+      filterByAvailability(filterByNetwork(filterBySearch(services), networkFilter), availabilityFilter),
       activeFilter,
     );
-    const hasMatch = accessFilter === 'offline'
-      ? accessBase.some(serviceIsOffline)
-      : accessBase.some((s) => s.pinned);
-    if (!hasMatch) accessFilter = 'all';
+    if (!accessBase.some((s) => s.pinned)) accessFilter = 'all';
+  }
+
+  if (availabilityFilter !== 'all') {
+    const availabilityBase = filterByCategory(
+      filterByNetwork(filterByAccess(filterBySearch(services)), networkFilter),
+      activeFilter,
+    );
+    if (!availabilityBase.some((s) => serviceAvailabilityBucket(s) === availabilityFilter)) {
+      availabilityFilter = 'all';
+    }
   }
 }
 
@@ -1097,8 +1133,11 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
       ? t('empty.filter.wolMissingMac', { count: missingMac })
       : t('empty.filter.wol');
     hint.classList.remove('hidden');
-  } else if (accessFilter === 'offline') {
+  } else if (availabilityFilter === 'offline') {
     hint.textContent = t('empty.filter.offline');
+    hint.classList.remove('hidden');
+  } else if (availabilityFilter === 'online') {
+    hint.textContent = t('empty.filter.online');
     hint.classList.remove('hidden');
   } else if (accessFilter === 'pinned') {
     hint.textContent = t('empty.filter.pinned');
@@ -1113,21 +1152,43 @@ function renderAccessFilters() {
   const loginCount = applyServiceFilters(services, { access: 'login' }).length;
   const publicCount = applyServiceFilters(services, { access: 'public' }).length;
   const wolCount = applyServiceFilters(services, { access: 'wol' }).length;
-  const offlineCount = applyServiceFilters(services, { access: 'offline' }).length;
   const pinnedCount = applyServiceFilters(services, { access: 'pinned' }).length;
+  const accessAllActive = accessFilter === 'all' && availabilityFilter === 'all';
+  const accessAllSuppressed = accessFilter === 'all' && availabilityFilter !== 'all';
   const container = $('#access-filters');
   container.innerHTML = [
-    `<button type="button" class="filter-chip ${accessFilter === 'all' ? 'active' : ''}" data-access="all"><span class="chip-label">${t('filter.all')}</span><span class="count">${allCount}</span></button>`,
+    `<button type="button" class="filter-chip ${accessAllActive ? 'active' : ''} ${accessAllSuppressed ? 'filter-suppressed' : ''}" data-access="all" title="${accessAllSuppressed ? t('filter.allSuppressedHint') : ''}"><span class="chip-label">${t('filter.all')}</span><span class="count">${allCount}</span></button>`,
     `<button type="button" class="filter-chip filter-login ${accessFilter === 'login' ? 'active' : ''}" data-access="login"><span class="chip-label"><span class="chip-icon" aria-hidden="true">🔐</span>${t('filter.login')}</span><span class="count">${loginCount}</span></button>`,
     `<button type="button" class="filter-chip filter-public ${accessFilter === 'public' ? 'active' : ''}" data-access="public"><span class="chip-label"><span class="chip-icon" aria-hidden="true">🌐</span>${t('filter.public')}</span><span class="count">${publicCount}</span></button>`,
     `<button type="button" class="filter-chip filter-wol ${accessFilter === 'wol' ? 'active' : ''}" data-access="wol"><span class="chip-label"><span class="chip-icon" aria-hidden="true">⚡</span>${t('filter.wol')}</span><span class="count">${wolCount}</span></button>`,
-    `<button type="button" class="filter-chip filter-offline ${accessFilter === 'offline' ? 'active' : ''}" data-access="offline"><span class="chip-label"><span class="chip-dot chip-dot-offline" aria-hidden="true"></span>${t('filter.offline')}</span><span class="count">${offlineCount}</span></button>`,
     `<button type="button" class="filter-chip filter-pinned ${accessFilter === 'pinned' ? 'active' : ''}" data-access="pinned"><span class="chip-label">${t('filter.pinned')}<span class="chip-icon chip-icon-star" aria-hidden="true">★</span></span><span class="count">${pinnedCount}</span></button>`,
   ].join('');
   container.querySelectorAll('.filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
       accessFilter = chip.dataset.access;
+      if (accessFilter === 'all') availabilityFilter = 'all';
       guardLayoutWidth('access filter', () => renderServices());
+    });
+  });
+}
+
+function renderAvailabilityFilters() {
+  const container = $('#availability-filters');
+  if (!container) return;
+
+  const allCount = applyServiceFilters(services, { availability: 'all' }).length;
+  const onlineCount = applyServiceFilters(services, { availability: 'online' }).length;
+  const offlineCount = applyServiceFilters(services, { availability: 'offline' }).length;
+
+  container.innerHTML = [
+    `<button type="button" class="filter-chip filter-all ${availabilityFilter === 'all' ? 'active' : ''}" data-availability="all"><span class="chip-label">${t('filter.all')}</span><span class="count">${allCount}</span></button>`,
+    `<button type="button" class="filter-chip filter-online ${availabilityFilter === 'online' ? 'active' : ''}" data-availability="online"><span class="chip-label"><span class="chip-dot chip-dot-online" aria-hidden="true"></span>${t('filter.online')}</span><span class="count">${onlineCount}</span></button>`,
+    `<button type="button" class="filter-chip filter-offline ${availabilityFilter === 'offline' ? 'active' : ''}" data-availability="offline"><span class="chip-label"><span class="chip-dot chip-dot-offline" aria-hidden="true"></span>${t('filter.offline')}</span><span class="count">${offlineCount}</span></button>`,
+  ].join('');
+  container.querySelectorAll('.filter-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      availabilityFilter = chip.dataset.availability;
+      guardLayoutWidth('availability filter', () => renderServices());
     });
   });
 }
@@ -1231,12 +1292,11 @@ function statusTooltip(s) {
 }
 
 function serviceIsOffline(s) {
-  const state = serviceHealthState(s);
-  return state === 'offline' || state === 'error';
+  return serviceAvailabilityBucket(s) === 'offline';
 }
 
 function serviceIsOnlineHealthy(s) {
-  return serviceHealthState(s) === 'online';
+  return serviceAvailabilityBucket(s) === 'online';
 }
 
 function serviceHealthState(s) {
@@ -1609,7 +1669,28 @@ function serviceIconPrefixFromInputId(selectId = 'edit-icon') {
   return selectId.replace(/-icon$/, '');
 }
 
+function getRecentIcons() {
+  try {
+    const raw = localStorage.getItem(RECENT_ICONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((i) => typeof i === 'string' && SERVICE_ICON_PRESETS.includes(i))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushRecentIcon(icon) {
+  const safe = (icon || 'globe').toLowerCase().replace(/[^a-z0-9]/g, '') || 'globe';
+  if (!SERVICE_ICON_PRESETS.includes(safe)) return;
+  let recent = getRecentIcons().filter((i) => i !== safe);
+  recent.unshift(safe);
+  localStorage.setItem(RECENT_ICONS_KEY, JSON.stringify(recent.slice(0, MAX_RECENT_ICONS)));
+}
+
 function iconsForPickerGroup(groupId) {
+  if (groupId === 'recent') return getRecentIcons();
   if (groupId === 'all') return [...SERVICE_ICON_PRESETS];
   const group = SERVICE_ICON_GROUPS.find((g) => g.id === groupId);
   if (!group?.icons) return [...SERVICE_ICON_PRESETS];
@@ -1627,8 +1708,17 @@ function filteredServiceIcons(prefix) {
 }
 
 function refreshIconPickerTabs(prefix) {
+  const recent = getRecentIcons();
+  if (iconPickerState[prefix]?.group === 'recent' && recent.length === 0) {
+    iconPickerState[prefix].group = 'all';
+  }
   const group = iconPickerState[prefix]?.group || 'all';
-  $$(`#${prefix}-icon-popover .icon-picker-tab`).forEach((tab) => {
+  const host = $(`#${prefix}-icon-picker`);
+  if (!host) return;
+  host.querySelectorAll('.icon-picker-tab').forEach((tab) => {
+    if (tab.dataset.group === 'recent') {
+      tab.classList.toggle('hidden', recent.length === 0);
+    }
     const active = tab.dataset.group === group;
     tab.classList.toggle('active', active);
     tab.setAttribute('aria-selected', active ? 'true' : 'false');
@@ -1651,88 +1741,83 @@ function refreshIconPickerGrid(prefix) {
       <span class="icon-picker-tile-label">${esc(label)}</span>
     </button>`;
   }).join('');
-  grid.querySelectorAll('.icon-picker-tile').forEach((tile) => {
-    tile.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectServiceIcon(prefix, tile.dataset.icon);
-    });
+}
+
+function bindIconPickerGridKeyboard(prefix) {
+  const grid = $(`#${prefix}-icon-grid`);
+  if (!grid || grid.dataset.keybound === '1') return;
+  grid.dataset.keybound = '1';
+  grid.addEventListener('keydown', (e) => {
+    const tiles = [...grid.querySelectorAll('.icon-picker-tile')];
+    if (!tiles.length) return;
+    const current = document.activeElement?.closest?.('.icon-picker-tile');
+    let idx = current ? tiles.indexOf(current) : -1;
+    const cols = Math.max(1, Math.floor(grid.clientWidth / 56) || 4);
+    if (e.key === 'ArrowRight') { e.preventDefault(); idx = Math.min(tiles.length - 1, idx + 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); idx = Math.max(0, idx <= 0 ? 0 : idx - 1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(tiles.length - 1, idx < 0 ? 0 : idx + cols); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(0, idx < 0 ? 0 : idx - cols); }
+    else if (e.key === 'Enter' || e.key === ' ') {
+      if (current) { e.preventDefault(); selectServiceIcon(prefix, current.dataset.icon); }
+      return;
+    } else return;
+    tiles[idx]?.focus();
   });
 }
 
-function buildIconPickerPopover(prefix) {
-  const popover = $(`#${prefix}-icon-popover`);
-  if (!popover || popover.dataset.ready === '1') return;
-  popover.dataset.ready = '1';
-  popover.innerHTML = `
+function buildIconPicker(prefix) {
+  const host = $(`#${prefix}-icon-picker`);
+  if (!host || host.dataset.ready === '1') return;
+  host.dataset.ready = '1';
+  host.innerHTML = `
     <div class="icon-picker">
       <div class="icon-picker-toolbar">
         <input type="search" class="icon-picker-search" id="${prefix}-icon-search"
-          data-i18n-placeholder="modal.edit.iconSearch" autocomplete="off" />
-        <div class="icon-picker-tabs" role="tablist">
+          data-i18n-placeholder="modal.edit.iconSearch" autocomplete="off"
+          aria-label="${esc(t('modal.edit.iconSearch'))}" />
+        <div class="icon-picker-tabs" role="tablist" aria-label="${esc(t('modal.edit.iconPreset'))}">
           ${SERVICE_ICON_GROUPS.map((g) =>
-            `<button type="button" class="icon-picker-tab" role="tab" data-group="${g.id}" data-i18n="${g.labelKey}"></button>`,
+            `<button type="button" class="icon-picker-tab${g.id === 'recent' ? ' hidden' : ''}" role="tab" data-group="${g.id}" data-i18n="${g.labelKey}"></button>`,
           ).join('')}
         </div>
       </div>
-      <div class="icon-picker-grid" id="${prefix}-icon-grid" role="listbox"></div>
+      <div class="icon-picker-grid" id="${prefix}-icon-grid" role="listbox" tabindex="0"
+        aria-label="${esc(t('modal.edit.iconPickAria'))}"></div>
       <p class="icon-picker-empty hidden" id="${prefix}-icon-empty" data-i18n="modal.edit.iconEmpty"></p>
     </div>`;
 
-  popover.querySelector('.icon-picker-search')?.addEventListener('input', (e) => {
+  host.querySelector('.icon-picker-search')?.addEventListener('input', (e) => {
     iconPickerState[prefix].query = e.target.value;
     refreshIconPickerGrid(prefix);
   });
-  popover.querySelectorAll('.icon-picker-tab').forEach((tab) => {
-    tab.addEventListener('click', (e) => {
-      e.stopPropagation();
+  host.querySelectorAll('.icon-picker-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
       iconPickerState[prefix].group = tab.dataset.group || 'all';
       refreshIconPickerTabs(prefix);
       refreshIconPickerGrid(prefix);
     });
   });
+  host.addEventListener('click', (e) => {
+    const tile = e.target.closest('.icon-picker-tile');
+    if (!tile) return;
+    selectServiceIcon(prefix, tile.dataset.icon);
+  });
+  bindIconPickerGridKeyboard(prefix);
   applyI18n();
   refreshIconPickerTabs(prefix);
   refreshIconPickerGrid(prefix);
 }
 
-function closeIconPopover() {
-  if (!activeIconPopover) return;
-  const prefix = activeIconPopover;
-  activeIconPopover = null;
-  $(`#${prefix}-icon-preview-btn`)?.setAttribute('aria-expanded', 'false');
-  $(`#${prefix}-icon-popover`)?.classList.add('hidden');
-  iconPickerState[prefix].query = '';
-  const search = $(`#${prefix}-icon-search`);
-  if (search) search.value = '';
-}
-
-function openIconPopover(prefix) {
-  closeIconPopover();
-  activeIconPopover = prefix;
-  buildIconPickerPopover(prefix);
-  const btn = $(`#${prefix}-icon-preview-btn`);
-  const popover = $(`#${prefix}-icon-popover`);
-  btn?.setAttribute('aria-expanded', 'true');
-  popover?.classList.remove('hidden');
-  refreshIconPickerTabs(prefix);
-  refreshIconPickerGrid(prefix);
-  requestAnimationFrame(() => popover.querySelector('.icon-picker-search')?.focus());
-}
-
-function toggleIconPopover(prefix) {
-  if (activeIconPopover === prefix) closeIconPopover();
-  else openIconPopover(prefix);
-}
-
 function selectServiceIcon(prefix, icon) {
-  setServiceIconValue(prefix, icon);
-  closeIconPopover();
+  setServiceIconValue(prefix, icon, { trackRecent: true });
 }
 
-function setServiceIconValue(prefix, icon) {
-  const safe = (icon || 'globe').toLowerCase();
+function setServiceIconValue(prefix, icon, { trackRecent = false } = {}) {
+  const safe = (icon || 'globe').toLowerCase().replace(/[^a-z0-9]/g, '') || 'globe';
   const input = $(`#${prefix}-icon`);
   if (input) input.value = safe;
+  if (trackRecent) pushRecentIcon(safe);
+  refreshIconPickerTabs(prefix);
   refreshIconPickerGrid(prefix);
   updateServiceIconPreview(prefix);
   input?.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1743,22 +1828,7 @@ function populateServiceIconSelect(selected = 'globe', selectId = 'edit-icon') {
 }
 
 function initServiceIconPickers() {
-  ['edit', 'add'].forEach((prefix) => {
-    buildIconPickerPopover(prefix);
-    $(`#${prefix}-icon-preview-btn`)?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleIconPopover(prefix);
-    });
-  });
-  document.addEventListener('click', (e) => {
-    if (!activeIconPopover) return;
-    const anchor = $(`#${activeIconPopover}-icon-preview-anchor`);
-    if (anchor && !anchor.contains(e.target)) closeIconPopover();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && activeIconPopover) closeIconPopover();
-  });
+  ['edit', 'add'].forEach((prefix) => buildIconPicker(prefix));
 }
 
 function updateServiceIconPreview(prefix) {
@@ -2139,6 +2209,7 @@ async function saveServiceEdit() {
 function renderServices() {
   normalizeFilterState();
   renderAccessFilters();
+  renderAvailabilityFilters();
   if (appSettings.show_category_filters !== false) {
     renderFilters();
   } else {
@@ -2165,7 +2236,7 @@ function renderServices() {
   renderSearchFilterHint(hiddenByFilter);
 
   const grouped = appSettings.services_grouped !== false;
-  const showGrouped = grouped && accessFilter === 'all' && activeFilter === 'all' && networkFilter === 'all';
+  const showGrouped = grouped && accessFilter === 'all' && availabilityFilter === 'all' && activeFilter === 'all' && networkFilter === 'all';
   const withLogin = filtered.filter((s) => s.has_login === true);
   const withoutLogin = filtered.filter((s) => !s.has_login);
 
@@ -2446,7 +2517,7 @@ function previewSettingsFromForm() {
   applyFavicon(appSettings.favicon_url);
   applyCustomLogo();
   applyLayout();
-  accessFilter = appSettings.default_access_filter || 'all';
+  applyDefaultAccessFilter(appSettings.default_access_filter);
   refreshServiceViews();
 }
 
@@ -2532,7 +2603,7 @@ async function importSettingsBackup(file) {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    accessFilter = appSettings.default_access_filter || 'all';
+    applyDefaultAccessFilter(appSettings.default_access_filter);
     activeFilter = 'all';
     networkFilter = 'all';
     await setLanguage(appSettings.language || 'pl');
@@ -3125,7 +3196,7 @@ $('#settings-theme-picker')?.addEventListener('click', (e) => {
 $('#settings-cancel').addEventListener('click', () => {
   if (settingsSnapshot) {
     appSettings = settingsSnapshot;
-    accessFilter = appSettings.default_access_filter || 'all';
+    applyDefaultAccessFilter(appSettings.default_access_filter);
   }
   applyTheme();
   refreshServiceViews();
@@ -3177,7 +3248,7 @@ $('#settings-save').addEventListener('click', async () => {
     body: JSON.stringify(payload),
   });
   if (newLang !== currentLang) await setLanguage(newLang);
-  accessFilter = appSettings.default_access_filter || 'all';
+  applyDefaultAccessFilter(appSettings.default_access_filter);
   applyTheme();
   refreshServiceViews();
   startHealthPolling();

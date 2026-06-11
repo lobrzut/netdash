@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.44
+
+- **Service modal icon picker (inline)**: always-visible visual grid with search, category tabs, and emoji/SVG tiles in add/edit modals — replaces hidden popover and old text `<select>`. Recent icons (localStorage), keyboard arrows + Enter, selected-state highlight, live preview. i18n pl/en/de/uk.
+
 ## v1.3.43
 
 - **Settings modal width (fix)**: dialog now truly uses `min(1200px, 96vw)` — overrides the base `.modal-content` `max-width: 440px` that kept v1.3.39 at ~440px. Sidebar stays 200px; content pane ~960px+. Two-column fields get a higher min width; fixed height and mobile layout (≤768px) unchanged.
