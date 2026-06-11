@@ -290,6 +290,7 @@
   "settings.dashboardHeading": "Pulpit",
   "settings.dashboardLayout": "Motyw pulpitu",
   "settings.dashboardLayoutClassic": "Klasyczny",
+  "settings.dashboardLayoutClassicSm": "Klasyczny (mały)",
   "settings.dashboardLayoutMedium": "Średni",
   "settings.dashboardLayoutCompact": "Kompaktowy",
   "settings.dashboardLayoutHint": "Układ przypiętych serwisów na Pulpicie — podgląd na żywo. Lista Serwisy bez zmian.",

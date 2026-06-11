@@ -286,6 +286,7 @@
   "settings.dashboardHeading": "Панель",
   "settings.dashboardLayout": "Макет панелі",
   "settings.dashboardLayoutClassic": "Класичний",
+  "settings.dashboardLayoutClassicSm": "Класичний (малий)",
   "settings.dashboardLayoutMedium": "Середній",
   "settings.dashboardLayoutCompact": "Компактний",
   "settings.dashboardLayoutHint": "Макет закріплених сервісів на панелі — попередній перегляд наживо. Список Сервіси без змін.",

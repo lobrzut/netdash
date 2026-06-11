@@ -291,6 +291,7 @@
   "settings.dashboardHeading": "Dashboard",
   "settings.dashboardLayout": "Dashboard-Layout",
   "settings.dashboardLayoutClassic": "Klassisch",
+  "settings.dashboardLayoutClassicSm": "Klassisch (klein)",
   "settings.dashboardLayoutMedium": "Mittel",
   "settings.dashboardLayoutCompact": "Kompakt",
   "settings.dashboardLayoutHint": "Layout angehefteter Dienste auf dem Dashboard — Live-Vorschau. Diensteliste bleibt unverändert.",

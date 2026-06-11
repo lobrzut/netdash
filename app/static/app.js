@@ -328,11 +328,15 @@ function applyCustomLogo() {
   });
 }
 
+function isPinnedClassicLayout(layout) {
+  return layout === 'classic' || layout === 'classic-sm';
+}
+
 function dashboardLayout() {
   const layout = appSettings.pinned_card_size || 'medium';
   if (layout === 'large') return 'classic';
   if (layout === 'normal') return 'medium';
-  if (['classic', 'medium', 'compact'].includes(layout)) return layout;
+  if (['classic', 'classic-sm', 'medium', 'compact'].includes(layout)) return layout;
   return 'medium';
 }
 
@@ -1432,7 +1436,7 @@ function formatServiceUrlDisplay(url) {
 function serviceCardHtml(s, opts = {}) {
   const { context = 'services', pinnedLayout = dashboardLayout() } = opts;
   const isPinnedCard = context === 'pinned';
-  const isPinnedClassic = isPinnedCard && pinnedLayout === 'classic';
+  const isPinnedClassic = isPinnedCard && isPinnedClassicLayout(pinnedLayout);
   const isPinnedMedium = isPinnedCard && pinnedLayout === 'medium';
   const compact = !isPinnedCard && appSettings.card_style === 'compact';
   const isHostOnly = s.protocol === 'host' || s.port === 0;

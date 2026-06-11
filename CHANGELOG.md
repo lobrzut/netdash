@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.54
+
+- **Pulpit — motyw Klasyczny (mały)**: czwarty układ `classic-sm` — ta sama struktura co Klasyczny (pionowe karty w grupach, watermark, URL, kategoria, uptime), wymiary ~50% (ikona 20px, karta min. 88px). Ustawienia → Wygląd → Pulpit. i18n pl/en/de/uk.
+
 ## v1.3.53
 
 - **Pulpit — sekcja przypiętych**: nagłówek „Przypięte serwisy” zawsze widoczny (także przy pustej liście), licznik pinów, pusta karta z CTA do Serwisów. Szersze etykiety kategorii w układzie kompaktowym (bez obcinania „DASHBO…”, „DEVELO…”); tooltip na pełnej nazwie.

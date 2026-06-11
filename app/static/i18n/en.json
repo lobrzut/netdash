@@ -291,6 +291,7 @@
   "settings.dashboardHeading": "Dashboard",
   "settings.dashboardLayout": "Dashboard layout",
   "settings.dashboardLayoutClassic": "Classic",
+  "settings.dashboardLayoutClassicSm": "Classic (small)",
   "settings.dashboardLayoutMedium": "Medium",
   "settings.dashboardLayoutCompact": "Compact",
   "settings.dashboardLayoutHint": "Layout for pinned services on the Dashboard — live preview. Services list is unchanged.",
