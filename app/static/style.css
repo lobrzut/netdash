@@ -555,9 +555,129 @@ body.modal-open {
   gap: 1rem;
 }
 
-.field-row .field { flex: 1; }
+.field-row .field { flex: 1; min-width: 0; }
 .field-grow { flex: 2 !important; }
 .field-color { flex: 0 0 140px !important; }
+
+/* ── Modal forms (single-column default) ── */
+.modal-form .field,
+.modal-service-form .field {
+  margin-bottom: 1rem;
+}
+
+.modal-form .field:last-child,
+.modal-service-form .field:last-child {
+  margin-bottom: 0;
+}
+
+.modal-form .field label,
+.modal-service-form .field label {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-bottom: 0.375rem;
+}
+
+.modal-form .field-label-wrap + input,
+.modal-form .field-label-wrap + textarea,
+.modal-service-form .field-label-wrap + input,
+.modal-service-form .field-label-wrap + textarea {
+  margin-top: 0;
+}
+
+.field-label-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.modal-form .field-label-wrap label,
+.modal-service-form .field-label-wrap label {
+  margin-bottom: 0;
+}
+
+.field-optional {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-grid--split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 480px) {
+  .modal-form .form-grid--split,
+  .modal-service-form .form-grid--split {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.form-grid--category-icon {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+@media (min-width: 400px) {
+  .modal-form .form-grid--category-icon,
+  .modal-service-form .form-grid--category-icon {
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+  }
+}
+
+.modal-form .form-grid .field,
+.modal-form .form-grid--split .field,
+.modal-form .form-grid--category-icon .field,
+.modal-service-form .form-grid .field,
+.modal-service-form .form-grid--split .field,
+.modal-service-form .form-grid--category-icon .field {
+  margin-bottom: 0;
+}
+
+.modal-form .checkbox-row,
+.modal-service-form .checkbox-row {
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.125rem 0;
+  margin-bottom: 0.25rem;
+}
+
+.modal-form .checkbox-row input[type="checkbox"],
+.modal-service-form .checkbox-row input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.modal-form .field input:not([type="color"]):not([type="checkbox"]),
+.modal-form .field textarea,
+.modal-form .field select,
+.modal-service-form .field input:not([type="color"]):not([type="checkbox"]),
+.modal-service-form .field textarea,
+.modal-service-form .field select {
+  min-width: 0;
+}
+
+.modal-form .field-color select {
+  max-width: 12rem;
+}
 
 .modal-wide { max-width: 520px; }
 
@@ -3521,15 +3641,15 @@ body.modal-open {
 }
 
 .modal-form-section {
-  margin-bottom: 1.25rem;
-  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .modal-form-section:last-of-type {
   border-bottom: none;
   padding-bottom: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .modal-form-section--compact {
@@ -3624,6 +3744,11 @@ body.modal-open {
   min-width: 4.5rem;
 }
 
+.icon-preview-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
 .service-edit-icon-preview {
   display: flex;
   align-items: center;
@@ -3636,15 +3761,68 @@ body.modal-open {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
+button.service-edit-icon-preview.icon-preview-btn {
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+button.service-edit-icon-preview.icon-preview-btn:hover {
+  border-color: rgba(var(--accent-rgb, 34, 197, 94), 0.45);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 34, 197, 94), 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+button.service-edit-icon-preview.icon-preview-btn:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 34, 197, 94), 0.35);
+}
+
+button.service-edit-icon-preview.icon-preview-btn[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb, 34, 197, 94), 0.08);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 34, 197, 94), 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.icon-preview-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .service-edit-icon-preview .service-icon {
   width: 2rem;
   height: 2rem;
   font-size: 1.25rem;
 }
 
+.icon-picker-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 120;
+  width: min(19rem, calc(100vw - 3rem));
+  padding: 0.625rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.icon-picker-popover .icon-picker-grid {
+  max-height: 10.5rem;
+  border: none;
+  background: rgba(0, 0, 0, 0.22);
+}
+
 /* ── Icon picker ── */
 .icon-picker-field {
-  margin-bottom: 0.25rem;
+  display: none;
 }
 
 .icon-picker {
@@ -3806,9 +3984,21 @@ body.modal-open {
   .services-grid--comfortable { grid-template-columns: 1fr; }
   .services-grid--pinned { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
   .field-row { flex-direction: column; gap: 0; }
-  .icon-picker-grid {
+  .icon-picker-popover {
+    position: fixed;
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: 0;
+    transform: translateX(-50%);
+    width: min(24rem, calc(100vw - 1rem));
+    max-height: min(52vh, 22rem);
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
+  }
+  .icon-picker-popover .icon-picker-grid {
     grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr));
-    max-height: 9.5rem;
+    max-height: min(38vh, 14rem);
   }
   .icon-picker-tile { min-height: 2.75rem; padding: 0.25rem; }
   .icon-picker-tile-label { display: none; }

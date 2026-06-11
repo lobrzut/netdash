@@ -1534,16 +1534,160 @@ function populateServiceCategorySuggestions() {
     .map((cat) => `<option value="${esc(cat)}"></option>`).join('');
 }
 
-function populateServiceIconSelect(selected = 'globe', selectId = 'edit-icon') {
-  const select = $(`#${selectId}`);
-  if (!select) return;
-  const safe = (selected || 'globe').toLowerCase();
-  const icons = new Set(SERVICE_ICON_PRESETS);
-  icons.add(safe);
-  select.innerHTML = [...icons].map((icon) => {
+function serviceIconPrefixFromInputId(selectId = 'edit-icon') {
+  return selectId.replace(/-icon$/, '');
+}
+
+function iconsForPickerGroup(groupId) {
+  if (groupId === 'all') return [...SERVICE_ICON_PRESETS];
+  const group = SERVICE_ICON_GROUPS.find((g) => g.id === groupId);
+  if (!group?.icons) return [...SERVICE_ICON_PRESETS];
+  return group.icons.filter((icon) => SERVICE_ICON_PRESETS.includes(icon));
+}
+
+function filteredServiceIcons(prefix) {
+  const state = iconPickerState[prefix] || { group: 'all', query: '' };
+  const q = (state.query || '').trim().toLowerCase();
+  let icons = iconsForPickerGroup(state.group);
+  if (q) icons = icons.filter((icon) => icon.includes(q));
+  const current = ($(`#${prefix}-icon`)?.value || 'globe').toLowerCase();
+  if (current && !icons.includes(current)) icons = [current, ...icons];
+  return icons;
+}
+
+function refreshIconPickerTabs(prefix) {
+  const group = iconPickerState[prefix]?.group || 'all';
+  $$(`#${prefix}-icon-popover .icon-picker-tab`).forEach((tab) => {
+    const active = tab.dataset.group === group;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+}
+
+function refreshIconPickerGrid(prefix) {
+  const grid = $(`#${prefix}-icon-grid`);
+  const empty = $(`#${prefix}-icon-empty`);
+  if (!grid) return;
+  const selected = ($(`#${prefix}-icon`)?.value || 'globe').toLowerCase();
+  const icons = filteredServiceIcons(prefix);
+  if (empty) empty.classList.toggle('hidden', icons.length > 0);
+  grid.innerHTML = icons.map((icon) => {
     const label = icon.charAt(0).toUpperCase() + icon.slice(1);
-    return `<option value="${esc(icon)}" ${icon === safe ? 'selected' : ''}>${esc(label)}</option>`;
+    const isSelected = icon === selected;
+    return `<button type="button" class="icon-picker-tile${isSelected ? ' selected' : ''}" role="option"
+      aria-selected="${isSelected}" data-icon="${esc(icon)}" title="${esc(label)}">
+      <div class="service-icon ${getIconClass(icon)}"></div>
+      <span class="icon-picker-tile-label">${esc(label)}</span>
+    </button>`;
   }).join('');
+  grid.querySelectorAll('.icon-picker-tile').forEach((tile) => {
+    tile.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectServiceIcon(prefix, tile.dataset.icon);
+    });
+  });
+}
+
+function buildIconPickerPopover(prefix) {
+  const popover = $(`#${prefix}-icon-popover`);
+  if (!popover || popover.dataset.ready === '1') return;
+  popover.dataset.ready = '1';
+  popover.innerHTML = `
+    <div class="icon-picker">
+      <div class="icon-picker-toolbar">
+        <input type="search" class="icon-picker-search" id="${prefix}-icon-search"
+          data-i18n-placeholder="modal.edit.iconSearch" autocomplete="off" />
+        <div class="icon-picker-tabs" role="tablist">
+          ${SERVICE_ICON_GROUPS.map((g) =>
+            `<button type="button" class="icon-picker-tab" role="tab" data-group="${g.id}" data-i18n="${g.labelKey}"></button>`,
+          ).join('')}
+        </div>
+      </div>
+      <div class="icon-picker-grid" id="${prefix}-icon-grid" role="listbox"></div>
+      <p class="icon-picker-empty hidden" id="${prefix}-icon-empty" data-i18n="modal.edit.iconEmpty"></p>
+    </div>`;
+
+  popover.querySelector('.icon-picker-search')?.addEventListener('input', (e) => {
+    iconPickerState[prefix].query = e.target.value;
+    refreshIconPickerGrid(prefix);
+  });
+  popover.querySelectorAll('.icon-picker-tab').forEach((tab) => {
+    tab.addEventListener('click', (e) => {
+      e.stopPropagation();
+      iconPickerState[prefix].group = tab.dataset.group || 'all';
+      refreshIconPickerTabs(prefix);
+      refreshIconPickerGrid(prefix);
+    });
+  });
+  applyI18n();
+  refreshIconPickerTabs(prefix);
+  refreshIconPickerGrid(prefix);
+}
+
+function closeIconPopover() {
+  if (!activeIconPopover) return;
+  const prefix = activeIconPopover;
+  activeIconPopover = null;
+  $(`#${prefix}-icon-preview-btn`)?.setAttribute('aria-expanded', 'false');
+  $(`#${prefix}-icon-popover`)?.classList.add('hidden');
+  iconPickerState[prefix].query = '';
+  const search = $(`#${prefix}-icon-search`);
+  if (search) search.value = '';
+}
+
+function openIconPopover(prefix) {
+  closeIconPopover();
+  activeIconPopover = prefix;
+  buildIconPickerPopover(prefix);
+  const btn = $(`#${prefix}-icon-preview-btn`);
+  const popover = $(`#${prefix}-icon-popover`);
+  btn?.setAttribute('aria-expanded', 'true');
+  popover?.classList.remove('hidden');
+  refreshIconPickerTabs(prefix);
+  refreshIconPickerGrid(prefix);
+  requestAnimationFrame(() => popover.querySelector('.icon-picker-search')?.focus());
+}
+
+function toggleIconPopover(prefix) {
+  if (activeIconPopover === prefix) closeIconPopover();
+  else openIconPopover(prefix);
+}
+
+function selectServiceIcon(prefix, icon) {
+  setServiceIconValue(prefix, icon);
+  closeIconPopover();
+}
+
+function setServiceIconValue(prefix, icon) {
+  const safe = (icon || 'globe').toLowerCase();
+  const input = $(`#${prefix}-icon`);
+  if (input) input.value = safe;
+  refreshIconPickerGrid(prefix);
+  updateServiceIconPreview(prefix);
+  input?.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function populateServiceIconSelect(selected = 'globe', selectId = 'edit-icon') {
+  setServiceIconValue(serviceIconPrefixFromInputId(selectId), selected);
+}
+
+function initServiceIconPickers() {
+  ['edit', 'add'].forEach((prefix) => {
+    buildIconPickerPopover(prefix);
+    $(`#${prefix}-icon-preview-btn`)?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleIconPopover(prefix);
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!activeIconPopover) return;
+    const anchor = $(`#${activeIconPopover}-icon-preview-anchor`);
+    if (anchor && !anchor.contains(e.target)) closeIconPopover();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && activeIconPopover) closeIconPopover();
+  });
 }
 
 function updateServiceIconPreview(prefix) {
@@ -2024,6 +2168,7 @@ function closeModal(id) {
   const el = $(`#${id}`);
   if (!el || el.classList.contains('hidden')) return;
   el.classList.add('hidden');
+  closeIconPopover();
   unlockPageScroll();
 }
 
@@ -3175,10 +3320,16 @@ $('#power-link-save').addEventListener('click', async () => {
   fillSettingsForm();
 });
 
+initServiceIconPickers();
+
 // Init
 (async () => {
   await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
   applyI18n();
+  ['edit', 'add'].forEach((prefix) => {
+    refreshIconPickerTabs(prefix);
+    refreshIconPickerGrid(prefix);
+  });
   await checkServerHealth();
   if (token) {
     showView('dashboard-view');
