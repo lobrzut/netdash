@@ -1852,6 +1852,17 @@ function initServiceIconPickers() {
   });
 }
 
+function isUploadedIconUrl(url) {
+  return (url || '').trim().startsWith('/uploads/icons/');
+}
+
+function syncIconUrlDetails(prefix) {
+  const details = $(`#${prefix}-icon-url-details`);
+  if (!details) return;
+  const iconUrl = $(`#${prefix}-icon-url`)?.value.trim() || '';
+  details.open = !!iconUrl && !isUploadedIconUrl(iconUrl);
+}
+
 function updateServiceIconPreview(prefix) {
   const preview = $(`#${prefix}-icon-preview`);
   if (!preview) return;
@@ -1859,13 +1870,14 @@ function updateServiceIconPreview(prefix) {
   const iconUrl = $(`#${prefix}-icon-url`)?.value.trim() || '';
   preview.innerHTML = renderServiceIcon({ icon, icon_url: iconUrl || null });
   refreshIconUploadStatus(prefix);
+  syncIconUrlDetails(prefix);
 }
 
 function refreshIconUploadStatus(prefix) {
   const status = $(`#${prefix}-icon-upload-status`);
   if (!status) return;
   const iconUrl = $(`#${prefix}-icon-url`)?.value.trim() || '';
-  if (!iconUrl.startsWith('/uploads/icons/')) {
+  if (!isUploadedIconUrl(iconUrl)) {
     status.classList.add('hidden');
     status.innerHTML = '';
     return;
@@ -1925,14 +1937,101 @@ async function uploadServiceIcon(prefix, file) {
   }
 }
 
-function setupServiceIconUpload(prefix) {
-  const fileInput = $(`#${prefix}-icon-file`);
-  const btn = $(`#${prefix}-icon-upload-btn`);
-  btn?.addEventListener('click', () => fileInput?.click());
-  fileInput?.addEventListener('change', async (e) => {
+function bindFileUploadButton(btn, fileInput, onFile) {
+  if (!btn || !fileInput || btn.dataset.uploadBound) return;
+  btn.dataset.uploadBound = '1';
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (btn.disabled) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
-    if (file) await uploadServiceIcon(prefix, file);
+    if (file) await onFile(file);
     e.target.value = '';
+  });
+}
+
+function setupServiceIconUpload(prefix) {
+  bindFileUploadButton(
+    $(`#${prefix}-icon-upload-btn`),
+    $(`#${prefix}-icon-file`),
+    (file) => uploadServiceIcon(prefix, file),
+  );
+}
+
+function refreshSettingsFaviconStatus() {
+  const status = $('#settings-favicon-upload-status');
+  if (!status) return;
+  const iconUrl = $('#settings-favicon')?.value.trim() || '';
+  if (!isUploadedIconUrl(iconUrl)) {
+    status.classList.add('hidden');
+    status.innerHTML = '';
+    return;
+  }
+  const filename = iconUrl.split('/').pop() || iconUrl;
+  status.classList.remove('hidden');
+  status.innerHTML = `
+    <img class="icon-upload-thumb" src="${esc(iconUrl)}" alt="" loading="lazy" />
+    <span class="icon-upload-name" title="${esc(filename)}">${esc(filename)}</span>`;
+}
+
+function syncSettingsFaviconDetails() {
+  const details = $('#settings-favicon-url-details');
+  if (!details) return;
+  const iconUrl = $('#settings-favicon')?.value.trim() || '';
+  details.open = !!iconUrl && !isUploadedIconUrl(iconUrl);
+}
+
+async function uploadSettingsFavicon(file) {
+  if (!file) return;
+  const btn = $('#settings-favicon-upload-btn');
+  if (!isAllowedIconFile(file)) {
+    showToast(t('modal.edit.uploadFailed'), 'error');
+    return;
+  }
+  if (file.size > MAX_ICON_UPLOAD_BYTES) {
+    showToast(t('modal.edit.uploadTooLarge'), 'error');
+    return;
+  }
+  if (btn) btn.disabled = true;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API}/api/services/upload-icon`, {
+      method: 'POST',
+      headers,
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(translateApiDetail(data.detail) || t('modal.edit.uploadFailed'));
+    }
+    const urlInput = $('#settings-favicon');
+    if (urlInput) urlInput.value = data.url;
+    refreshSettingsFaviconStatus();
+    syncSettingsFaviconDetails();
+    applyFavicon(data.url);
+    showToast(file.name, 'success');
+  } catch (err) {
+    showToast(err.message || t('modal.edit.uploadFailed'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setupSettingsFaviconUpload() {
+  bindFileUploadButton(
+    $('#settings-favicon-upload-btn'),
+    $('#settings-favicon-file'),
+    uploadSettingsFavicon,
+  );
+  $('#settings-favicon')?.addEventListener('input', () => {
+    refreshSettingsFaviconStatus();
+    syncSettingsFaviconDetails();
   });
 }
 
@@ -2642,6 +2741,8 @@ function fillSettingsForm() {
   $('#settings-pinned-card-size').value = pinnedCardSize();
   solScriptContext = { mac: null, port: null };
   refreshSolScriptPreviews();
+  refreshSettingsFaviconStatus();
+  syncSettingsFaviconDetails();
 }
 
 function previewSettingsFromForm() {
@@ -3607,6 +3708,7 @@ $('#power-link-save').addEventListener('click', async () => {
 });
 
 initServiceIconPickers();
+setupSettingsFaviconUpload();
 
 // Init
 (async () => {

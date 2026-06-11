@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.45" />
-  <script src="/static/i18n.js?v=1.3.45"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.49" />
+  <script src="/static/i18n.js?v=1.3.49"></script>
 </head>
 <body>
   <div id="app">
@@ -241,10 +241,18 @@
             <div class="field"><label for="settings-title" data-i18n="settings.appTitle">Tytuł</label><input type="text" id="settings-title" /></div>
             <div class="field"><label for="settings-subtitle" data-i18n="settings.subtitle">Podtytuł</label><input type="text" id="settings-subtitle" /></div>
             <div class="field"><label for="settings-footer" data-i18n="settings.footer">Stopka</label><input type="text" id="settings-footer" /></div>
-            <div class="field">
-              <label for="settings-favicon" data-i18n="settings.favicon">Favicon (URL)</label>
-              <input type="url" id="settings-favicon" placeholder="/static/favicon.svg" />
+            <div class="field icon-source-field">
+              <label data-i18n="settings.favicon">Favicon</label>
+              <div class="icon-upload-primary">
+                <button type="button" class="btn btn-primary btn-sm" id="settings-favicon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj z pliku</button>
+                <input type="file" id="settings-favicon-file" class="sr-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
+              </div>
               <span class="hint" data-i18n="settings.faviconHint">Pozostaw puste dla domyślnej ikony NetDash</span>
+              <div class="icon-upload-status hidden" id="settings-favicon-upload-status" aria-live="polite"></div>
+              <details class="icon-url-details" id="settings-favicon-url-details">
+                <summary data-i18n="modal.edit.iconUrlOr">lub podaj URL</summary>
+                <input type="url" id="settings-favicon" placeholder="/static/favicon.svg" />
+              </details>
             </div>
           </div>
         </details>
@@ -325,6 +333,20 @@
                 <input type="color" id="settings-accent" value="#22c55e" aria-label="Kolor akcentu" />
                 <output class="color-picker-hex" id="settings-accent-hex" for="settings-accent">#22c55e</output>
               </div>
+            </div>
+          </div>
+        </details>
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.dashboardHeading">Pulpit</summary>
+          <div class="settings-accordion-body">
+            <div class="field">
+              <label for="settings-pinned-card-size" data-i18n="settings.pinnedCardSize">Rozmiar przypiętych na Pulpicie</label>
+              <select id="settings-pinned-card-size">
+                <option value="compact" data-i18n="settings.pinnedSizeCompact">Kompaktowy</option>
+                <option value="normal" data-i18n="settings.pinnedSizeNormal">Normalny</option>
+                <option value="large" data-i18n="settings.pinnedSizeLarge">Duży</option>
+              </select>
+              <span class="hint" data-i18n="settings.pinnedCardSizeHint">Dotyczy tylko przypiętych serwisów na Pulpicie — lista Serwisy bez zmian.</span>
             </div>
           </div>
         </details>
@@ -878,18 +900,21 @@ sol --udp-port 9
           <label data-i18n="modal.edit.iconPreset">Preset ikony</label>
           <div class="icon-picker-host" id="edit-icon-picker"></div>
         </div>
-        <div class="field">
+        <div class="field icon-source-field">
           <div class="field-label-wrap">
-            <label for="edit-icon-url" data-i18n="modal.edit.iconUrl">URL ikony</label>
+            <label data-i18n="modal.edit.iconSource">Własna ikona</label>
             <span class="field-optional" data-i18n="settings.optional">Opcjonalnie</span>
           </div>
-          <div class="icon-url-row">
-            <input type="url" id="edit-icon-url" placeholder="https://..." />
-            <button type="button" class="btn btn-ghost btn-sm" id="edit-icon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj plik</button>
-            <input type="file" id="edit-icon-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
+          <div class="icon-upload-primary">
+            <button type="button" class="btn btn-primary btn-sm" id="edit-icon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj z pliku</button>
+            <input type="file" id="edit-icon-file" class="sr-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
           </div>
           <p class="hint" data-i18n="modal.edit.uploadHint">PNG, JPEG, WebP lub SVG — maks. 2 MB</p>
           <div class="icon-upload-status hidden" id="edit-icon-upload-status" aria-live="polite"></div>
+          <details class="icon-url-details" id="edit-icon-url-details">
+            <summary data-i18n="modal.edit.iconUrlOr">lub podaj URL</summary>
+            <input type="url" id="edit-icon-url" placeholder="https://..." />
+          </details>
         </div>
         <div class="field">
           <div class="field-label-wrap">
@@ -969,18 +994,21 @@ sol --udp-port 9
           <label data-i18n="modal.edit.iconPreset">Preset ikony</label>
           <div class="icon-picker-host" id="add-icon-picker"></div>
         </div>
-        <div class="field">
+        <div class="field icon-source-field">
           <div class="field-label-wrap">
-            <label for="add-icon-url" data-i18n="modal.edit.iconUrl">URL ikony</label>
+            <label data-i18n="modal.edit.iconSource">Własna ikona</label>
             <span class="field-optional" data-i18n="settings.optional">Opcjonalnie</span>
           </div>
-          <div class="icon-url-row">
-            <input type="url" id="add-icon-url" placeholder="https://..." />
-            <button type="button" class="btn btn-ghost btn-sm" id="add-icon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj plik</button>
-            <input type="file" id="add-icon-file" class="hidden" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
+          <div class="icon-upload-primary">
+            <button type="button" class="btn btn-primary btn-sm" id="add-icon-upload-btn" data-i18n="modal.edit.uploadIcon">Wgraj z pliku</button>
+            <input type="file" id="add-icon-file" class="sr-file-input" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" />
           </div>
           <p class="hint" data-i18n="modal.edit.uploadHint">PNG, JPEG, WebP lub SVG — maks. 2 MB</p>
           <div class="icon-upload-status hidden" id="add-icon-upload-status" aria-live="polite"></div>
+          <details class="icon-url-details" id="add-icon-url-details">
+            <summary data-i18n="modal.edit.iconUrlOr">lub podaj URL</summary>
+            <input type="url" id="add-icon-url" placeholder="https://..." />
+          </details>
         </div>
         <div class="field">
           <div class="field-label-wrap">
@@ -1010,6 +1038,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.45"></script>
+  <script src="/static/app.js?v=1.3.49"></script>
 </body>
 </html>

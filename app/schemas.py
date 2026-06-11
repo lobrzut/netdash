@@ -180,6 +180,7 @@ class AppSettingsOut(BaseModel):
     services_grouped: bool = True
     default_access_filter: str = "all"
     card_style: str = "detailed"
+    pinned_card_size: str = "compact"
     custom_css: str | None = None
     favicon_url: str | None = None
     use_custom_logo: bool = False
@@ -224,6 +225,7 @@ class AppSettingsUpdate(BaseModel):
     services_grouped: bool | None = None
     default_access_filter: str | None = None
     card_style: str | None = None
+    pinned_card_size: str | None = None
     custom_css: str | None = None
     favicon_url: str | None = None
     use_custom_logo: bool | None = None

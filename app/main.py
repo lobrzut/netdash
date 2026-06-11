@@ -179,6 +179,7 @@ def _migrate_db(sync_conn):
             ("services_grouped", "BOOLEAN DEFAULT 1"),
             ("default_access_filter", "VARCHAR(16) DEFAULT 'all'"),
             ("card_style", "VARCHAR(16) DEFAULT 'detailed'"),
+            ("pinned_card_size", "VARCHAR(16) DEFAULT 'compact'"),
             ("custom_css", "TEXT"),
             ("favicon_url", "VARCHAR(512)"),
             ("use_custom_logo", "BOOLEAN DEFAULT 0"),

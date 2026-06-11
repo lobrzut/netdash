@@ -1,8 +1,13 @@
 # Changelog
 
+## v1.3.49
+
+- **Service modal — upload icon (fix)**: „Wgraj z pliku” as primary action opens native OS file picker reliably (`sr-file-input` instead of `display:none`). URL field moved to collapsed „lub podaj URL”; uploaded icons show preview + filename only (not raw `/uploads/icons/…` in the main field). Identify favicon URLs stay in collapsed section. Same pattern for Settings → Favicon upload. i18n pl/en/de/uk.
+
 ## v1.3.48
 
 - **Dashboard — kompaktowe przypięte serwisy**: karty w poziomie (ikona + nazwa + port), max ~58px wysokości; ukryty URL (tooltip na nazwie), bez kategorii/uptime w grupie. Mniejsze badge, watermark i panele grup (`minmax(14rem)`). Pin, hover-akcje i grupowanie bez zmian.
+- **Settings → Wygląd → Pulpit — rozmiar przypiętych kart**: Kompaktowy (domyślny) | Normalny | Duży. `pinned_card_size` w bazie; `body[data-pinned-size]`; podgląd na żywo. Lista Serwisy bez zmian. i18n pl/en/de/uk.
 
 ## v1.3.47
 
