@@ -706,7 +706,8 @@ body.modal-open {
   box-sizing: border-box;
 }
 .modal-content.modal-settings {
-  width: min(960px, 95vw);
+  width: min(1200px, 96vw);
+  max-width: min(1200px, 96vw);
   min-height: 520px;
   height: min(640px, 88vh);
   max-height: min(88vh, calc(100vh - 2rem));
@@ -968,7 +969,7 @@ body.modal-open {
 
 .settings-panel .field-row .field {
   flex: 1 1 calc(50% - 0.5rem);
-  min-width: min(100%, 10rem);
+  min-width: min(100%, 14rem);
 }
 
 .settings-panel .checkbox-row {
