@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.65
+
+- **Pulpit — Klasyczny (mały)**: wyraźnie większe ikony na przypiętych kartach (27px → 40px, ten sam rozmiar co Klasyczny) — powiększony kontener, glyph 14px, status-dot 7px. Siatka kart min. 7.5rem (mobile 6.25rem), lekko większy padding/gap w górnej strefie. Nazwa, URL i stopka bez zmian hierarchii.
+
 ## v1.3.64
 
 - **Pulpit — układ Kompaktowy (mini-karty)**: wyraźnie większe kafelki przypiętych serwisów (~210px+, min. 60px wysokości) — ikona 38px, czytelna nazwa (13px, semibold) i port jako podtytuł. Siatka `auto-fill` wypełnia szerokość wiersza zamiast zostawiać pustą przestrzeń po prawej. Akcje (★, edycja, notatki, WoL, sleep) w prawym górnym rogu na hover (Homer/Dashy) — bez rozszerzania karty w dół. Lepsze wyrównanie etykiet kategorii z wierszem kafelków.
