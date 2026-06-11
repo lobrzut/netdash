@@ -329,12 +329,11 @@ function applyCustomLogo() {
 }
 
 function pinnedCardSize() {
-  const size = appSettings.pinned_card_size || 'compact';
-  return ['compact', 'normal', 'large'].includes(size) ? size : 'compact';
+  return 'compact';
 }
 
 function applyPinnedCardSize() {
-  document.body.setAttribute('data-pinned-size', pinnedCardSize());
+  document.body.setAttribute('data-pinned-size', 'compact');
 }
 
 function applyLayout() {
@@ -2085,6 +2084,23 @@ function pinnedGroupSortKey(category) {
   return DEFAULT_SERVICE_CATEGORIES.length + label.toLowerCase();
 }
 
+function pinnedServiceDedupeKey(s) {
+  const host = (s.host || '').toLowerCase();
+  const port = s.port ?? 0;
+  const url = sanitizeServiceUrl(s.url || '').toLowerCase();
+  return `${host}:${port}:${url}`;
+}
+
+function dedupePinnedServices(list) {
+  const seen = new Set();
+  return list.filter((s) => {
+    const key = pinnedServiceDedupeKey(s);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function groupPinnedServices(list) {
   const groups = new Map();
   list.forEach((s) => {
@@ -2105,13 +2121,53 @@ function groupPinnedServices(list) {
     ]);
 }
 
+function pinnedChipHtml(s) {
+  const isHostOnly = s.protocol === 'host' || s.port === 0;
+  const showPort = appSettings.show_ports !== false && !isHostOnly;
+  const offline = s.is_online === false;
+  const cardUrl = isHostOnly ? '' : sanitizeServiceUrl(s.url);
+  const urlInfo = isHostOnly ? { display: s.host, full: s.host } : formatServiceUrlDisplay(s.url);
+  const displayName = displayServiceName(s);
+  const tooltip = urlInfo.full ? `${displayName} — ${urlInfo.full}` : displayName;
+  const healthState = serviceHealthState(s);
+  const pinTitle = t('action.unpin');
+  return `
+    <div class="pinned-chip ${offline ? 'is-offline' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" title="${esc(tooltip)}" style="--category-accent:${categoryAccentColor(s.category)}">
+      <div class="pinned-chip-icon-wrap">
+        ${renderServiceIcon(s)}
+        <span class="status-dot status-${healthState}" title="${esc(statusTooltip(s))}"></span>
+      </div>
+      <span class="pinned-chip-name">${esc(displayName)}</span>
+      ${showPort ? `<span class="pinned-chip-port" aria-hidden="true">:${s.port}</span>` : ''}
+      <div class="pinned-chip-actions">
+        <button type="button" class="pinned-chip-action pinned-chip-unpin" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}">★</button>
+      </div>
+    </div>`;
+}
+
+function bindPinnedChips(root) {
+  root.querySelectorAll('.pinned-chip').forEach((chip) => {
+    chip.addEventListener('click', (e) => {
+      if (e.target.closest('.pinned-chip-action')) return;
+      const url = chip.dataset.url;
+      if (url && url !== '#') window.open(url, '_blank', 'noopener');
+    });
+  });
+  root.querySelectorAll('.pinned-chip-unpin').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await toggleServicePin(Number(btn.dataset.id));
+    });
+  });
+}
+
 function renderPinnedServices() {
   const container = $('#pinned-container');
   const empty = $('#pinned-empty-state');
   const title = $('#pinned-section-title');
   if (!container) return;
 
-  const pinned = services.filter((s) => s.pinned);
+  const pinned = dedupePinnedServices(services.filter((s) => s.pinned));
 
   if (pinned.length === 0) {
     container.innerHTML = '';
@@ -2127,12 +2183,12 @@ function renderPinnedServices() {
     <div class="pinned-groups">
       ${groups.map(([label, items]) => `
         <section class="pinned-group">
-          <h3 class="pinned-group-label">${esc(label)}</h3>
-          <div class="services-grid services-grid--pinned">${items.map((s) => serviceCardHtml(s, { context: 'pinned' })).join('')}</div>
+          <h3 class="pinned-group-label" title="${esc(label)}">${esc(label)}</h3>
+          <div class="pinned-chips">${items.map((s) => pinnedChipHtml(s)).join('')}</div>
         </section>
       `).join('')}
     </div>`;
-  bindServiceCards(container);
+  bindPinnedChips(container);
 }
 
 async function toggleServicePin(id) {
@@ -2153,10 +2209,12 @@ async function toggleServicePin(id) {
 function patchServiceCardsForId(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
+  if (document.querySelector(`#pinned-container .pinned-chip[data-id="${id}"]`)) {
+    renderPinnedServices();
+  }
   document.querySelectorAll(`.service-card[data-id="${id}"]`).forEach((card) => {
-    const context = card.closest('#pinned-container') ? 'pinned' : 'services';
     const wrapper = document.createElement('div');
-    wrapper.innerHTML = serviceCardHtml(svc, { context });
+    wrapper.innerHTML = serviceCardHtml(svc, { context: 'services' });
     const next = wrapper.firstElementChild;
     if (next) {
       card.replaceWith(next);

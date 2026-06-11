@@ -214,6 +214,9 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
         if app_settings.author_bio and ("Łukasz" in app_settings.author_bio or "30+" in app_settings.author_bio):
             app_settings.author_bio = ""
             changed = True
+        if app_settings.pinned_card_size in ("large", "normal", None, ""):
+            app_settings.pinned_card_size = "compact"
+            changed = True
         if changed:
             await db.commit()
             await db.refresh(app_settings)
