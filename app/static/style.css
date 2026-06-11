@@ -1654,9 +1654,9 @@ body.modal-open {
 
 /* ── Header ── */
 .header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
   padding: 0.875rem 2rem;
   min-height: 3.75rem;
@@ -1680,14 +1680,13 @@ body.modal-open {
   align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
-  justify-self: start;
 }
 
 .header-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  justify-self: center;
+  flex: 1;
   min-width: 0;
 }
 
@@ -1748,7 +1747,7 @@ body.modal-open {
   justify-content: flex-end;
   gap: 0.75rem;
   flex-shrink: 0;
-  justify-self: end;
+  margin-left: auto;
 }
 
 .header-actions-services {
@@ -5114,8 +5113,8 @@ button.service-edit-icon-preview.icon-preview-btn[aria-expanded="true"] {
 }
 
 @media (max-width: 768px) {
-  .header { display: flex; padding: 1rem; flex-wrap: wrap; gap: 0.75rem; }
-  .header-nav { order: 3; width: 100%; justify-content: center; justify-self: stretch; }
+  .header { padding: 1rem; flex-wrap: wrap; gap: 0.75rem; }
+  .header-nav { order: 3; width: 100%; justify-content: flex-start; }
   .nav-segment { max-width: 100%; width: 100%; }
   .header-actions { width: 100%; justify-content: flex-end; flex-wrap: nowrap; }
   .header-actions-services { min-width: 0; flex: 1 1 auto; }
