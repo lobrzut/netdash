@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.68
+
+- **Pulpit — układ Kompaktowy**: przywrócony pasek akcji rozwijany w dół na hover (★, edycja, notatki, WoL, sleep) — karta płynnie rośnie pod treścią zamiast nachodzić w prawym górnym rogu. Zachowane ulepszenia v1.3.64+: większe kafelki (~210px), siatka `auto-fill`, 2-liniowe etykiety, lepszy padding. Układ Średni bez zmian (akcje w rogu).
+- **Nagłówek — wyśrodkowane zakładki**: Pulpit / Serwisy na środku paska (siatka 3-kolumnowa: logo | nav | akcje). Stały slot Skanuj/Dodaj i klastr ⚙/Wyloguj po prawej bez zmian. Mobile: zakładki w pełnej szerokości, wyśrodkowane.
+
 ## v1.3.67
 
 - **Nagłówek — porządek akcji**: selektor języka (PL/EN/DE/UA) przeniesiony z paska głównego do Ustawień → Język. Przycisk ustawień to sama ikona ⚙ obok „Wyloguj” (tooltip i `aria-label` z i18n). Stała szerokość slotu „Skanuj sieć” / „+ Dodaj” — przełączanie Pulpit ↔ Serwisy nie przesuwa ikon po prawej.
