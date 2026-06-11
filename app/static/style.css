@@ -249,6 +249,7 @@ html {
 
 html, body {
   overflow-x: hidden;
+  overflow-y: auto;
   width: 100%;
   max-width: 100%;
 }
@@ -257,6 +258,7 @@ html, body {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-y: visible;
   box-sizing: border-box;
 }
 
@@ -1799,9 +1801,13 @@ body.modal-open {
   max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
+  overflow-y: visible;
 }
 
-#dashboard-view .main { flex: 1; }
+#dashboard-view .main {
+  flex: 1 0 auto;
+  min-width: 0;
+}
 
 /* ── Scan bar ── */
 .scan-bar {
@@ -2872,6 +2878,7 @@ body.modal-open {
 
 .pinned-section {
   margin-top: 0.25rem;
+  overflow: visible;
 }
 
 .pinned-section-header {
@@ -2906,7 +2913,7 @@ body.modal-open {
   position: absolute;
   top: 0.375rem;
   right: 0.375rem;
-  z-index: 5;
+  z-index: 10;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--transition);
@@ -3050,16 +3057,49 @@ body[data-dashboard-layout="compact"] .pinned-chip:focus-within .pinned-chip-por
   max-width: 2.5rem;
 }
 
-body[data-dashboard-layout="compact"] .pinned-chip-actions {
+body[data-dashboard-layout="compact"] .pinned-chip-unpin-corner {
   position: absolute;
   top: 0.125rem;
   right: 0.125rem;
-  left: auto;
-  bottom: auto;
-  inset: auto;
+  z-index: 10;
+  flex: 0 0 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  color: var(--accent-bright);
+  font-size: 0.625rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition), background var(--transition), border-color var(--transition);
+}
+
+body[data-dashboard-layout="compact"] .pinned-chip:hover .pinned-chip-unpin-corner,
+body[data-dashboard-layout="compact"] .pinned-chip:focus-within .pinned-chip-unpin-corner {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body[data-dashboard-layout="compact"] .pinned-chip-unpin-corner:hover {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: var(--highlight);
+}
+
+body[data-dashboard-layout="compact"] .pinned-chip-actions {
+  position: absolute;
+  top: auto;
+  right: 0.125rem;
+  left: 0.125rem;
+  bottom: 0.125rem;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: flex-end;
+  gap: 0.125rem;
   padding: 0;
   border-radius: 0;
   background: none;
@@ -3095,6 +3135,16 @@ body[data-dashboard-layout="compact"] .pinned-chip-action:hover {
   background: rgba(34, 197, 94, 0.18);
   border-color: rgba(34, 197, 94, 0.35);
   color: var(--highlight);
+}
+
+body[data-dashboard-layout="compact"] .pinned-chip-action.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body[data-dashboard-layout="compact"] .pinned-chip-action.has-content {
+  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--accent-bright);
 }
 
 /* ── Classic layout: Homer-style grouped vertical cards ── */
@@ -3589,9 +3639,61 @@ body[data-dashboard-layout="medium"] .service-card--pinned-medium .pinned-unpin-
   min-height: unset;
 }
 
+.service-card--pinned .service-actions--pinned {
+  margin-top: auto;
+  padding-top: 0.375rem;
+  min-height: 1.75rem;
+}
+
+body[data-dashboard-layout="classic"] .service-card--pinned .service-actions--pinned .service-action,
+body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions--pinned .service-action {
+  width: 1.375rem;
+  height: 1.375rem;
+  min-width: 1.375rem;
+  font-size: 0.6875rem;
+}
+
+body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions--pinned {
+  padding-top: 0.1875rem;
+  min-height: 1.25rem;
+  gap: 0.1875rem;
+}
+
+body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions--pinned .service-action {
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
+  font-size: 0.5625rem;
+  border-radius: 4px;
+}
+
+body[data-dashboard-layout="medium"] .service-card--pinned-medium .service-actions--pinned {
+  position: absolute;
+  right: 0.1875rem;
+  bottom: 0.1875rem;
+  left: auto;
+  width: auto;
+  margin-top: 0;
+  padding: 0.125rem;
+  min-height: auto;
+  gap: 0.1875rem;
+  background: color-mix(in srgb, var(--bg-card) 90%, transparent);
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+body[data-dashboard-layout="medium"] .service-card--pinned-medium .service-actions--pinned .service-action {
+  width: 1.125rem;
+  height: 1.125rem;
+  min-width: 1.125rem;
+  font-size: 0.625rem;
+  border-radius: 4px;
+}
+
 @media (hover: none) {
   .pinned-unpin-btn,
-  body[data-dashboard-layout="compact"] .pinned-chip-actions {
+  body[data-dashboard-layout="compact"] .pinned-chip-actions,
+  body[data-dashboard-layout="compact"] .pinned-chip-unpin-corner {
     opacity: 1;
     pointer-events: auto;
   }
@@ -3648,9 +3750,14 @@ body[data-dashboard-layout="medium"] .service-card--pinned-medium .pinned-unpin-
   transform: translateY(-3px);
 }
 
-.service-card > :not(.service-card-watermark):not(.service-delete) {
+.service-card > :not(.service-card-watermark):not(.service-delete):not(.pinned-unpin-btn):not(.service-actions) {
   position: relative;
   z-index: 1;
+}
+
+.service-card .pinned-unpin-btn {
+  position: absolute;
+  z-index: 10;
 }
 
 .service-card-watermark {

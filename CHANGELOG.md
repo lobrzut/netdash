@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.55
+
+- **Pulpit — scroll**: naprawione blokowanie przewijania pionowego przy wielu przypiętych kategoriach/serwisach (`overflow-y: visible` na `#dashboard-view` / `#app`, `flex: 1 0 auto` na `.main`). Modal ustawień bez zmian.
+- **Pulpit — WoL/SOL na przypiętych**: przyciski ✎ 📝 ⚡ 💤 na hover w classic, classic-sm, medium i compact (jak na kartach Serwisy). Istniejące API + toast.
+- **Pulpit — ★ odpinanie**: gwiazdka w prawym górnym rogu na hover (fix `position: relative` nadpisującego `absolute`), z-index nad watermarkiem; compact — osobny corner ★, akcje na dole chipa.
+
 ## v1.3.54
 
 - **Pulpit — motyw Klasyczny (mały)**: czwarty układ `classic-sm` — ta sama struktura co Klasyczny (pionowe karty w grupach, watermark, URL, kategoria, uptime), wymiary ~50% (ikona 20px, karta min. 88px). Ustawienia → Wygląd → Pulpit. i18n pl/en/de/uk.

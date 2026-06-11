@@ -1433,6 +1433,26 @@ function formatServiceUrlDisplay(url) {
   }
 }
 
+function pinnedHoverActionsHtml(s) {
+  const hasNotes = !!(s.service_notes && s.service_notes.trim());
+  const canPower = isWolDevice(s);
+  return `
+        <button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>
+        <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
+        <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
+        <button type="button" class="service-action service-sleep-btn ${canPower && isServiceOnline(s) ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && isServiceOnline(s) ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>`;
+}
+
+function pinnedChipActionsHtml(s) {
+  const hasNotes = !!(s.service_notes && s.service_notes.trim());
+  const canPower = isWolDevice(s);
+  return `
+        <button type="button" class="pinned-chip-action pinned-chip-edit" data-id="${s.id}" title="${t('action.edit')}">✎</button>
+        <button type="button" class="pinned-chip-action pinned-chip-notes ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
+        <button type="button" class="pinned-chip-action pinned-chip-wol ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
+        <button type="button" class="pinned-chip-action pinned-chip-sleep ${canPower && isServiceOnline(s) ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && isServiceOnline(s) ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>`;
+}
+
 function serviceCardHtml(s, opts = {}) {
   const { context = 'services', pinnedLayout = dashboardLayout() } = opts;
   const isPinnedCard = context === 'pinned';
@@ -1492,13 +1512,13 @@ function serviceCardHtml(s, opts = {}) {
         </div>` : ''}
         ${uptimeLabel && (isPinnedClassic || !isPinnedCard) ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
       </div>
-      ${!isPinnedCard ? `<div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
+      ${isPinnedCard ? `<div class="service-actions service-actions--pinned">${pinnedHoverActionsHtml(s)}</div>` : `<div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
         ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
         <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
         <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
         <button type="button" class="service-action service-sleep-btn ${canPower && isServiceOnline(s) ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && isServiceOnline(s) ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>
-      </div>` : ''}
+      </div>`}
     </div>`;
 }
 
@@ -2192,24 +2212,59 @@ function pinnedChipHtml(s) {
       </div>
       <span class="pinned-chip-name">${esc(displayName)}</span>
       ${showPort ? `<span class="pinned-chip-port" aria-hidden="true">:${s.port}</span>` : ''}
-      <div class="pinned-chip-actions">
-        <button type="button" class="pinned-chip-action pinned-chip-unpin" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}">★</button>
-      </div>
+      <button type="button" class="pinned-chip-unpin-corner" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}">★</button>
+      <div class="pinned-chip-actions">${pinnedChipActionsHtml(s)}</div>
     </div>`;
 }
 
 function bindPinnedChips(root) {
   root.querySelectorAll('.pinned-chip').forEach((chip) => {
     chip.addEventListener('click', (e) => {
-      if (e.target.closest('.pinned-chip-action')) return;
+      if (e.target.closest('.pinned-chip-action, .pinned-chip-unpin-corner')) return;
       const url = chip.dataset.url;
       if (url && url !== '#') window.open(url, '_blank', 'noopener');
     });
   });
-  root.querySelectorAll('.pinned-chip-unpin').forEach((btn) => {
+  root.querySelectorAll('.pinned-chip-unpin-corner').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       await toggleServicePin(Number(btn.dataset.id));
+    });
+  });
+  root.querySelectorAll('.pinned-chip-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openServiceEditModal(Number(btn.dataset.id));
+    });
+  });
+  root.querySelectorAll('.pinned-chip-notes').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openServiceNotesModal(Number(btn.dataset.id));
+    });
+  });
+  root.querySelectorAll('.pinned-chip-wol:not(.is-placeholder)').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await api(`/api/services/${btn.dataset.id}/wol`, { method: 'POST' });
+        showToast(t('toast.wolSent'), 'success');
+      } catch (err) {
+        showToast(err.message || t('action.wolFailed'), 'error');
+      }
+    });
+  });
+  root.querySelectorAll('.pinned-chip-sleep:not(.is-placeholder)').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(t('confirm.sleep'))) return;
+      try {
+        await api(`/api/services/${btn.dataset.id}/sleep`, { method: 'POST' });
+        showToast(t('toast.sleepSent'), 'success');
+        await loadDashboard();
+      } catch (err) {
+        showToast(err.message || t('action.sleepFailed'), 'error');
+      }
     });
   });
 }
