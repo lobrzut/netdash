@@ -289,6 +289,7 @@
   "settings.dashboardLayoutClassicSm": "Класичний (малий)",
   "settings.dashboardLayoutMedium": "Середній",
   "settings.dashboardLayoutCompact": "Компактний",
+  "settings.dashboardLayoutCompactBig": "Компактний (великий)",
   "settings.dashboardLayoutHint": "Макет закріплених сервісів на панелі — попередній перегляд наживо. Список Сервіси без змін.",
   "settings.pinnedCardSize": "Розмір закріплених карток",
   "settings.pinnedSizeCompact": "Компактний",

@@ -294,6 +294,7 @@
   "settings.dashboardLayoutClassicSm": "Klassisch (klein)",
   "settings.dashboardLayoutMedium": "Mittel",
   "settings.dashboardLayoutCompact": "Kompakt",
+  "settings.dashboardLayoutCompactBig": "Kompakt (groß)",
   "settings.dashboardLayoutHint": "Layout angehefteter Dienste auf dem Dashboard — Live-Vorschau. Diensteliste bleibt unverändert.",
   "settings.pinnedCardSize": "Größe angehefteter Karten",
   "settings.pinnedSizeCompact": "Kompakt",

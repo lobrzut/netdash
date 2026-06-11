@@ -335,7 +335,7 @@ function dashboardLayout() {
   const layout = appSettings.pinned_card_size || 'medium';
   if (layout === 'large') return 'classic';
   if (layout === 'normal') return 'medium';
-  if (['classic', 'classic-sm', 'medium', 'compact'].includes(layout)) return layout;
+  if (['classic', 'classic-sm', 'medium', 'compact', 'compact-big'].includes(layout)) return layout;
   return 'medium';
 }
 
@@ -2319,7 +2319,7 @@ function renderPinnedServices() {
   empty?.classList.add('hidden');
   const groups = groupPinnedServices(pinned);
 
-  if (layout === 'compact') {
+  if (layout === 'compact' || layout === 'compact-big') {
     container.innerHTML = `
       <div class="pinned-groups pinned-groups--compact">
         ${groups.map(([label, items]) => `

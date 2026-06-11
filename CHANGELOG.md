@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.69
+
+- **Pulpit — układ Kompaktowy (mniejszy)**: zmniejszone kafelki (~178px × min. 48px, ikona 32px) z rozwijanym paskiem akcji na dole przy hover — więcej serwisów na ekranie przy zachowaniu czytelności.
+- **Pulpit — nowy układ Kompaktowy (duży)**: rozmiar kafelków jak poprzedni Kompaktowy v1.3.68 (~210px × min. 60px, ikona 38px), stała wysokość karty — akcje (★, edycja, notatki, WoL, sleep) w prawym górnym rogu na hover (jak Średni), bez rozszerzania kafelka w dół. Piąty motyw w Ustawienia → Pulpit. i18n pl/en/de/uk.
+- **Pulpit — gwiazdka odpięcia po lewej**: w układach Kompaktowy, Kompaktowy (duży) i Średni przycisk ★ jest po lewej stronie paska akcji (edycja, notatki, WoL, sleep po prawej) — `space-between` zamiast grupowania wszystkich ikon po prawej.
+
 ## v1.3.68
 
 - **Pulpit — układ Kompaktowy**: przywrócony pasek akcji rozwijany w dół na hover (★, edycja, notatki, WoL, sleep) — karta płynnie rośnie pod treścią zamiast nachodzić w prawym górnym rogu. Zachowane ulepszenia v1.3.64+: większe kafelki (~210px), siatka `auto-fill`, 2-liniowe etykiety, lepszy padding. Układ Średni bez zmian (akcje w rogu).

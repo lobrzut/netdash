@@ -293,6 +293,7 @@
   "settings.dashboardLayoutClassicSm": "Klasyczny (mały)",
   "settings.dashboardLayoutMedium": "Średni",
   "settings.dashboardLayoutCompact": "Kompaktowy",
+  "settings.dashboardLayoutCompactBig": "Kompaktowy (duży)",
   "settings.dashboardLayoutHint": "Układ przypiętych serwisów na Pulpicie — podgląd na żywo. Lista Serwisy bez zmian.",
   "settings.pinnedCardSize": "Rozmiar przypiętych na Pulpicie",
   "settings.pinnedSizeCompact": "Kompaktowy",

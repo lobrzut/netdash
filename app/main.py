@@ -223,7 +223,7 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
             changed = True
         elif layout == "compact":
             pass
-        elif layout not in ("classic", "classic-sm", "medium"):
+        elif layout not in ("classic", "classic-sm", "medium", "compact", "compact-big"):
             app_settings.pinned_card_size = "medium"
             changed = True
         if changed:

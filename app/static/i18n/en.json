@@ -294,6 +294,7 @@
   "settings.dashboardLayoutClassicSm": "Classic (small)",
   "settings.dashboardLayoutMedium": "Medium",
   "settings.dashboardLayoutCompact": "Compact",
+  "settings.dashboardLayoutCompactBig": "Compact (large)",
   "settings.dashboardLayoutHint": "Layout for pinned services on the Dashboard — live preview. Services list is unchanged.",
   "settings.pinnedCardSize": "Pinned card size",
   "settings.pinnedSizeCompact": "Compact",
