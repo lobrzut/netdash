@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.33" />
-  <script src="/static/i18n.js?v=1.3.33"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.35" />
+  <script src="/static/i18n.js?v=1.3.35"></script>
 </head>
 <body>
   <div id="app">
@@ -852,13 +852,17 @@ sol --udp-port 9
         </div>
         <div class="field field-icon-preview">
           <label data-i18n="modal.edit.icon">Ikona</label>
-          <div class="service-edit-icon-preview" id="edit-icon-preview"></div>
+          <div class="icon-preview-anchor" id="edit-icon-preview-anchor">
+            <input type="hidden" id="edit-icon" value="globe" />
+            <button type="button" class="service-edit-icon-preview icon-preview-btn" id="edit-icon-preview-btn"
+              aria-haspopup="listbox" aria-expanded="false"
+              data-i18n-title="modal.edit.iconPickHint"
+              data-i18n="modal.edit.iconPickAria" data-i18n-attr="aria-label">
+              <span class="icon-preview-inner" id="edit-icon-preview" aria-hidden="true"></span>
+            </button>
+            <div class="icon-picker-popover hidden" id="edit-icon-popover"></div>
+          </div>
         </div>
-      </div>
-      <div class="field icon-picker-field">
-        <label data-i18n="modal.edit.iconPreset">Preset ikony</label>
-        <input type="hidden" id="edit-icon" value="globe" />
-        <div class="icon-picker" id="edit-icon-picker" data-prefix="edit"></div>
       </div>
       <div class="field">
         <label for="edit-icon-url" data-i18n="modal.edit.iconUrl">URL ikony (opcjonalnie)</label>
@@ -927,13 +931,17 @@ sol --udp-port 9
           </div>
           <div class="field field-icon-preview">
             <label data-i18n="modal.edit.icon">Ikona</label>
-            <div class="service-edit-icon-preview" id="add-icon-preview"></div>
+            <div class="icon-preview-anchor" id="add-icon-preview-anchor">
+              <input type="hidden" id="add-icon" value="globe" />
+              <button type="button" class="service-edit-icon-preview icon-preview-btn" id="add-icon-preview-btn"
+                aria-haspopup="listbox" aria-expanded="false"
+                data-i18n-title="modal.edit.iconPickHint"
+                data-i18n="modal.edit.iconPickAria" data-i18n-attr="aria-label">
+                <span class="icon-preview-inner" id="add-icon-preview" aria-hidden="true"></span>
+              </button>
+              <div class="icon-picker-popover hidden" id="add-icon-popover"></div>
+            </div>
           </div>
-        </div>
-        <div class="field icon-picker-field">
-          <label data-i18n="modal.edit.iconPreset">Preset ikony</label>
-          <input type="hidden" id="add-icon" value="globe" />
-          <div class="icon-picker" id="add-icon-picker" data-prefix="add"></div>
         </div>
         <div class="field">
           <label for="add-icon-url" data-i18n="modal.edit.iconUrl">URL ikony (opcjonalnie)</label>
@@ -964,6 +972,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.33"></script>
+  <script src="/static/app.js?v=1.3.35"></script>
 </body>
 </html>

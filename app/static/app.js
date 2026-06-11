@@ -23,6 +23,23 @@ const SERVICE_ICON_PRESETS = [
   'search', 'storage', 'ai', 'dashboard', 'workflow', 'mqtt', 'nas', 'plug', 'download', 'tv',
   'film', 'photo', 'doc', 'wifi', 'ci', 'nginx', 'apache', 'python', 'windows', 'caddy', 'traefik',
 ];
+const SERVICE_ICON_GROUPS = [
+  { id: 'all', labelKey: 'modal.edit.iconGroup.all' },
+  { id: 'media', labelKey: 'modal.edit.iconGroup.media', icons: ['play', 'tv', 'film', 'photo', 'download'] },
+  {
+    id: 'infra',
+    labelKey: 'modal.edit.iconGroup.infra',
+    icons: ['docker', 'database', 'storage', 'nas', 'cloud', 'router', 'dns', 'ftp', 'monitor', 'queue', 'wifi', 'plug', 'mqtt', 'home'],
+  },
+  { id: 'web', labelKey: 'modal.edit.iconGroup.web', icons: ['globe', 'nginx', 'apache', 'caddy', 'traefik', 'api', 'shield', 'lock', 'mail'] },
+  {
+    id: 'dev',
+    labelKey: 'modal.edit.iconGroup.dev',
+    icons: ['git', 'code', 'terminal', 'ci', 'python', 'windows', 'workflow', 'search', 'dashboard', 'ai', 'chart', 'folder', 'doc'],
+  },
+];
+const iconPickerState = { edit: { group: 'all', query: '' }, add: { group: 'all', query: '' } };
+let activeIconPopover = null;
 const DEFAULT_SERVICE_CATEGORIES = [
   'Media', 'Monitoring', 'DevOps', 'Storage', 'Network', 'Home Automation', 'Urządzenie', 'Inne',
 ];
@@ -1286,6 +1303,7 @@ function serviceCardHtml(s, opts = {}) {
   const healthState = serviceHealthState(s);
   const accent = categoryAccentColor(s.category);
   const uptimeLabel = serviceUptimeLabel(s);
+  const displayName = displayServiceName(s);
   return `
     <div class="service-card ${isPinnedCard ? 'service-card--pinned' : ''} ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
       ${renderServiceWatermark(s)}
@@ -1303,13 +1321,15 @@ function serviceCardHtml(s, opts = {}) {
           <span class="status-dot status-${healthState}" title="${esc(statusTooltip(s))}"></span>
         </div>
       </div>
-      <div class="service-name">${esc(displayServiceName(s))}</div>
-      ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}" title="${esc(urlInfo.full)}">${esc(urlInfo.display)}</div>` : ''}
-      ${showMeta ? `<div class="service-meta">
-        ${(!compact || isPinnedCard) ? `<span class="service-category">${esc(s.category)}</span>` : ''}
-        ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
-      </div>` : ''}
-      ${uptimeLabel ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
+      <div class="service-body">
+        <div class="service-name" title="${esc(displayName)}">${esc(displayName)}</div>
+        ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}" title="${esc(urlInfo.full)}">${esc(urlInfo.display)}</div>` : ''}
+        ${showMeta ? `<div class="service-meta">
+          ${(!compact || isPinnedCard) ? `<span class="service-category" title="${esc(s.category)}">${esc(s.category)}</span>` : ''}
+          ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
+        </div>` : ''}
+        ${uptimeLabel ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
+      </div>
       <div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
         ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
