@@ -366,3 +366,9 @@ class SettingsImportRequest(BaseModel):
     services: list[SettingsBackupService] = Field(default_factory=list)
     api_keys: list[SettingsBackupApiKey] = Field(default_factory=list)
     notes: list[SettingsBackupNote] = Field(default_factory=list)
+
+
+class HomerImportResult(BaseModel):
+    imported: int
+    skipped: int = 0
+    services: list[ServiceOut] = Field(default_factory=list)

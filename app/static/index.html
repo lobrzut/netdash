@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.24" />
-  <script src="/static/i18n.js?v=1.3.24"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.25" />
+  <script src="/static/i18n.js?v=1.3.25"></script>
 </head>
 <body>
   <div id="app">
@@ -156,7 +156,7 @@
           </div>
           <h2 data-i18n="empty.pinned">Brak przypiętych serwisów</h2>
           <p data-i18n="empty.pinned.hint">Przypnij serwisy klikając ★ na karcie w zakładce Serwisy.</p>
-          <button type="button" class="btn btn-ghost" id="goto-services-btn" data-i18n="empty.pinned.go">Przejdź do Serwisów</button>
+          <button type="button" class="btn btn-accent" id="goto-services-btn" data-i18n="empty.pinned.go">Przejdź do Serwisów</button>
         </div>
       </section>
 
@@ -196,13 +196,18 @@
         <div id="services-container"></div>
         <div id="empty-state" class="empty-state hidden">
           <div class="empty-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+            <svg class="empty-icon-default" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
               <circle cx="12" cy="12" r="10"/>
               <path d="M8 12h8M12 8v8"/>
+            </svg>
+            <svg class="empty-icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="M20 20l-3.5-3.5"/>
             </svg>
           </div>
           <h2 id="empty-title" data-i18n="empty.services">Brak serwisów</h2>
           <p id="empty-hint" data-i18n="empty.services.hint">Kliknij Skanuj sieć aby automatycznie wykryć serwisy w Twojej sieci lokalnej.</p>
+          <button type="button" class="btn btn-ghost hidden" id="empty-clear-search" data-i18n="empty.services.clearSearch">Wyczyść wyszukiwanie</button>
         </div>
       </section>
     </main>
@@ -374,7 +379,6 @@
               <a class="about-link" id="settings-github-link" href="https://github.com/lobrzut/netdash" target="_blank" rel="noopener" data-i18n="about.github">Repozytorium GitHub</a>
             </div>
             <div class="about-editor-card">
-              <h3 class="about-editor-title">NetDash</h3>
               <div class="field field--flush">
                 <label for="settings-about-project" data-i18n="settings.aboutDescription">Opis projektu</label>
                 <textarea id="settings-about-project" rows="4" class="about-editor-textarea" spellcheck="false"></textarea>
@@ -569,6 +573,16 @@ sol --udp-port 9
               <input type="file" id="settings-backup-file" accept="application/json,.json" class="hidden" />
             </div>
             <p id="settings-backup-message" class="password-message hidden" role="status"></p>
+          </div>
+        </details>
+        <details class="settings-accordion">
+          <summary data-i18n="settings.homer.heading">Import Homer (YAML)</summary>
+          <div class="settings-accordion-body">
+            <p class="hint" data-i18n="settings.homer.hint">Wgraj plik config.yml z Homer — NetDash utworzy serwisy (nazwa, URL, ikona, kategoria). Istniejące adresy URL zostaną pominięte.</p>
+            <div class="field-row backup-actions">
+              <button type="button" class="btn btn-ghost" id="settings-homer-import" data-i18n="settings.homer.import">Wybierz config.yml</button>
+              <input type="file" id="settings-homer-file" accept=".yml,.yaml,text/yaml,application/x-yaml" class="hidden" />
+            </div>
           </div>
         </details>
       </div>
@@ -886,6 +900,6 @@ sol --udp-port 9
   </div>
   </div>
 
-  <script src="/static/app.js?v=1.3.24"></script>
+  <script src="/static/app.js?v=1.3.25"></script>
 </body>
 </html>

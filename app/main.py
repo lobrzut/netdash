@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
@@ -16,6 +16,7 @@ from app.config import BASE_DIR, BUILD_DATE, GITHUB_REPO, VERSION, settings
 from app.database import Base, async_session, engine, get_db
 from app.enrich import enrich_all_services, enrich_mac_addresses, should_auto_wol
 from app.health import check_all_services
+from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.url_utils import sanitize_service_url
@@ -51,6 +52,7 @@ from app.schemas import (
     ArpDeviceOut,
     ArpLookupOut,
     ArpScanRequest,
+    HomerImportResult,
     LoginRequest,
     PasswordChangeRequest,
     NetworkInfo,
@@ -588,6 +590,67 @@ async def create_service(
     await db.commit()
     await db.refresh(service)
     return service
+
+
+@app.post("/api/services/import/homer", response_model=HomerImportResult)
+async def import_homer_services(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid file encoding (expected UTF-8)") from exc
+
+    try:
+        parsed = parse_homer_config(text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not parsed:
+        raise HTTPException(status_code=400, detail="No importable services found in Homer config")
+
+    from urllib.parse import urlparse
+
+    existing = await db.execute(select(Service.url))
+    known_urls = {sanitize_service_url(u).lower() for (u,) in existing.all() if u}
+    created: list[Service] = []
+    skipped = 0
+
+    for item in parsed:
+        url = sanitize_service_url(item["url"])
+        if url.lower() in known_urls:
+            skipped += 1
+            continue
+        parsed_url = urlparse(url)
+        host = parsed_url.hostname or "localhost"
+        port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
+        service = Service(
+            name=item["name"],
+            url=url,
+            host=host,
+            port=port,
+            protocol=parsed_url.scheme or "http",
+            category=item.get("category") or "Inne",
+            icon=item.get("icon") or "globe",
+            icon_url=item.get("icon_url"),
+            description=item.get("description"),
+            auto_discovered=False,
+            customized=True,
+            has_login=False,
+            pinned=False,
+        )
+        db.add(service)
+        created.append(service)
+        known_urls.add(url.lower())
+
+    await db.commit()
+    for svc in created:
+        await db.refresh(svc)
+
+    return HomerImportResult(imported=len(created), skipped=skipped, services=created)
 
 
 _SERVICE_CUSTOMIZE_FIELDS = frozenset(

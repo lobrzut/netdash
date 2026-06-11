@@ -25,7 +25,7 @@ Invoke-Remote "mkdir -p ${RemoteDir}/data ${RemoteDir}/deploy"
 
 $Items = @(
     "app", "deploy", "docker-compose.yml", "docker-compose.dev.yml", "Dockerfile",
-    "requirements.txt", "run.py", "start.ps1", "start.sh", "README.md", "DEPLOYMENT.md",
+    "requirements.txt", "run.py", "start.ps1", "start.sh", "README.md", "ROADMAP.md", "DEPLOYMENT.md",
     "docs", "LICENSE", ".env.example"
 )
 foreach ($item in $Items) {

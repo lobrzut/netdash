@@ -28,6 +28,25 @@ const DEFAULT_SERVICE_CATEGORIES = [
 ];
 
 const $ = (sel) => document.querySelector(sel);
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+const CATEGORY_ACCENTS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899', '#06b6d4', '#ef4444', '#84cc16'];
+
+function categoryAccentColor(category) {
+  const name = (category || 'Inne').trim();
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CATEGORY_ACCENTS[Math.abs(hash) % CATEGORY_ACCENTS.length];
+}
 const $$ = (sel) => document.querySelectorAll(sel);
 
 async function api(path, options = {}) {
@@ -902,28 +921,35 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
   const empty = $('#empty-state');
   const title = $('#empty-title');
   const hint = $('#empty-hint');
+  const icon = empty?.querySelector('.empty-icon');
+  const clearBtn = $('#empty-clear-search');
   const q = serviceSearch.trim();
 
   empty.classList.remove('hidden');
 
   if (services.length === 0) {
+    icon?.classList.remove('empty-icon--search');
     title.textContent = t('empty.services');
     hint.textContent = t('empty.services.hint');
     hint.classList.remove('hidden');
+    clearBtn?.classList.add('hidden');
     return;
   }
 
   if (q) {
-    title.innerHTML = `${t('empty.services.search')} <strong>${esc(q)}</strong>`;
+    icon?.classList.add('empty-icon--search');
+    title.innerHTML = t('empty.services.searchTitle');
+    hint.innerHTML = t('empty.services.searchHint', { query: `<strong>${esc(q)}</strong>` });
+    hint.classList.remove('hidden');
     if (hiddenByFilter > 0) {
-      hint.textContent = t('empty.services.searchHidden', { count: hiddenByFilter });
-      hint.classList.remove('hidden');
-    } else {
-      hint.classList.add('hidden');
+      hint.innerHTML += `<br><span class="empty-filter-note">${esc(t('empty.services.searchHidden', { count: hiddenByFilter }))}</span>`;
     }
+    clearBtn?.classList.remove('hidden');
     return;
   }
 
+  icon?.classList.remove('empty-icon--search');
+  clearBtn?.classList.add('hidden');
   title.textContent = t('empty.services.filter');
   if (accessFilter === 'wol') {
     const missingMac = services.filter((s) => !s.mac_address).length;
@@ -1045,9 +1071,47 @@ function formatRelativeTime(iso) {
 }
 
 function statusTooltip(s) {
-  if (s.is_online !== false) return t('status.online');
+  const state = serviceHealthState(s);
+  if (state === 'online') return t('status.online');
+  if (state === 'error') return serviceHealthError(s) || t('status.error');
+  if (state === 'stale') return t('status.stale');
+  if (state === 'unknown') return t('status.unknown');
   const since = formatRelativeTime(s.last_seen);
   return since ? t('status.offlineSince', { time: since }) : t('status.offline');
+}
+
+function serviceHealthState(s) {
+  if (hasServiceAuthError(s)) return 'error';
+  if (s.is_online === false) return 'offline';
+  const intervalSec = appSettings.health_check_interval || 60;
+  if (s.last_checked) {
+    const ageMs = Date.now() - new Date(s.last_checked).getTime();
+    if (ageMs > intervalSec * 3000) return 'stale';
+    return 'online';
+  }
+  if (appSettings.health_check_enabled !== false) return 'unknown';
+  return 'online';
+}
+
+function serviceUptimeLabel(s) {
+  const state = serviceHealthState(s);
+  if (state === 'online') {
+    if (s.last_checked) {
+      const rel = formatRelativeTime(s.last_checked);
+      return rel ? t('status.checkedAgo', { time: rel }) : '';
+    }
+    return '';
+  }
+  if (state === 'offline' && s.last_seen) {
+    const rel = formatRelativeTime(s.last_seen);
+    return rel ? t('status.lastSeen', { time: rel }) : '';
+  }
+  if (state === 'stale' && s.last_checked) {
+    const rel = formatRelativeTime(s.last_checked);
+    return rel ? t('status.checkedAgo', { time: rel }) : t('status.stale');
+  }
+  if (state === 'unknown') return t('status.unknown');
+  return '';
 }
 
 function isHttpErrorName(name) {
@@ -1127,8 +1191,11 @@ function serviceCardHtml(s, opts = {}) {
   const healthErr = serviceHealthError(s);
   const hasAuthError = hasServiceAuthError(s);
   const healthBadge = serviceHealthBadge(s);
+  const healthState = serviceHealthState(s);
+  const accent = categoryAccentColor(s.category);
+  const uptimeLabel = serviceUptimeLabel(s);
   return `
-    <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}">
+    <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
       ${renderServiceWatermark(s)}
       <button class="service-delete" data-id="${s.id}" title="${t('modal.delete')}">&times;</button>
       <div class="service-top">
@@ -1141,7 +1208,7 @@ function serviceCardHtml(s, opts = {}) {
         </div>
         <div class="service-icon-wrap">
           ${renderServiceIcon(s)}
-          <span class="status-dot ${offline ? 'status-offline' : 'status-online'}" title="${esc(statusTooltip(s))}"></span>
+          <span class="status-dot status-${healthState}" title="${esc(statusTooltip(s))}"></span>
         </div>
       </div>
       <div class="service-name">${esc(displayServiceName(s))}</div>
@@ -1150,6 +1217,7 @@ function serviceCardHtml(s, opts = {}) {
         ${!compact ? `<span class="service-category">${esc(s.category)}</span>` : ''}
         ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
       </div>` : ''}
+      ${uptimeLabel ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
       <div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
         ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
@@ -1427,7 +1495,26 @@ async function toggleServicePin(id) {
     body: JSON.stringify({ pinned: !svc.pinned }),
   });
   Object.assign(svc, normalizeService(updated));
-  refreshServiceViews();
+  updateStats();
+  renderPinnedServices();
+  if (currentPage === 'services') {
+    patchServiceCardsForId(id);
+  }
+}
+
+function patchServiceCardsForId(id) {
+  const svc = services.find((s) => s.id === id);
+  if (!svc) return;
+  document.querySelectorAll(`.service-card[data-id="${id}"]`).forEach((card) => {
+    const context = card.closest('#pinned-container') ? 'home' : 'services';
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = serviceCardHtml(svc, { context });
+    const next = wrapper.firstElementChild;
+    if (next) {
+      card.replaceWith(next);
+      bindServiceCards(next.parentElement || document);
+    }
+  });
 }
 
 function updateEditMacVisibility() {
@@ -1841,8 +1928,17 @@ $('#add-btn').addEventListener('click', () => {
   $('#add-category').value = t('modal.key.other');
   openModal('add-modal');
 });
+const debouncedRenderServices = debounce(renderServices, 200);
+
 $('#services-search').addEventListener('input', (e) => {
   serviceSearch = e.target.value;
+  debouncedRenderServices();
+});
+
+$('#empty-clear-search')?.addEventListener('click', () => {
+  serviceSearch = '';
+  const input = $('#services-search');
+  if (input) input.value = '';
   renderServices();
 });
 
@@ -2039,6 +2135,40 @@ async function importSettingsBackup(file) {
   }
 }
 
+async function importHomerConfig(file) {
+  if (!file) return;
+  showBackupMessage('');
+  const btn = $('#settings-homer-import');
+  if (btn) btn.disabled = true;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${API}/api/services/import/homer`, {
+      method: 'POST',
+      headers,
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(translateApiDetail(data.detail) || `HTTP ${res.status}`);
+    }
+    await loadServices();
+    updateStats();
+    showBackupMessage(
+      t('settings.homer.importSuccess', { imported: data.imported, skipped: data.skipped || 0 }),
+      'success',
+    );
+  } catch (err) {
+    showBackupMessage(err.message || t('settings.homer.importError'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    const input = $('#settings-homer-file');
+    if (input) input.value = '';
+  }
+}
+
 async function changePassword(currentPassword, newPassword) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -2073,6 +2203,11 @@ $('#settings-backup-import')?.addEventListener('click', () => $('#settings-backu
 $('#settings-backup-file')?.addEventListener('change', (e) => {
   const file = e.target.files?.[0];
   if (file) importSettingsBackup(file);
+});
+$('#settings-homer-import')?.addEventListener('click', () => $('#settings-homer-file')?.click());
+$('#settings-homer-file')?.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (file) importHomerConfig(file);
 });
 
 function switchSettingsTab(tabId) {

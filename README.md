@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.18-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.25-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -43,6 +43,16 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - Online/offline health checks with persistent tiles
 - Docker one-command deploy
 - i18n: English, Polish, German, Ukrainian
+
+## What's new in v1.3.25
+
+- Uptime dots on cards: online / offline / stale / unknown / HTTP error + subtle „last seen” text
+- Homer-inspired card polish: category color accent, stronger hover, watermark preserved
+- Friendlier empty states (pinned CTA, search no-results + clear button)
+- Debounced service search; faster pin toggle without full grid re-render
+- **Homer YAML import** — Settings → Backup → Import Homer (config.yml)
+
+See [ROADMAP.md](ROADMAP.md) for remaining gaps.
 
 ## Deploy from GitHub
 
@@ -196,8 +206,9 @@ netdash/
 
 - [x] Online/offline status + health check
 - [x] Per-service notes + Wake-on-LAN
-- [ ] YAML import/export (Homer compatibility)
-- [ ] ARP scan for device discovery
+- [x] Homer YAML import (MVP)
+- [ ] YAML export (Homer compatibility)
+- [x] ARP scan for device discovery
 - [ ] Multi-user support
 
 ## License
