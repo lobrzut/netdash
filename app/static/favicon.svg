@@ -1,6 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="7" fill="#0a0a0a"/>
-  <circle cx="16" cy="16" r="3" stroke="#4ade80" stroke-width="1.75"/>
-  <path stroke="#22c55e" stroke-width="1.75" stroke-linecap="round" d="M16 5v4M16 23v4M5 16h4M23 16h4"/>
-  <path stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" d="M8.5 8.5l2.8 2.8M20.7 20.7l2.8 2.8M8.5 23.5l2.8-2.8M20.7 11.3l2.8-2.8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="NetDash">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="68%">
+      <stop offset="0%" stop-color="#141414"/>
+      <stop offset="100%" stop-color="#080808"/>
+    </radialGradient>
+    <linearGradient id="arm" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 0.13  0 0 0 0 0.77  0 0 0 0 0.31  0 0 0 0.55 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 0.13  0 0 0 0 0.77  0 0 0 0 0.31  0 0 0 0.35 0"/>
+    </filter>
+  </defs>
+  <!-- Rounded square container -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" stroke="#1a1a1a" stroke-width="1"/>
+  <rect x="2" y="2" width="60" height="60" rx="12" stroke="rgba(34,197,94,0.08)" stroke-width="0.75"/>
+  <!-- Ambient center glow -->
+  <circle cx="32" cy="32" r="14" fill="#22c55e" opacity="0.06" filter="url(#softGlow)"/>
+  <!-- Crosshair symbol -->
+  <g filter="url(#glow)" stroke="url(#arm)" stroke-linecap="round">
+    <path stroke-width="3" d="M32 11v11M32 42v11M11 32h11M42 32h11"/>
+    <path stroke-width="2.5" d="M18.5 18.5l7.8 7.8M37.7 37.7l7.8 7.8M18.5 45.5l7.8-7.8M37.7 26.3l7.8-7.8"/>
+  </g>
+  <!-- Center reticle -->
+  <circle cx="32" cy="32" r="5.5" stroke="#4ade80" stroke-width="2" fill="#22c55e" fill-opacity="0.18"/>
+  <circle cx="32" cy="32" r="2" fill="#4ade80"/>
 </svg>

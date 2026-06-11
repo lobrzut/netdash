@@ -302,22 +302,22 @@ function applyCustomLogo() {
     ? appSettings.custom_logo_url
     : null;
   document.querySelectorAll('.logo-icon, .logo-small').forEach((box) => {
-    let img = box.querySelector('img.custom-logo');
-    const svg = box.querySelector('svg');
+    let custom = box.querySelector('img.custom-logo');
+    const brand = box.querySelector('img.brand-logo');
     if (url) {
-      if (!img) {
-        img = document.createElement('img');
-        img.className = 'custom-logo';
-        img.alt = '';
-        img.decoding = 'async';
-        box.insertBefore(img, svg || null);
+      if (!custom) {
+        custom = document.createElement('img');
+        custom.className = 'custom-logo';
+        custom.alt = '';
+        custom.decoding = 'async';
+        box.appendChild(custom);
       }
-      img.src = url;
-      img.classList.remove('hidden');
-      if (svg) svg.classList.add('hidden');
+      custom.src = url;
+      custom.classList.remove('hidden');
+      brand?.classList.add('hidden');
     } else {
-      if (img) img.classList.add('hidden');
-      if (svg) svg.classList.remove('hidden');
+      custom?.classList.add('hidden');
+      brand?.classList.remove('hidden');
     }
   });
 }
@@ -562,7 +562,7 @@ function startHealthPolling() {
 
 function updateStats() {
   $('#stat-total').textContent = services.length;
-  $('#stat-online').textContent = services.filter(isServiceOnline).length;
+  $('#stat-online').textContent = services.filter(serviceIsOnlineHealthy).length;
   $('#stat-login').textContent = services.filter((s) => s.has_login === true).length;
   $('#stat-keys').textContent = apiKeys.length;
   $('#stat-notes').textContent = notes.length;
@@ -877,6 +877,8 @@ function filterByAccess(list, access = accessFilter) {
   if (access === 'login') return list.filter((s) => s.has_login);
   if (access === 'public') return list.filter((s) => !s.has_login);
   if (access === 'wol') return list.filter(isWolDevice);
+  if (access === 'offline') return list.filter(serviceIsOffline);
+  if (access === 'pinned') return list.filter((s) => s.pinned);
   return list;
 }
 
@@ -925,6 +927,17 @@ function normalizeFilterState() {
     if (!categoryBase.some((s) => s.category === activeFilter)) {
       activeFilter = 'all';
     }
+  }
+
+  if (accessFilter === 'offline' || accessFilter === 'pinned') {
+    const accessBase = filterByCategory(
+      filterByNetwork(filterBySearch(services), networkFilter),
+      activeFilter,
+    );
+    const hasMatch = accessFilter === 'offline'
+      ? accessBase.some(serviceIsOffline)
+      : accessBase.some((s) => s.pinned);
+    if (!hasMatch) accessFilter = 'all';
   }
 }
 
@@ -1084,6 +1097,12 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
       ? t('empty.filter.wolMissingMac', { count: missingMac })
       : t('empty.filter.wol');
     hint.classList.remove('hidden');
+  } else if (accessFilter === 'offline') {
+    hint.textContent = t('empty.filter.offline');
+    hint.classList.remove('hidden');
+  } else if (accessFilter === 'pinned') {
+    hint.textContent = t('empty.filter.pinned');
+    hint.classList.remove('hidden');
   } else {
     hint.classList.add('hidden');
   }
@@ -1094,12 +1113,16 @@ function renderAccessFilters() {
   const loginCount = applyServiceFilters(services, { access: 'login' }).length;
   const publicCount = applyServiceFilters(services, { access: 'public' }).length;
   const wolCount = applyServiceFilters(services, { access: 'wol' }).length;
+  const offlineCount = applyServiceFilters(services, { access: 'offline' }).length;
+  const pinnedCount = applyServiceFilters(services, { access: 'pinned' }).length;
   const container = $('#access-filters');
   container.innerHTML = [
     `<button type="button" class="filter-chip ${accessFilter === 'all' ? 'active' : ''}" data-access="all"><span class="chip-label">${t('filter.all')}</span><span class="count">${allCount}</span></button>`,
     `<button type="button" class="filter-chip filter-login ${accessFilter === 'login' ? 'active' : ''}" data-access="login"><span class="chip-label"><span class="chip-icon" aria-hidden="true">🔐</span>${t('filter.login')}</span><span class="count">${loginCount}</span></button>`,
     `<button type="button" class="filter-chip filter-public ${accessFilter === 'public' ? 'active' : ''}" data-access="public"><span class="chip-label"><span class="chip-icon" aria-hidden="true">🌐</span>${t('filter.public')}</span><span class="count">${publicCount}</span></button>`,
     `<button type="button" class="filter-chip filter-wol ${accessFilter === 'wol' ? 'active' : ''}" data-access="wol"><span class="chip-label"><span class="chip-icon" aria-hidden="true">⚡</span>${t('filter.wol')}</span><span class="count">${wolCount}</span></button>`,
+    `<button type="button" class="filter-chip filter-offline ${accessFilter === 'offline' ? 'active' : ''}" data-access="offline"><span class="chip-label"><span class="chip-dot chip-dot-offline" aria-hidden="true"></span>${t('filter.offline')}</span><span class="count">${offlineCount}</span></button>`,
+    `<button type="button" class="filter-chip filter-pinned ${accessFilter === 'pinned' ? 'active' : ''}" data-access="pinned"><span class="chip-label">${t('filter.pinned')}<span class="chip-icon chip-icon-star" aria-hidden="true">★</span></span><span class="count">${pinnedCount}</span></button>`,
   ].join('');
   container.querySelectorAll('.filter-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -1205,6 +1228,15 @@ function statusTooltip(s) {
   if (state === 'unknown') return t('status.unknown');
   const since = formatRelativeTime(s.last_seen);
   return since ? t('status.offlineSince', { time: since }) : t('status.offline');
+}
+
+function serviceIsOffline(s) {
+  const state = serviceHealthState(s);
+  return state === 'offline' || state === 'error';
+}
+
+function serviceIsOnlineHealthy(s) {
+  return serviceHealthState(s) === 'online';
 }
 
 function serviceHealthState(s) {
@@ -1760,7 +1792,11 @@ function watermarkFallbackHtml(s) {
   if (letter) {
     return `<div class="service-card-watermark service-card-watermark--letter" aria-hidden="true">${esc(letter.toUpperCase())}</div>`;
   }
-  return `<div class="service-card-watermark icon-globe" aria-hidden="true"></div>`;
+  return netdashWatermarkHtml();
+}
+
+function netdashWatermarkHtml() {
+  return `<div class="service-card-watermark service-card-watermark--img service-card-watermark--brand" aria-hidden="true"><img src="/static/favicon.svg" alt="" loading="eager" decoding="async" /></div>`;
 }
 
 function renderServiceWatermark(s) {

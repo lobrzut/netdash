@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.41
+
+- **Logo NetDash**: dopracowany SVG crosshair (ciemny zaokrąglony kwadrat, neonowy zielony celownik z delikatnym glow). Ten sam plik w nagłówku, faviconie i domyślnym watermarku kart serwisów. `use_custom_logo` pozostaje wyłączone — bez logo HELLUK.
+
+## v1.3.40
+
+- **Serwisy — filtry Offline i Przypięte ★**: pasek filtrów dostępu rozszerzony do Wszystkie | Z logowaniem | Publiczne | WoL | Offline | Przypięte ★. Offline = `is_online === false` lub błąd health (nie login-gated); Przypięte = `pinned === true`. Liczniki na pigułkach, kombinowalne z kategorią i siecią. i18n pl/en/de/uk.
+
 ## v1.3.39
 
 - **Settings modal width**: dialog widened to `min(960px, 95vw)`; sidebar fixed at 200px so the content pane gets more room. Fixed height unchanged; mobile layout below 640px unchanged.
