@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.42
+
+- **Serwisy — filtr Offline/Online (kombinowalny)**: pigułki dostępności obok filtrów dostępu; Offline = `is_online === false` lub błąd health (`serviceHealthState` offline/error). Łączy się z Z logowaniem, kategorią i siecią (toggle — klik ponownie wyłącza). Usunięto błędny filtr Przypięte z paska dostępu. i18n pl/en/de/uk.
+
 ## v1.3.41
 
 - **Logo NetDash**: dopracowany SVG crosshair (ciemny zaokrąglony kwadrat, neonowy zielony celownik z delikatnym glow). Ten sam plik w nagłówku, faviconie i domyślnym watermarku kart serwisów. `use_custom_logo` pozostaje wyłączone — bez logo HELLUK.
