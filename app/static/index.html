@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.37" />
-  <script src="/static/i18n.js?v=1.3.37"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.38" />
+  <script src="/static/i18n.js?v=1.3.38"></script>
 </head>
 <body>
   <div id="app">
@@ -425,7 +425,11 @@
         <details class="settings-accordion" open>
           <summary data-i18n="settings.tab.scan">Skanowanie</summary>
           <div class="settings-accordion-body">
-            <div class="field"><label for="settings-scan-cidr" data-i18n="settings.scanCidr">Domyślna sieć</label><input type="text" id="settings-scan-cidr" placeholder="192.168.1.0/24" /></div>
+            <div class="field">
+              <label for="settings-scan-cidr" data-i18n="settings.scanCidr">Domyślne sieci (CIDR)</label>
+              <textarea id="settings-scan-cidr" rows="3" data-i18n-placeholder="settings.scanCidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.0.0/24&#10;10.0.0.0/24"></textarea>
+              <span class="hint" data-i18n="settings.scanCidrHint">Jedna sieć na linię lub oddzielone przecinkiem. Obsługiwane maski /24–/22.</span>
+            </div>
             <p id="docker-scan-warning" class="hint hint-warning hidden" role="alert"></p>
             <label class="checkbox-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
             <div class="field">
@@ -643,10 +647,10 @@ sol --udp-port 9
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-form">
       <h2 data-i18n="modal.scan.title">Skanowanie sieci</h2>
-      <p class="modal-desc" data-i18n="modal.scan.desc">Podaj zakres sieci w formacie CIDR lub zostaw puste aby skanować lokalną sieć.</p>
+      <p class="modal-desc" data-i18n="modal.scan.desc">Podaj jedną lub więcej sieci (CIDR) — każda w nowej linii lub oddzielona przecinkiem. Zostaw puste, aby skanować lokalną sieć.</p>
       <div class="field">
-        <label for="cidr-input" data-i18n="modal.scan.cidr">Sieć (CIDR)</label>
-        <input type="text" id="cidr-input" data-i18n-placeholder="modal.scan.cidrPlaceholder" placeholder="np. 192.168.1.0/24" />
+        <label for="cidr-input" data-i18n="modal.scan.cidr">Sieci (CIDR)</label>
+        <textarea id="cidr-input" rows="3" data-i18n-placeholder="modal.scan.cidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.0.0/24"></textarea>
         <span class="hint" id="local-network-hint"></span>
       </div>
       <label class="checkbox-row">
@@ -1005,6 +1009,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.37"></script>
+  <script src="/static/app.js?v=1.3.38"></script>
 </body>
 </html>

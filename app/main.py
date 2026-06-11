@@ -25,13 +25,14 @@ from app.scanner import (
     DiscoveredService,
     _fallback_service_name,
     build_local_host_service,
+    format_cidr_list,
     get_local_ip,
     get_local_network,
     is_http_error_name,
     is_likely_docker_bridge,
-    resolve_scan_cidr,
+    resolve_scan_cidrs,
     parse_host_scan_ports,
-    scan_network,
+    scan_networks,
     suggest_service_identity,
 )
 from app.arp_scan import lookup_mac_for_ip, scan_arp_network
@@ -886,7 +887,7 @@ async def _update_scan_progress(job_id: int, phase: str, current: int, total: in
         await db.commit()
 
 
-async def _run_scan(job_id: int, cidr: str, full_scan: bool = False):
+async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
     async with async_session() as db:
         result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
         job = result.scalar_one()
@@ -914,8 +915,8 @@ async def _run_scan(job_id: int, cidr: str, full_scan: bool = False):
         host_only = app_settings.host_only_entries is not False
 
     try:
-        discovered = await scan_network(
-            cidr,
+        discovered = await scan_networks(
+            cidrs,
             full_scan=full_scan,
             host_scan_ports=host_ports,
             host_only_entries=host_only,
@@ -936,9 +937,14 @@ async def _run_scan(job_id: int, cidr: str, full_scan: bool = False):
             job.finished_at = datetime.now(timezone.utc)
             job.progress_phase = "done"
             await db.commit()
-        logger.info("Scan %s completed: %s services in %s", job_id, len(discovered), cidr)
+        logger.info(
+            "Scan %s completed: %s services across %s",
+            job_id,
+            len(discovered),
+            format_cidr_list(cidrs),
+        )
     except Exception:
-        logger.exception("Scan %s failed for %s", job_id, cidr)
+        logger.exception("Scan %s failed for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
             result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
             job = result.scalar_one()
@@ -959,13 +965,17 @@ async def start_scan(
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
 
     app_settings = await _get_or_create_settings(db)
-    cidr = resolve_scan_cidr(data.cidr, app_settings.scan_cidr_default)
-    job = ScanJob(cidr=cidr, status="pending")
+    try:
+        cidrs = resolve_scan_cidrs(data.cidr, app_settings.scan_cidr_default)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    cidr_label = format_cidr_list(cidrs)
+    job = ScanJob(cidr=cidr_label, status="pending")
     db.add(job)
     await db.commit()
     await db.refresh(job)
 
-    task = asyncio.create_task(_run_scan(job.id, cidr, data.full_scan))
+    task = asyncio.create_task(_run_scan(job.id, cidrs, data.full_scan))
     scan_tasks[job.id] = task
     return job
 
@@ -1075,15 +1085,22 @@ async def arp_scan_network(
     app_settings = await _get_or_create_settings(db)
     if app_settings.arp_scan_enabled is False:
         raise HTTPException(status_code=403, detail="Skan ARP jest wyłączony w ustawieniach")
-    cidr = resolve_scan_cidr(data.cidr if data else None, app_settings.scan_cidr_default)
     try:
-        devices = await scan_arp_network(cidr)
+        cidrs = resolve_scan_cidrs(data.cidr if data else None, app_settings.scan_cidr_default)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    all_devices: dict[str, ArpDeviceOut] = {}
+    try:
+        for cidr in cidrs:
+            devices = await scan_arp_network(cidr)
+            for device in devices:
+                all_devices[device.ip] = ArpDeviceOut(ip=device.ip, mac=device.mac, hostname=device.hostname)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Skan ARP nie powiódł się: {exc}") from exc
 
-    mac_by_ip = {d.ip: d.mac for d in devices}
+    mac_by_ip = {ip: d.mac for ip, d in all_devices.items()}
     async with async_session() as db:
         result = await db.execute(select(Service))
         for svc in result.scalars().all():
@@ -1093,7 +1110,7 @@ async def arp_scan_network(
                     svc.wol_enabled = True
         await db.commit()
 
-    return [ArpDeviceOut(ip=d.ip, mac=d.mac, hostname=d.hostname) for d in devices]
+    return list(all_devices.values())
 
 
 @app.get("/api/network/arp-lookup", response_model=ArpLookupOut)

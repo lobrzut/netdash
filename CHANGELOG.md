@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.38
+
+- **Multi-network scanning**: Settings → Scanning and the scan modal accept multiple CIDR ranges (one per line or comma-separated), e.g. `192.168.1.0/24, 192.168.0.0/24, 10.0.0.0/24`. Backend validates and scans all listed subnets; ARP scan covers all configured networks.
+- **Settings → Scanning scroll fix**: extra bottom padding on the scan tab so “Usuń nieaktywne po (dni)” and its hint are fully visible when scrolled.
+- i18n pl/en/de/uk for multi-CIDR labels and hints.
+
 ## v1.3.37
 
 - **Modal form UX**: single-column layouts in narrow modals, section headers, `settings.optional` hint pattern, unified `.modal-form` / `.form-grid` across API key, note, service add/edit, and service-notes modals. i18n pl/en/de/uk.

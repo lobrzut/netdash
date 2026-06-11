@@ -281,15 +281,55 @@ def get_local_network() -> str:
         return "192.168.1.0/24"
 
 
+def parse_scan_cidrs(text: str) -> list[str]:
+    """Parse comma/newline/semicolon separated CIDR list."""
+    if not text or not text.strip():
+        return []
+    parts = re.split(r"[\s,;]+", text.strip())
+    cidrs: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            network = ipaddress.ip_network(part, strict=False)
+            cidr_str = str(network)
+        except ValueError as exc:
+            raise ValueError(f"Nieprawidłowy CIDR: {part}") from exc
+        if cidr_str not in seen:
+            seen.add(cidr_str)
+            cidrs.append(cidr_str)
+    return cidrs
+
+
+def normalize_scan_cidr_list(text: str | None) -> str | None:
+    if not text or not text.strip():
+        return None
+    cidrs = parse_scan_cidrs(text)
+    return ", ".join(cidrs) if cidrs else None
+
+
+def format_cidr_list(cidrs: list[str]) -> str:
+    return ", ".join(cidrs)
+
+
+def resolve_scan_cidrs(
+    cidr: str | None = None,
+    scan_cidr_default: str | None = None,
+) -> list[str]:
+    if cidr and cidr.strip():
+        return parse_scan_cidrs(cidr)
+    if scan_cidr_default and scan_cidr_default.strip():
+        return parse_scan_cidrs(scan_cidr_default)
+    return [get_local_network()]
+
+
 def resolve_scan_cidr(
     cidr: str | None = None,
     scan_cidr_default: str | None = None,
 ) -> str:
-    if cidr and cidr.strip():
-        return cidr.strip()
-    if scan_cidr_default and scan_cidr_default.strip():
-        return scan_cidr_default.strip()
-    return get_local_network()
+    return format_cidr_list(resolve_scan_cidrs(cidr, scan_cidr_default))
 
 
 def parse_host_scan_ports(ports_str: str | None) -> list[int]:
@@ -886,4 +926,28 @@ async def scan_network(
             if service_callback:
                 await service_callback(service)
 
+    return list(unique.values())
+
+
+async def scan_networks(
+    cidrs: list[str],
+    *,
+    full_scan: bool = False,
+    host_scan_ports: list[int] | None = None,
+    host_only_entries: bool = True,
+    progress_callback: ProgressCallback | None = None,
+    service_callback: ServiceCallback | None = None,
+) -> list[DiscoveredService]:
+    unique: dict[tuple[str, int], DiscoveredService] = {}
+    for cidr in cidrs:
+        discovered = await scan_network(
+            cidr,
+            full_scan=full_scan,
+            host_scan_ports=host_scan_ports,
+            host_only_entries=host_only_entries,
+            progress_callback=progress_callback,
+            service_callback=service_callback,
+        )
+        for service in discovered:
+            unique[(service.host, service.port)] = service
     return list(unique.values())

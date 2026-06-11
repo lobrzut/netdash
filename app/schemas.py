@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.scanner import normalize_scan_cidr_list, parse_scan_cidrs
 
 
 class Token(BaseModel):
@@ -109,8 +111,19 @@ class ServiceOut(BaseModel):
 
 
 class ScanRequest(BaseModel):
-    cidr: str | None = Field(default=None, description="Sieć w formacie CIDR, np. 192.168.1.0/24")
+    cidr: str | None = Field(
+        default=None,
+        description="Sieć(e) w formacie CIDR — wiele oddzielonych przecinkiem lub nową linią",
+    )
     full_scan: bool = Field(default=False, description="Skanuj wszystkie porty (wolniejsze)")
+
+    @field_validator("cidr")
+    @classmethod
+    def validate_cidr(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        parse_scan_cidrs(value)
+        return normalize_scan_cidr_list(value)
 
 
 class ScanStatus(BaseModel):
@@ -219,6 +232,14 @@ class AppSettingsUpdate(BaseModel):
     health_check_interval: int | None = None
     gptwol_url: str | None = None
     stale_remove_days: int | None = None
+
+    @field_validator("scan_cidr_default")
+    @classmethod
+    def validate_scan_cidr_default(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        parse_scan_cidrs(value)
+        return normalize_scan_cidr_list(value)
 
 
 class PowerActionResult(BaseModel):

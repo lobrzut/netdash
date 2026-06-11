@@ -95,7 +95,7 @@ class AppSettings(Base):
     author_url: Mapped[str] = mapped_column(String(256), default="https://github.com/lobrzut")
     about_project: Mapped[str] = mapped_column(Text, default=DEFAULT_ABOUT_PROJECT)
     footer_text: Mapped[str] = mapped_column(String(256), default="")
-    scan_cidr_default: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scan_cidr_default: Mapped[str | None] = mapped_column(String(512), nullable=True)
     full_scan_default: Mapped[bool] = mapped_column(Boolean, default=False)
     host_scan_ports: Mapped[str] = mapped_column(String(128), default="22,445,3389,5900")
     host_only_entries: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -129,7 +129,7 @@ class ScanJob(Base):
     __tablename__ = "scan_jobs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    cidr: Mapped[str] = mapped_column(String(64))
+    cidr: Mapped[str] = mapped_column(String(512))
     status: Mapped[str] = mapped_column(String(32), default="pending")
     found_count: Mapped[int] = mapped_column(Integer, default=0)
     progress_phase: Mapped[str] = mapped_column(String(32), default="")

@@ -297,6 +297,31 @@ function applyFavicon(url) {
   link.href = href;
 }
 
+function applyCustomLogo() {
+  const url = appSettings.use_custom_logo && appSettings.custom_logo_url
+    ? appSettings.custom_logo_url
+    : null;
+  document.querySelectorAll('.logo-icon, .logo-small').forEach((box) => {
+    let img = box.querySelector('img.custom-logo');
+    const svg = box.querySelector('svg');
+    if (url) {
+      if (!img) {
+        img = document.createElement('img');
+        img.className = 'custom-logo';
+        img.alt = '';
+        img.decoding = 'async';
+        box.insertBefore(img, svg || null);
+      }
+      img.src = url;
+      img.classList.remove('hidden');
+      if (svg) svg.classList.add('hidden');
+    } else {
+      if (img) img.classList.add('hidden');
+      if (svg) svg.classList.remove('hidden');
+    }
+  });
+}
+
 function applyLayout() {
   $('#widget-clock')?.classList.toggle('hidden', appSettings.show_clock === false);
   $('#widget-vault')?.classList.toggle('hidden', appSettings.show_vault === false);
@@ -389,6 +414,7 @@ function applyTheme() {
   $('#login-subtitle').textContent = appSettings.subtitle || t('app.tagline');
   applyCustomCss(appSettings.custom_css || '');
   applyFavicon(appSettings.favicon_url);
+  applyCustomLogo();
   applyLayout();
 }
 
@@ -917,7 +943,18 @@ function hostToSubnet(host) {
 
 function cidrToSubnet24(cidr) {
   if (!cidr) return null;
-  return hostToSubnet(cidr.split('/')[0]);
+  const first = cidr.split(/[\s,;]+/).find(Boolean);
+  return first ? hostToSubnet(first.split('/')[0]) : null;
+}
+
+function parseScanCidrs(cidrText) {
+  if (!cidrText) return [];
+  const subnets = new Set();
+  cidrText.split(/[\s,;]+/).filter(Boolean).forEach((part) => {
+    const subnet = cidrToSubnet24(part);
+    if (subnet) subnets.add(subnet);
+  });
+  return [...subnets];
 }
 
 function getLocalNetworkSubnet() {
@@ -932,8 +969,10 @@ function collectNetworkSubnets(serviceList) {
   });
   const localSubnet = getLocalNetworkSubnet();
   if (localSubnet && !(localSubnet in counts)) counts[localSubnet] = 0;
-  const scanSubnet = cidrToSubnet24(appSettings.scan_cidr_default);
-  if (scanSubnet && !(scanSubnet in counts)) counts[scanSubnet] = 0;
+  const scanSubnets = parseScanCidrs(appSettings.scan_cidr_default);
+  scanSubnets.forEach((subnet) => {
+    if (!(subnet in counts)) counts[subnet] = 0;
+  });
   return counts;
 }
 
@@ -2369,6 +2408,7 @@ function previewSettingsFromForm() {
   $('#app-subtitle').textContent = appSettings.subtitle || t('app.tagline');
   applyCustomCss(appSettings.custom_css || '');
   applyFavicon(appSettings.favicon_url);
+  applyCustomLogo();
   applyLayout();
   accessFilter = appSettings.default_access_filter || 'all';
   refreshServiceViews();
