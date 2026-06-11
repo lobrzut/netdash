@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.66
+
+- **Pulpit — układ Średni (polish)**: większe mini-karty w grupach kategorii (~200px+, min. 68px) — ikona 38px, nazwa (13px semibold, 2 linie) i port jako podtytuł w pionowym stosie. Siatka `auto-fill` wypełnia szerokość pudełka kategorii (bez pustych 2×2 i pojedynczych „dziur”). Akcje (★, edycja, notatki, WoL, sleep) w prawym górnym rogu na hover — bez nachodzenia na port/nazwę. Delikatniejsza ramka przypiętych (akcent kategorii na hover zamiast stałej zielonej). Lepszy padding/nagłówki sekcji (WEB, INNE, API…). Dedup pinów rozszerzony o `host:port` (np. podwójny Portainer/AI-SIEM/RDP).
+
 ## v1.3.65
 
 - **Pulpit — Klasyczny (mały)**: wyraźnie większe ikony na przypiętych kartach (27px → 40px, ten sam rozmiar co Klasyczny) — powiększony kontener, glyph 14px, status-dot 7px. Siatka kart min. 7.5rem (mobile 6.25rem), lekko większy padding/gap w górnej strefie. Nazwa, URL i stopka bez zmian hierarchii.

@@ -1489,7 +1489,12 @@ function serviceCardHtml(s, opts = {}) {
     <div class="service-card ${isPinnedCard ? 'service-card--pinned' : ''} ${isPinnedMedium ? 'service-card--pinned-medium' : ''} ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
       ${renderServiceWatermark(s)}
       ${!isPinnedCard ? `<button type="button" class="service-delete" data-id="${s.id}" title="${t('modal.delete')}" aria-label="${t('modal.delete')}">&times;</button>` : ''}
-      ${isPinnedCard ? `<button type="button" class="pinned-unpin-btn service-action service-pin-btn is-pinned" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}" aria-pressed="true">★</button>` : ''}
+      ${isPinnedMedium ? `
+      <div class="pinned-medium-toolbar" aria-hidden="true">
+        <button type="button" class="pinned-medium-unpin service-action service-pin-btn is-pinned" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}" aria-pressed="true">★</button>
+        <div class="pinned-medium-actions">${pinnedHoverActionsHtml(s)}</div>
+      </div>` : ''}
+      ${isPinnedCard && !isPinnedMedium ? `<button type="button" class="pinned-unpin-btn service-action service-pin-btn is-pinned" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}" aria-pressed="true">★</button>` : ''}
       <div class="service-top">
         <div class="service-badges">
           ${hasAuthError && showPinnedBadges ? `<span class="badge badge-error service-error-badge" title="${esc(healthErr)}">${esc(healthBadge)}</span>` : ''}
@@ -1512,13 +1517,13 @@ function serviceCardHtml(s, opts = {}) {
         </div>` : ''}
         ${uptimeLabel && (isPinnedClassic || !isPinnedCard) ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
       </div>
-      ${isPinnedCard ? `<div class="service-actions service-actions--pinned">${pinnedHoverActionsHtml(s)}</div>` : `<div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
+      ${isPinnedCard && !isPinnedMedium ? `<div class="service-actions service-actions--pinned">${pinnedHoverActionsHtml(s)}</div>` : !isPinnedCard ? `<div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
         ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
         <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
         <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
         <button type="button" class="service-action service-sleep-btn ${canPower && isServiceOnline(s) ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && isServiceOnline(s) ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>
-      </div>`}
+      </div>` : ''}
     </div>`;
 }
 
@@ -2169,11 +2174,17 @@ function updateServiceUrlDuplicateHint(prefix, excludeId = null) {
 }
 
 function dedupePinnedServices(list) {
-  const seen = new Set();
+  const seenUrl = new Set();
+  const seenHostPort = new Set();
   return list.filter((s) => {
-    const key = pinnedServiceDedupeKey(s);
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const urlKey = pinnedServiceDedupeKey(s);
+    if (seenUrl.has(urlKey)) return false;
+    seenUrl.add(urlKey);
+    if (s.protocol !== 'host' && s.port !== 0) {
+      const hostPort = `${(s.host || '').toLowerCase()}:${s.port ?? 0}`;
+      if (seenHostPort.has(hostPort)) return false;
+      seenHostPort.add(hostPort);
+    }
     return true;
   });
 }
