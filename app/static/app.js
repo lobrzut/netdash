@@ -328,16 +328,20 @@ function applyCustomLogo() {
   });
 }
 
-function pinnedCardSize() {
-  return 'compact';
+function dashboardLayout() {
+  const layout = appSettings.pinned_card_size || 'medium';
+  if (layout === 'large') return 'classic';
+  if (layout === 'normal') return 'medium';
+  if (['classic', 'medium', 'compact'].includes(layout)) return layout;
+  return 'medium';
 }
 
-function applyPinnedCardSize() {
-  document.body.setAttribute('data-pinned-size', 'compact');
+function applyDashboardLayout() {
+  document.body.setAttribute('data-dashboard-layout', dashboardLayout());
 }
 
 function applyLayout() {
-  applyPinnedCardSize();
+  applyDashboardLayout();
   $('#widget-clock')?.classList.toggle('hidden', appSettings.show_clock === false);
   $('#widget-vault')?.classList.toggle('hidden', appSettings.show_vault === false);
   $('#widget-notes')?.classList.toggle('hidden', appSettings.show_notes === false);
@@ -450,7 +454,7 @@ const DEFAULT_SETTINGS = {
   services_columns: 'normal',
   default_access_filter: 'all',
   card_style: 'detailed',
-  pinned_card_size: 'compact',
+  pinned_card_size: 'medium',
   show_about: false,
   full_scan_default: false,
   host_scan_ports: '22,445,3389,5900',
@@ -1426,14 +1430,18 @@ function formatServiceUrlDisplay(url) {
 }
 
 function serviceCardHtml(s, opts = {}) {
-  const { context = 'services' } = opts;
+  const { context = 'services', pinnedLayout = dashboardLayout() } = opts;
   const isPinnedCard = context === 'pinned';
+  const isPinnedClassic = isPinnedCard && pinnedLayout === 'classic';
+  const isPinnedMedium = isPinnedCard && pinnedLayout === 'medium';
   const compact = !isPinnedCard && appSettings.card_style === 'compact';
   const isHostOnly = s.protocol === 'host' || s.port === 0;
-  const showUrl = appSettings.show_service_urls !== false && !isPinnedCard;
+  const showUrl = isPinnedCard
+    ? (isPinnedClassic && appSettings.show_service_urls !== false)
+    : (appSettings.show_service_urls !== false);
   const showPort = appSettings.show_ports !== false && !isHostOnly;
   const showMeta = isPinnedCard
-    ? showPort
+    ? (isPinnedClassic ? (showPort || showUrl) : showPort)
     : (!compact || showPort || (showUrl && isHostOnly));
   const offline = s.is_online === false;
   const hasNotes = !!(s.service_notes && s.service_notes.trim());
@@ -1452,17 +1460,19 @@ function serviceCardHtml(s, opts = {}) {
   const pinnedNameTitle = isPinnedCard && urlInfo.full
     ? `${displayName} — ${urlInfo.full}`
     : displayName;
+  const showPinnedBadges = !isPinnedCard || isPinnedClassic;
   return `
-    <div class="service-card ${isPinnedCard ? 'service-card--pinned' : ''} ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
+    <div class="service-card ${isPinnedCard ? 'service-card--pinned' : ''} ${isPinnedMedium ? 'service-card--pinned-medium' : ''} ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
       ${renderServiceWatermark(s)}
-      <button type="button" class="service-delete" data-id="${s.id}" title="${t('modal.delete')}" aria-label="${t('modal.delete')}">&times;</button>
+      ${!isPinnedCard ? `<button type="button" class="service-delete" data-id="${s.id}" title="${t('modal.delete')}" aria-label="${t('modal.delete')}">&times;</button>` : ''}
+      ${isPinnedCard ? `<button type="button" class="pinned-unpin-btn service-action service-pin-btn is-pinned" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}" aria-pressed="true">★</button>` : ''}
       <div class="service-top">
         <div class="service-badges">
-          ${hasAuthError ? `<span class="badge badge-error service-error-badge" title="${esc(healthErr)}">${esc(healthBadge)}</span>` : ''}
-          ${s.has_login ? `<span class="badge badge-login">${t('badge.login')}</span>` : ''}
-          ${(!compact || isPinnedCard) && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
+          ${hasAuthError && showPinnedBadges ? `<span class="badge badge-error service-error-badge" title="${esc(healthErr)}">${esc(healthBadge)}</span>` : ''}
+          ${s.has_login && showPinnedBadges ? `<span class="badge badge-login">${t('badge.login')}</span>` : ''}
+          ${showPinnedBadges && (!compact || isPinnedClassic) && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
           ${s.pinned && !isPinnedCard ? `<span class="badge badge-pin">${t('badge.pin')}</span>` : ''}
-          ${offline ? `<span class="badge badge-offline">${t('badge.offline')}</span>` : ''}
+          ${offline && showPinnedBadges ? `<span class="badge badge-offline">${t('badge.offline')}</span>` : ''}
         </div>
         <div class="service-icon-wrap">
           ${renderServiceIcon(s)}
@@ -1473,18 +1483,18 @@ function serviceCardHtml(s, opts = {}) {
         <div class="service-name" title="${esc(pinnedNameTitle)}">${esc(displayName)}</div>
         ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}" title="${esc(urlInfo.full)}">${esc(urlInfo.display)}</div>` : ''}
         ${showMeta ? `<div class="service-meta">
-          ${(!compact && !isPinnedCard) ? `<span class="service-category" title="${esc(s.category)}">${esc(s.category)}</span>` : ''}
+          ${(!compact && !isPinnedCard) || isPinnedClassic ? `<span class="service-category" title="${esc(s.category)}">${esc(s.category)}</span>` : ''}
           ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
         </div>` : ''}
-        ${uptimeLabel && !isPinnedCard ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
+        ${uptimeLabel && (isPinnedClassic || !isPinnedCard) ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
       </div>
-      <div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
+      ${!isPinnedCard ? `<div class="service-actions ${powerContext ? 'service-actions--power' : ''}">
         ${context === 'services' ? `<button type="button" class="service-action service-edit-btn" data-id="${s.id}" title="${t('action.edit')}">✎</button>` : ''}
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
         <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
         <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
         <button type="button" class="service-action service-sleep-btn ${canPower && isServiceOnline(s) ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && isServiceOnline(s) ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>
-      </div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -2168,6 +2178,7 @@ function renderPinnedServices() {
   if (!container) return;
 
   const pinned = dedupePinnedServices(services.filter((s) => s.pinned));
+  const layout = dashboardLayout();
 
   if (pinned.length === 0) {
     container.innerHTML = '';
@@ -2179,26 +2190,44 @@ function renderPinnedServices() {
   title?.classList.remove('hidden');
   empty?.classList.add('hidden');
   const groups = groupPinnedServices(pinned);
+
+  if (layout === 'compact') {
+    container.innerHTML = `
+      <div class="pinned-groups pinned-groups--compact">
+        ${groups.map(([label, items]) => `
+          <section class="pinned-group pinned-group--compact">
+            <h3 class="pinned-group-label" title="${esc(label)}">${esc(label)}</h3>
+            <div class="pinned-chips">${items.map((s) => pinnedChipHtml(s)).join('')}</div>
+          </section>
+        `).join('')}
+      </div>`;
+    bindPinnedChips(container);
+    return;
+  }
+
+  const gridClass = layout === 'medium' ? 'services-grid--pinned-medium' : 'services-grid--pinned';
   container.innerHTML = `
-    <div class="pinned-groups">
+    <div class="pinned-groups pinned-groups--cards">
       ${groups.map(([label, items]) => `
-        <section class="pinned-group">
+        <section class="pinned-group pinned-group--cards">
           <h3 class="pinned-group-label" title="${esc(label)}">${esc(label)}</h3>
-          <div class="pinned-chips">${items.map((s) => pinnedChipHtml(s)).join('')}</div>
+          <div class="services-grid ${gridClass}">${items.map((s) => serviceCardHtml(s, { context: 'pinned', pinnedLayout: layout })).join('')}</div>
         </section>
       `).join('')}
     </div>`;
-  bindPinnedChips(container);
+  bindServiceCards(container);
 }
 
 async function toggleServicePin(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
+  const wasPinned = svc.pinned;
   const updated = await api(`/api/services/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ pinned: !svc.pinned }),
   });
   Object.assign(svc, normalizeService(updated));
+  if (wasPinned) showToast(t('toast.unpinned'), 'success');
   updateStats();
   renderPinnedServices();
   if (currentPage === 'services') {
@@ -2209,7 +2238,7 @@ async function toggleServicePin(id) {
 function patchServiceCardsForId(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
-  if (document.querySelector(`#pinned-container .pinned-chip[data-id="${id}"]`)) {
+  if (document.querySelector(`#pinned-container [data-id="${id}"]`)) {
     renderPinnedServices();
   }
   document.querySelectorAll(`.service-card[data-id="${id}"]`).forEach((card) => {
@@ -2796,7 +2825,7 @@ function fillSettingsForm() {
   $('#settings-default-access').value = appSettings.default_access_filter || 'all';
   $('#settings-services-columns').value = appSettings.services_columns || 'normal';
   $('#settings-card-style').value = appSettings.card_style || 'detailed';
-  $('#settings-pinned-card-size').value = pinnedCardSize();
+  $('#settings-pinned-card-size').value = dashboardLayout();
   solScriptContext = { mac: null, port: null };
   refreshSolScriptPreviews();
   refreshSettingsFaviconStatus();

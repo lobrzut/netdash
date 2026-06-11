@@ -179,7 +179,7 @@ def _migrate_db(sync_conn):
             ("services_grouped", "BOOLEAN DEFAULT 1"),
             ("default_access_filter", "VARCHAR(16) DEFAULT 'all'"),
             ("card_style", "VARCHAR(16) DEFAULT 'detailed'"),
-            ("pinned_card_size", "VARCHAR(16) DEFAULT 'compact'"),
+            ("pinned_card_size", "VARCHAR(16) DEFAULT 'medium'"),
             ("custom_css", "TEXT"),
             ("favicon_url", "VARCHAR(512)"),
             ("use_custom_logo", "BOOLEAN DEFAULT 0"),
@@ -214,8 +214,17 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
         if app_settings.author_bio and ("Łukasz" in app_settings.author_bio or "30+" in app_settings.author_bio):
             app_settings.author_bio = ""
             changed = True
-        if app_settings.pinned_card_size in ("large", "normal", None, ""):
-            app_settings.pinned_card_size = "compact"
+        layout = app_settings.pinned_card_size
+        if layout in ("large", None, ""):
+            app_settings.pinned_card_size = "classic"
+            changed = True
+        elif layout == "normal":
+            app_settings.pinned_card_size = "medium"
+            changed = True
+        elif layout == "compact":
+            pass
+        elif layout not in ("classic", "medium"):
+            app_settings.pinned_card_size = "medium"
             changed = True
         if changed:
             await db.commit()

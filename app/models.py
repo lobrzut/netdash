@@ -111,7 +111,7 @@ class AppSettings(Base):
     services_grouped: Mapped[bool] = mapped_column(Boolean, default=True)
     default_access_filter: Mapped[str] = mapped_column(String(16), default="all")
     card_style: Mapped[str] = mapped_column(String(16), default="detailed")
-    pinned_card_size: Mapped[str] = mapped_column(String(16), default="compact")
+    pinned_card_size: Mapped[str] = mapped_column(String(16), default="medium")
     custom_css: Mapped[str | None] = mapped_column(Text, nullable=True)
     favicon_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     use_custom_logo: Mapped[bool] = mapped_column(Boolean, default=False)

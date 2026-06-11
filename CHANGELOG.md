@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.52
+
+- **Dashboard — 3 motywy pulpitu**: **Klasyczny** (Homer-style pionowe karty w grupach kategorii: ikona, nazwa, URL, kategoria, uptime, watermark), **Średni** (poziome mini-karty ~58px: ikona + nazwa + port, subtelne grupy), **Kompaktowy** (gęste chipy w wierszach). Ustawienia → Wygląd → Pulpit → **Motyw pulpitu** z podglądem na żywo. Domyślny: Średni. Migracja DB: `large`→classic, `normal`→medium, `compact` bez zmian.
+- **Odpinanie (★)**: przycisk w prawym górnym rogu karty/chipa na hover — nie blokuje kliknięcia w serwis. Toast po odpięciu. i18n pl/en/de/uk.
+
 ## v1.3.51
 
 - **Dashboard — przypięte serwisy (ultra-kompakt)**: dedykowane chipy `.pinned-chip` (~40×140px) zamiast kart serwisowych — wiersz kategorii (10px muted label) + inline chipy (32px ikona, nazwa, port tylko na hover). Bez badge PIN/auto/login, bez zielonej ramki pinned. Dedup po host:port:url. `data-pinned-size="compact"` wymuszony zawsze. ~200px wysokości dla ~11 pinów.
