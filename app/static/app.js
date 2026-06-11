@@ -2210,14 +2210,20 @@ function pinnedChipHtml(s) {
   const pinTitle = t('action.unpin');
   return `
     <div class="pinned-chip ${offline ? 'is-offline' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" title="${esc(tooltip)}" style="--category-accent:${categoryAccentColor(s.category)}">
-      <div class="pinned-chip-icon-wrap">
-        ${renderServiceIcon(s)}
-        <span class="status-dot status-${healthState}" title="${esc(statusTooltip(s))}"></span>
+      <div class="pinned-chip-main">
+        <div class="pinned-chip-icon-wrap">
+          ${renderServiceIcon(s)}
+          <span class="status-dot status-${healthState}" title="${esc(statusTooltip(s))}"></span>
+        </div>
+        <div class="pinned-chip-text">
+          <span class="pinned-chip-name">${esc(displayName)}</span>
+          ${showPort ? `<span class="pinned-chip-port" aria-hidden="true">:${s.port}</span>` : ''}
+        </div>
       </div>
-      <span class="pinned-chip-name">${esc(displayName)}</span>
-      ${showPort ? `<span class="pinned-chip-port" aria-hidden="true">:${s.port}</span>` : ''}
-      <button type="button" class="pinned-chip-unpin-corner" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}">★</button>
-      <div class="pinned-chip-actions">${pinnedChipActionsHtml(s)}</div>
+      <div class="pinned-chip-toolbar">
+        <button type="button" class="pinned-chip-unpin-corner" data-id="${s.id}" title="${pinTitle}" aria-label="${pinTitle}">★</button>
+        <div class="pinned-chip-actions">${pinnedChipActionsHtml(s)}</div>
+      </div>
     </div>`;
 }
 

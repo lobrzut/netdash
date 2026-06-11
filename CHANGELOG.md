@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.63
+
+- **Pulpit — układ Kompaktowy (polish)**: większe chipy przypiętych serwisów (152–184px × min. 48px) z czytelniejszą etykietą (2 linie, 12px), lepszym paddingiem i wyrównaniem ikony. Pasek akcji (★, edycja, notatki, WoL, sleep) w dedykowanym wierszu pod treścią — bez nachodzenia na ikonę/nazwę. Szersze etykiety kategorii (2 linie), wyrównanie wierszy `flex-start`.
+
 ## v1.3.62
 
 - **Pulpit — scroll (fix v3)**: naprawione trwałe blokowanie przewijania po zamknięciu modala — `closeIconPopover()` było wywoływane bez definicji (ReferenceError), więc `unlockPageScroll` nigdy nie działał i `body` zostawało z `position: fixed`. Blokada oparta na liczbie widocznych `.modal` w DOM (zamiast refcount), `reconcilePageScrollLock` przy starcie i `pageshow`. Jeden scrollport: `html { overflow-y: scroll }`, bez drugiego na `body`.
