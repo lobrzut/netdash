@@ -699,7 +699,7 @@ body.modal-open {
   box-sizing: border-box;
 }
 .modal-content.modal-settings {
-  width: min(720px, 92vw);
+  width: min(960px, 95vw);
   min-height: 520px;
   height: min(640px, 88vh);
   max-height: min(88vh, calc(100vh - 2rem));
@@ -736,7 +736,7 @@ body.modal-open {
 }
 
 .settings-sidebar {
-  flex: 0 0 11.5rem;
+  flex: 0 0 12.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
