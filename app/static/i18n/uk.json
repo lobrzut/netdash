@@ -394,6 +394,7 @@
   "modal.edit.wolEnabled": "Wake-on-LAN",
   "modal.edit.macHint": "Потрібно для Wake-on-LAN і сну",
   "modal.edit.macRequired": "Введіть MAC-адресу для Wake-on-LAN",
+  "modal.edit.duplicateUrl": "Ця URL-адреса вже використовується: {names}",
   "modal.scan.cidrPlaceholder": "напр. 192.168.1.0/24",
   "modal.scan.fullLong": "Повне сканування (всі порти — повільніше, більше результатів)",
   "modal.close": "Закрити",

@@ -2094,11 +2094,50 @@ function pinnedGroupSortKey(category) {
   return DEFAULT_SERVICE_CATEGORIES.length + label.toLowerCase();
 }
 
+function normalizeUrlCompareKey(url) {
+  const clean = sanitizeServiceUrl(url).trim().toLowerCase();
+  if (!clean) return '';
+  try {
+    const u = new URL(clean);
+    const port = u.port || (u.protocol === 'https:' ? '443' : u.protocol === 'http:' ? '80' : '');
+    const path = u.pathname.replace(/\/$/, '') || '/';
+    return `${u.hostname}:${port}:${u.protocol}//${u.host}${path}${u.search}`;
+  } catch {
+    return clean.replace(/\/$/, '');
+  }
+}
+
 function pinnedServiceDedupeKey(s) {
   const host = (s.host || '').toLowerCase();
   const port = s.port ?? 0;
   const url = sanitizeServiceUrl(s.url || '').toLowerCase();
   return `${host}:${port}:${url}`;
+}
+
+function findDuplicateServicesByUrl(url, excludeId = null) {
+  const key = normalizeUrlCompareKey(url);
+  if (!key) return [];
+  return services.filter((s) => {
+    if (excludeId != null && s.id === excludeId) return false;
+    if (s.protocol === 'host' || s.port === 0) return false;
+    return normalizeUrlCompareKey(s.url || '') === key;
+  });
+}
+
+function updateServiceUrlDuplicateHint(prefix, excludeId = null) {
+  const input = $(`#${prefix}-url`);
+  const hint = $(`#${prefix}-url-duplicate`);
+  if (!input || !hint) return;
+  const url = input.value.trim();
+  const dupes = findDuplicateServicesByUrl(url, excludeId);
+  if (!dupes.length) {
+    hint.classList.add('hidden');
+    hint.textContent = '';
+    return;
+  }
+  const names = dupes.map((s) => s.name).join(', ');
+  hint.textContent = t('modal.edit.duplicateUrl', { names });
+  hint.classList.remove('hidden');
 }
 
 function dedupePinnedServices(list) {
@@ -2171,23 +2210,33 @@ function bindPinnedChips(root) {
   });
 }
 
+function updatePinnedSectionHeader(count) {
+  const countEl = $('#pinned-section-count');
+  if (!countEl) return;
+  if (count > 0) {
+    countEl.textContent = String(count);
+    countEl.classList.remove('hidden');
+  } else {
+    countEl.textContent = '';
+    countEl.classList.add('hidden');
+  }
+}
+
 function renderPinnedServices() {
   const container = $('#pinned-container');
   const empty = $('#pinned-empty-state');
-  const title = $('#pinned-section-title');
   if (!container) return;
 
   const pinned = dedupePinnedServices(services.filter((s) => s.pinned));
   const layout = dashboardLayout();
+  updatePinnedSectionHeader(pinned.length);
 
   if (pinned.length === 0) {
     container.innerHTML = '';
-    title?.classList.add('hidden');
     empty?.classList.remove('hidden');
     return;
   }
 
-  title?.classList.remove('hidden');
   empty?.classList.add('hidden');
   const groups = groupPinnedServices(pinned);
 
@@ -2431,6 +2480,7 @@ function resetAddServiceForm() {
   $('#add-pinned').checked = false;
   $('#add-has-login').checked = false;
   clearIdentifyStatus('add');
+  updateServiceUrlDuplicateHint('add');
 }
 
 async function saveServiceAdd() {
@@ -2480,6 +2530,7 @@ function openServiceEditModal(id) {
   $('#edit-mac').value = svc.mac_address || '';
   updateEditMacVisibility();
   updateEditServiceIconPreview();
+  updateServiceUrlDuplicateHint('edit', id);
   openModal('edit-modal');
 }
 
@@ -3638,6 +3689,11 @@ $('#edit-open-notes')?.addEventListener('click', () => {
   openServiceNotesModal(Number(id));
 });
 $('#edit-wol-enabled')?.addEventListener('change', updateEditMacVisibility);
+$('#edit-url')?.addEventListener('input', () => {
+  const id = Number($('#edit-id')?.value);
+  updateServiceUrlDuplicateHint('edit', Number.isFinite(id) && id > 0 ? id : null);
+});
+$('#add-url')?.addEventListener('input', () => updateServiceUrlDuplicateHint('add'));
 $('#edit-save').addEventListener('click', async () => {
   try {
     await saveServiceEdit();

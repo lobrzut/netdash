@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.53
+
+- **Pulpit — sekcja przypiętych**: nagłówek „Przypięte serwisy” zawsze widoczny (także przy pustej liście), licznik pinów, pusta karta z CTA do Serwisów. Szersze etykiety kategorii w układzie kompaktowym (bez obcinania „DASHBO…”, „DEVELO…”); tooltip na pełnej nazwie.
+- **Serwisy — duplikat URL**: ostrzeżenie w modalu dodawania/edycji, gdy ten sam URL jest już przypisany do innego serwisu (np. drugi Portainer). i18n pl/en/de/uk.
+- **PWA (lekko)**: `manifest.json`, `theme-color`, ikona SVG — możliwość „Zainstaluj aplikację” w przeglądarce.
+- **Docs**: `DEPLOYMENT.md` — wersja zsynchronizowana z `config.py`.
+
 ## v1.3.52
 
 - **Dashboard — 3 motywy pulpitu**: **Klasyczny** (Homer-style pionowe karty w grupach kategorii: ikona, nazwa, URL, kategoria, uptime, watermark), **Średni** (poziome mini-karty ~58px: ikona + nazwa + port, subtelne grupy), **Kompaktowy** (gęste chipy w wierszach). Ustawienia → Wygląd → Pulpit → **Motyw pulpitu** z podglądem na żywo. Domyślny: Średni. Migracja DB: `large`→classic, `normal`→medium, `compact` bez zmian.

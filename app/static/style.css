@@ -2870,8 +2870,36 @@ body.modal-open {
   margin-bottom: 0.5rem;
 }
 
+.pinned-section {
+  margin-top: 0.25rem;
+}
+
+.pinned-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pinned-section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.375rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 #pinned-section-title {
-  margin-bottom: 0.375rem;
+  margin-bottom: 0;
 }
 
 .pinned-unpin-btn {
@@ -2916,8 +2944,8 @@ body[data-dashboard-layout="compact"] .pinned-group--compact {
 body[data-dashboard-layout="compact"] .pinned-group-label {
   margin: 0;
   flex: 0 0 auto;
-  width: 3.5rem;
-  max-width: 3.5rem;
+  width: 6.25rem;
+  max-width: 6.25rem;
   font-weight: 600;
   font-size: 0.625rem;
   letter-spacing: 0.08em;
