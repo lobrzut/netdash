@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.33
+
+- **Dashboard pinned services** reuse the same Homer-style card layout as Serwisy (badges, icon, name, URL, category, uptime, watermark) via `.service-card--pinned` / `.services-grid--pinned`, scaled down with matching aspect ratio.
+
+## v1.3.32
+
+- Fix service card **× delete button** positioning (exclude from flex `position: relative` rule); 28px top-right hit target, hover-only.
+- Fix **watermark** intermittent load: `loading="eager"`, onerror fallback icon_url → preset → letter → globe.
+
 ## v1.3.31
 
 - Redesigned **Settings → About**: hero layout, version badge, GitHub chip, read-only author card, tech stack chips.

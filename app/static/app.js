@@ -1540,10 +1540,11 @@ function updateEditServiceIconPreview() {
 
 const LETTER_WATERMARK_ICONS = new Set(['nginx', 'apache', 'caddy', 'traefik']);
 
-function renderServiceWatermark(s) {
-  if (s.icon_url) {
-    return `<div class="service-card-watermark service-card-watermark--img" aria-hidden="true"><img src="${esc(s.icon_url)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`;
-  }
+function serviceIconPreset(s) {
+  return getIconClass((s.icon || 'globe').toLowerCase());
+}
+
+function watermarkFallbackHtml(s) {
   const icon = (s.icon || 'globe').toLowerCase();
   const cls = getIconClass(icon);
   if (LETTER_WATERMARK_ICONS.has(icon)) {
@@ -1557,6 +1558,14 @@ function renderServiceWatermark(s) {
     return `<div class="service-card-watermark service-card-watermark--letter" aria-hidden="true">${esc(letter.toUpperCase())}</div>`;
   }
   return `<div class="service-card-watermark icon-globe" aria-hidden="true"></div>`;
+}
+
+function renderServiceWatermark(s) {
+  const preset = serviceIconPreset(s);
+  if (s.icon_url) {
+    return `<div class="service-card-watermark service-card-watermark--img" data-preset="${preset}" aria-hidden="true"><img src="${esc(s.icon_url)}" alt="" loading="eager" decoding="async" referrerpolicy="no-referrer" onerror="const w=this.parentElement;w.classList.remove('service-card-watermark--img');w.classList.add(w.dataset.preset||'icon-globe');this.remove();" /></div>`;
+  }
+  return watermarkFallbackHtml(s);
 }
 
 function renderPinnedServices() {

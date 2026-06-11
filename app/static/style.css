@@ -2633,7 +2633,7 @@ body.modal-open {
   transform: translateY(-3px);
 }
 
-.service-card > :not(.service-card-watermark) {
+.service-card > :not(.service-card-watermark):not(.service-delete) {
   position: relative;
   z-index: 1;
 }
@@ -2896,20 +2896,27 @@ body.modal-open {
 
 .service-delete {
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  width: 24px;
-  height: 24px;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
   opacity: 0;
-  transition: all var(--transition);
-  border-radius: 4px;
-  font-size: 1rem;
+  transition: opacity var(--transition), color var(--transition), background var(--transition);
+  border-radius: 6px;
+  font-size: 1.125rem;
   line-height: 1;
-  z-index: 3;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
 }
 
 .service-card:hover .service-delete { opacity: 1; }
