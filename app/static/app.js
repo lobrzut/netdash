@@ -256,7 +256,6 @@ async function login(username, password) {
 async function setLanguage(lang) {
   await loadLanguage(lang);
   applyI18n();
-  $('#lang-quick').value = lang;
   $('#settings-language').value = lang;
   renderAccessFilters();
   renderAvailabilityFilters();
@@ -3733,13 +3732,6 @@ $('#settings-save').addEventListener('click', async () => {
   startHealthPolling();
   closeModal('settings-modal');
   settingsSnapshot = null;
-});
-
-$('#lang-quick').addEventListener('change', async (e) => {
-  const lang = e.target.value;
-  appSettings = await api('/api/settings', { method: 'PATCH', body: JSON.stringify({ language: lang }) });
-  await setLanguage(lang);
-  applyTheme();
 });
 
 $('#add-key-btn').addEventListener('click', () => openKeyModal());

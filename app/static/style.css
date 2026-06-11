@@ -1744,16 +1744,26 @@ body.modal-open {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: flex-end;
+  gap: 0.75rem;
   flex-shrink: 0;
-  min-width: 0;
+  margin-left: auto;
 }
 
 .header-actions-services {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  min-width: 15.75rem;
+}
+
+.header-actions-account {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
 }
 
 #dashboard-view[data-page="home"] .header-actions-services {
@@ -1767,7 +1777,8 @@ body.modal-open {
 }
 
 .btn-nav-settings {
-  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 1.0625rem;
 }
 
 .logo-small {
@@ -5080,7 +5091,8 @@ button.service-edit-icon-preview.icon-preview-btn[aria-expanded="true"] {
   .header { padding: 1rem; flex-wrap: wrap; gap: 0.75rem; }
   .header-nav { order: 3; width: 100%; justify-content: flex-start; }
   .nav-segment { max-width: 100%; width: 100%; }
-  .header-actions { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+  .header-actions { width: 100%; justify-content: flex-end; flex-wrap: nowrap; }
+  .header-actions-services { min-width: 0; flex: 1 1 auto; }
   .services-search { max-width: 100%; }
   .main { padding: 1rem; }
   .widgets-row { grid-template-columns: 1fr; }

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.67
+
+- **Nagłówek — porządek akcji**: selektor języka (PL/EN/DE/UA) przeniesiony z paska głównego do Ustawień → Język. Przycisk ustawień to sama ikona ⚙ obok „Wyloguj” (tooltip i `aria-label` z i18n). Stała szerokość slotu „Skanuj sieć” / „+ Dodaj” — przełączanie Pulpit ↔ Serwisy nie przesuwa ikon po prawej.
+
 ## v1.3.66
 
 - **Pulpit — układ Średni (polish)**: większe mini-karty w grupach kategorii (~200px+, min. 68px) — ikona 38px, nazwa (13px semibold, 2 linie) i port jako podtytuł w pionowym stosie. Siatka `auto-fill` wypełnia szerokość pudełka kategorii (bez pustych 2×2 i pojedynczych „dziur”). Akcje (★, edycja, notatki, WoL, sleep) w prawym górnym rogu na hover — bez nachodzenia na port/nazwę. Delikatniejsza ramka przypiętych (akcent kategorii na hover zamiast stałej zielonej). Lepszy padding/nagłówki sekcji (WEB, INNE, API…). Dedup pinów rozszerzony o `host:port` (np. podwójny Portainer/AI-SIEM/RDP).
