@@ -792,8 +792,8 @@ async function saveKey() {
     pinned: $('#key-pinned').checked,
   };
   const secret = $('#key-secret').value;
-  if (!payload.name) return alert(t('alert.keyName'));
-  if (!editId && !secret) return alert(t('alert.keySecret'));
+  if (!payload.name) return showToast(t('alert.keyName'));
+  if (!editId && !secret) return showToast(t('alert.keySecret'));
 
   if (editId) {
     if (secret) payload.secret = secret;
@@ -814,7 +814,7 @@ async function saveNote() {
     color: $('#note-color').value,
     pinned: $('#note-pinned').checked,
   };
-  if (!payload.title) return alert(t('alert.noteTitle'));
+  if (!payload.title) return showToast(t('alert.noteTitle'));
 
   if (editId) {
     await api(`/api/notes/${editId}`, { method: 'PATCH', body: JSON.stringify(payload) });
@@ -1267,11 +1267,12 @@ function formatServiceUrlDisplay(url) {
 
 function serviceCardHtml(s, opts = {}) {
   const { context = 'services' } = opts;
-  const compact = context === 'home' || appSettings.card_style === 'compact';
+  const isPinnedCard = context === 'pinned';
+  const compact = !isPinnedCard && appSettings.card_style === 'compact';
   const isHostOnly = s.protocol === 'host' || s.port === 0;
   const showUrl = appSettings.show_service_urls !== false;
   const showPort = appSettings.show_ports !== false && !isHostOnly;
-  const showMeta = !compact || showPort || (showUrl && isHostOnly);
+  const showMeta = !compact || isPinnedCard || showPort || (showUrl && isHostOnly);
   const offline = s.is_online === false;
   const hasNotes = !!(s.service_notes && s.service_notes.trim());
   const canPower = isWolDevice(s);
@@ -1286,14 +1287,14 @@ function serviceCardHtml(s, opts = {}) {
   const accent = categoryAccentColor(s.category);
   const uptimeLabel = serviceUptimeLabel(s);
   return `
-    <div class="service-card ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
+    <div class="service-card ${isPinnedCard ? 'service-card--pinned' : ''} ${compact ? 'service-card--compact' : ''} ${s.pinned ? 'pinned' : ''} ${s.has_login ? 'has-login' : ''} ${offline ? 'is-offline' : ''} ${hasAuthError ? 'has-auth-error' : ''} ${isHostOnly ? 'host-only' : ''} ${powerContext ? 'power-context' : ''}" data-id="${s.id}" data-url="${esc(cardUrl)}" style="--category-accent:${accent}">
       ${renderServiceWatermark(s)}
-      <button class="service-delete" data-id="${s.id}" title="${t('modal.delete')}">&times;</button>
+      <button type="button" class="service-delete" data-id="${s.id}" title="${t('modal.delete')}" aria-label="${t('modal.delete')}">&times;</button>
       <div class="service-top">
         <div class="service-badges">
           ${hasAuthError ? `<span class="badge badge-error service-error-badge" title="${esc(healthErr)}">${esc(healthBadge)}</span>` : ''}
           ${s.has_login ? `<span class="badge badge-login">${t('badge.login')}</span>` : ''}
-          ${!compact && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
+          ${(!compact || isPinnedCard) && s.auto_discovered ? `<span class="badge badge-auto">${t('badge.auto')}</span>` : ''}
           ${s.pinned ? `<span class="badge badge-pin">${t('badge.pin')}</span>` : ''}
           ${offline ? `<span class="badge badge-offline">${t('badge.offline')}</span>` : ''}
         </div>
@@ -1305,7 +1306,7 @@ function serviceCardHtml(s, opts = {}) {
       <div class="service-name">${esc(displayServiceName(s))}</div>
       ${showUrl ? `<div class="service-url ${isHostOnly ? 'service-url--host' : ''}" title="${esc(urlInfo.full)}">${esc(urlInfo.display)}</div>` : ''}
       ${showMeta ? `<div class="service-meta">
-        ${!compact ? `<span class="service-category">${esc(s.category)}</span>` : ''}
+        ${(!compact || isPinnedCard) ? `<span class="service-category">${esc(s.category)}</span>` : ''}
         ${showPort ? `<span class="service-port">:${s.port}</span>` : ''}
       </div>` : ''}
       ${uptimeLabel ? `<div class="service-uptime" aria-hidden="true">${esc(uptimeLabel)}</div>` : ''}
@@ -1314,7 +1315,7 @@ function serviceCardHtml(s, opts = {}) {
         <button type="button" class="service-action service-pin-btn ${s.pinned ? 'is-pinned' : ''}" data-id="${s.id}" title="${pinTitle}" aria-pressed="${s.pinned ? 'true' : 'false'}">★</button>
         <button type="button" class="service-action service-notes-btn ${hasNotes ? 'has-content' : ''}" data-id="${s.id}" title="${t('modal.serviceNotes')}">📝</button>
         <button type="button" class="service-action service-wol-btn ${canPower ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.wol')}" ${canPower ? '' : 'tabindex="-1" aria-hidden="true"'}>⚡</button>
-        <button type="button" class="service-action service-sleep-btn ${canPower && s.is_online !== false ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && s.is_online !== false ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>
+        <button type="button" class="service-action service-sleep-btn ${canPower && isServiceOnline(s) ? '' : 'is-placeholder'}" data-id="${s.id}" title="${t('action.sleep')}" ${canPower && isServiceOnline(s) ? '' : 'tabindex="-1" aria-hidden="true"'}>💤</button>
       </div>
     </div>`;
 }
@@ -1350,10 +1351,10 @@ function bindServiceCards(root) {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       try {
-        const res = await api(`/api/services/${btn.dataset.id}/wol`, { method: 'POST' });
-        alert(t('action.wolSent'));
+        await api(`/api/services/${btn.dataset.id}/wol`, { method: 'POST' });
+        showToast(t('toast.wolSent'), 'success');
       } catch (err) {
-        alert(err.message || t('action.wolFailed'));
+        showToast(err.message || t('action.wolFailed'), 'error');
       }
     });
   });
@@ -1362,11 +1363,11 @@ function bindServiceCards(root) {
       e.stopPropagation();
       if (!confirm(t('confirm.sleep'))) return;
       try {
-        const res = await api(`/api/services/${btn.dataset.id}/sleep`, { method: 'POST' });
-        alert(t('action.sleepSent'));
+        await api(`/api/services/${btn.dataset.id}/sleep`, { method: 'POST' });
+        showToast(t('toast.sleepSent'), 'success');
         await loadDashboard();
       } catch (err) {
-        alert(err.message || t('action.sleepFailed'));
+        showToast(err.message || t('action.sleepFailed'), 'error');
       }
     });
   });
@@ -1577,8 +1578,7 @@ function renderPinnedServices() {
 
   title?.classList.remove('hidden');
   empty?.classList.add('hidden');
-  const gridClass = `services-grid services-grid--compact ${gridDensityClass()}`.trim();
-  container.innerHTML = `<div class="${gridClass}">${pinned.map((s) => serviceCardHtml(s, { context: 'home' })).join('')}</div>`;
+  container.innerHTML = `<div class="services-grid services-grid--pinned">${pinned.map((s) => serviceCardHtml(s, { context: 'pinned' })).join('')}</div>`;
   bindServiceCards(container);
 }
 
@@ -1601,7 +1601,7 @@ function patchServiceCardsForId(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
   document.querySelectorAll(`.service-card[data-id="${id}"]`).forEach((card) => {
-    const context = card.closest('#pinned-container') ? 'home' : 'services';
+    const context = card.closest('#pinned-container') ? 'pinned' : 'services';
     const wrapper = document.createElement('div');
     wrapper.innerHTML = serviceCardHtml(svc, { context });
     const next = wrapper.firstElementChild;
@@ -1688,7 +1688,7 @@ async function identifyServiceModal(prefix) {
   const name = $(`#${prefix}-name`)?.value.trim() || '';
   const url = $(`#${prefix}-url`)?.value.trim() || '';
   if (!name && !url) {
-    alert(t('modal.edit.identifyNeedInput'));
+    showToast(t('modal.edit.identifyNeedInput'), 'error');
     return;
   }
 
@@ -1753,7 +1753,7 @@ async function identifyServiceModal(prefix) {
       }
     }
   } catch (err) {
-    alert(err.message || t('modal.edit.identifyError'));
+    showToast(err.message || t('modal.edit.identifyError'), 'error');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -1802,7 +1802,7 @@ async function saveServiceAdd() {
   const description = $('#add-description').value.trim() || null;
   const pinned = $('#add-pinned').checked;
   const has_login = $('#add-has-login').checked;
-  if (!name || !url) return alert(t('alert.serviceFields'));
+  if (!name || !url) return showToast(t('alert.serviceFields'), 'error');
   await api('/api/services', {
     method: 'POST',
     body: JSON.stringify({
@@ -1871,9 +1871,9 @@ async function saveServiceEdit() {
   const mac_address = wol_enabled ? ($('#edit-mac').value.trim() || null) : null;
   const svc = services.find((s) => s.id === id);
   const isHostOnly = svc?.protocol === 'host' || svc?.port === 0;
-  if (!name) return alert(t('alert.serviceFields'));
-  if (!isHostOnly && !url) return alert(t('alert.serviceFields'));
-  if (wol_enabled && !mac_address) return alert(t('modal.edit.macRequired'));
+  if (!name) return showToast(t('alert.serviceFields'), 'error');
+  if (!isHostOnly && !url) return showToast(t('alert.serviceFields'), 'error');
+  if (wol_enabled && !mac_address) return showToast(t('modal.edit.macRequired'), 'error');
   const payload = {
     name, category, icon, icon_url: iconUrlRaw || null, description, pinned, has_login, wol_enabled, mac_address,
   };
@@ -2037,7 +2037,7 @@ async function startScan(cidr, fullScan = false) {
   } catch (err) {
     $('#scan-bar').classList.add('hidden');
     $('#scan-btn').disabled = false;
-    alert(err.message || t('alert.scanStart'));
+    showToast(err.message || t('alert.scanStart'), 'error');
     return;
   }
 
@@ -2058,13 +2058,13 @@ async function startScan(cidr, fullScan = false) {
         $('#scan-status-text').textContent = '';
         await loadDashboard();
         if (status.found_count === 0) {
-          alert(t('scan.noResults'));
+          showToast(t('scan.noResults'), 'info');
         }
       } else if (status.status === 'failed') {
         clearInterval(scanPollInterval);
         $('#scan-bar').classList.add('hidden');
         $('#scan-btn').disabled = false;
-        alert(t('scan.failed'));
+        showToast(t('scan.failed'), 'error');
       }
     } catch {
       clearInterval(scanPollInterval);
@@ -2787,11 +2787,11 @@ async function copySolScript(scope) {
   if (!preview?.value) return;
   try {
     await navigator.clipboard.writeText(preview.value);
-    alert(t('settings.sol.scripts.copied'));
+    showToast(t('toast.copied'), 'success');
   } catch {
     preview.select();
     document.execCommand('copy');
-    alert(t('settings.sol.scripts.copied'));
+    showToast(t('toast.copied'), 'success');
   }
 }
 
@@ -3133,7 +3133,7 @@ $('#arp-scan-btn')?.addEventListener('click', async () => {
 $('#power-link-save').addEventListener('click', async () => {
   const id = $('#power-link-service').value;
   const mac = $('#power-link-mac').value.trim();
-  if (!id || !mac) return alert(t('alert.macRequired'));
+  if (!id || !mac) return showToast(t('alert.macRequired'), 'error');
   await api(`/api/services/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({

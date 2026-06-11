@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+ARG NETDASH_BUILD_DATE=""
+ENV NETDASH_BUILD_DATE=${NETDASH_BUILD_DATE}
+
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -113,6 +113,8 @@ class AppSettings(Base):
     card_style: Mapped[str] = mapped_column(String(16), default="detailed")
     custom_css: Mapped[str | None] = mapped_column(Text, nullable=True)
     favicon_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    use_custom_logo: Mapped[bool] = mapped_column(Boolean, default=False)
+    custom_logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     wol_broadcast_ip: Mapped[str] = mapped_column(String(64), default="255.255.255.255")
     wol_port: Mapped[int] = mapped_column(Integer, default=9)
     sol_port: Mapped[int] = mapped_column(Integer, default=9)

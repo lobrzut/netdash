@@ -50,6 +50,7 @@ if [ ! -f .env ]; then
   echo "Brak .env - ustaw NETDASH_SECRET_KEY i NETDASH_DEFAULT_ADMIN_PASSWORD"
   exit 1
 fi
+export NETDASH_BUILD_DATE=$(date -u +%Y-%m-%d)
 docker compose config >/dev/null
 docker compose build
 docker compose up -d --remove-orphans

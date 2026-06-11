@@ -154,10 +154,13 @@
   "theme.homer.name": "Homer",
   "theme.homer.desc": "Ciemny niebieski inspirowany Homerem",
   "settings.language": "Język interfejsu",
+  "settings.section.branding": "Branding i autor",
   "settings.authorName": "Nick autora",
   "settings.authorUrl": "Link (GitHub)",
   "settings.aboutProject": "O projekcie NetDash",
   "settings.aboutDescription": "Opis projektu",
+  "settings.aboutDescriptionPlaceholder": "Krótki opis NetDash wyświetlany w zakładce O projekcie…",
+  "settings.aboutDescriptionHint": "Wyświetlany w zakładce O projekcie (tylko do odczytu).",
   "settings.footer": "Tekst w stopce",
   "settings.scanCidr": "Domyślna sieć (CIDR)",
   "settings.dockerScanWarning": "NetDash działa w Dockerze (IP {ip}, sieć {network}) — to sieć kontenera, nie LAN. Ustaw CIDR (np. 192.168.1.0/24) lub włącz network_mode: host na serwerze Linux.",
@@ -221,6 +224,9 @@
   "action.wol": "Wyślij Wake-on-LAN",
   "action.sleep": "Wyślij Sleep-on-LAN",
   "action.wolSent": "Pakiet WoL wysłany",
+  "toast.wolSent": "Pakiet WoL wysłany ✓",
+  "toast.sleepSent": "Pakiet SOL wysłany ✓",
+  "toast.copied": "Skopiowano do schowka",
   "action.wolFailed": "Nie udało się wysłać WoL",
   "action.sleepSent": "Pakiet SOL wysłany",
   "action.sleepFailed": "Nie udało się wysłać SOL",
@@ -363,8 +369,4 @@
   "error.noteNotFound": "Notatka nie znaleziona",
   "error.scanInProgress": "Skanowanie już trwa — poczekaj na zakończenie",
   "error.scanNotFound": "Skan nie znaleziony",
-  "error.wolNotConfigured": "WoL nie jest skonfigurowane dla tego serwisu",
-  "error.solNotConfigured": "Sleep-on-LAN nie jest skonfigurowane dla tego serwisu",
-  "error.arpDisabled": "Skan ARP jest wyłączony w ustawieniach",
-  "error.backupUnsupportedVersion": "Nieobsługiwana wersja kopii zapasowej: {version}"
-}
+  "error.wolNotConfigured": "WoL nie jest skonfigurowane dla tego se

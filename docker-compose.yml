@@ -1,6 +1,9 @@
 services:
   netdash:
-    build: .
+    build:
+      context: .
+      args:
+        NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
     container_name: netdash
     restart: always
     # Przy network_mode: host sekcja ports jest niedozwolona (Docker odmawia startu).

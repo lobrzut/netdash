@@ -165,6 +165,8 @@ class AppSettingsOut(BaseModel):
     card_style: str = "detailed"
     custom_css: str | None = None
     favicon_url: str | None = None
+    use_custom_logo: bool = False
+    custom_logo_url: str | None = None
     wol_broadcast_ip: str = "255.255.255.255"
     wol_port: int = 9
     sol_port: int = 9
@@ -207,6 +209,8 @@ class AppSettingsUpdate(BaseModel):
     card_style: str | None = None
     custom_css: str | None = None
     favicon_url: str | None = None
+    use_custom_logo: bool | None = None
+    custom_logo_url: str | None = None
     wol_broadcast_ip: str | None = None
     wol_port: int | None = None
     sol_port: int | None = None
