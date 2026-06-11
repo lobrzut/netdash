@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.26-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.27-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -43,6 +43,11 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - Online/offline health checks with persistent tiles
 - Docker one-command deploy
 - i18n: English, Polish, German, Ukrainian
+
+## What's new in v1.3.27
+
+- Uptime dots stay green for login-gated and self-signed HTTPS services when reachable.
+- Fixed stale amber status when checks were OK but timestamp looked old.
 
 ## What's new in v1.3.26
 

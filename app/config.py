@@ -14,10 +14,31 @@ def _get_build_date() -> str:
     if env:
         return env
     try:
-        mtime = Path(__file__).stat().st_mtime
-        return datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%d")
+        import subprocess
+
+        result = subprocess.run(
+            ["git", "-C", str(BASE_DIR), "log", "-1", "--format=%cs"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+    try:
+        latest = 0.0
+        app_dir = BASE_DIR / "app"
+        if app_dir.is_dir():
+            for path in app_dir.rglob("*"):
+                if path.is_file():
+                    latest = max(latest, path.stat().st_mtime)
+        if latest:
+            return datetime.fromtimestamp(latest, tz=timezone.utc).strftime("%Y-%m-%d")
     except OSError:
-        return ""
+        pass
+    return ""
 
 
 BUILD_DATE = _get_build_date()

@@ -16,9 +16,13 @@ from app.url_utils import sanitize_service_url
 logger = logging.getLogger("netdash.health")
 
 _HTTP_STATUS_RE = re.compile(r"^HTTP\s+(\d{3})\b", re.IGNORECASE)
+# Auth / redirect responses mean the host is reachable, not an outage.
+_REACHABLE_HTTP_CODES = frozenset(range(300, 400)) | {401, 403}
 
 
 def _http_detail_from_response(response: httpx.Response) -> str | None:
+    if response.status_code in _REACHABLE_HTTP_CODES:
+        return None
     if response.status_code < 400:
         return None
     body = response.text[:8192]
@@ -91,10 +95,9 @@ async def apply_health_result(
     service.last_checked = now
     if online:
         service.last_seen = now
-    if detail and (is_http_error_name(detail) or _HTTP_STATUS_RE.match(detail)):
-        service.health_detail = detail[:128]
-    elif online and not detail:
         service.health_detail = None
+    elif detail and (is_http_error_name(detail) or _HTTP_STATUS_RE.match(detail)):
+        service.health_detail = detail[:128]
 
 
 async def check_all_services(db: AsyncSession) -> int:

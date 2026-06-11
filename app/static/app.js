@@ -37,6 +37,36 @@ function debounce(fn, ms) {
   };
 }
 
+const TOAST_DURATION_MS = 3500;
+
+function showToast(message, type = 'info') {
+  if (!message) return;
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    container.setAttribute('aria-live', 'polite');
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.setAttribute('role', 'status');
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast-visible'));
+  const dismiss = () => {
+    toast.classList.remove('toast-visible');
+    toast.classList.add('toast-out');
+    setTimeout(() => toast.remove(), 280);
+  };
+  const timer = setTimeout(dismiss, TOAST_DURATION_MS);
+  toast.addEventListener('click', () => {
+    clearTimeout(timer);
+    dismiss();
+  });
+}
+
 const CATEGORY_ACCENTS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899', '#06b6d4', '#ef4444', '#84cc16'];
 
 function categoryAccentColor(category) {
@@ -120,15 +150,47 @@ function applyVersionDisplay() {
   const ver = formatVersion(appVersion);
   ['#app-version', '#login-version', '#settings-app-version'].forEach((sel) => {
     const el = $(sel);
-    if (el) el.textContent = ver;
+    if (el) {
+      el.textContent = ver;
+      if (sel === '#settings-app-version') el.title = ver;
+    }
   });
   const buildEl = $('#settings-build-date');
+  const buildChip = $('#settings-build-chip');
   if (buildEl) buildEl.textContent = buildDate || '—';
+  if (buildChip) buildChip.hidden = !buildDate;
   const githubEl = $('#settings-github-link');
-  if (githubEl && githubRepo) {
-    githubEl.href = githubRepo;
-    githubEl.textContent = githubRepo;
+  if (githubEl && githubRepo) githubEl.href = githubRepo;
+}
+
+function authorInitials(name) {
+  const clean = String(name || 'lobrzut').replace(/^@/, '').trim();
+  if (!clean) return 'ND';
+  const parts = clean.split(/[\s._-]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return clean.slice(0, 2).toUpperCase();
+}
+
+function renderAboutPanel() {
+  const prose = $('#about-prose-text');
+  if (prose) prose.textContent = ($('#settings-about-project')?.value || appSettings.about_project || '').trim();
+
+  const wrap = $('#about-prose-wrap');
+  if (wrap && prose) {
+    wrap.classList.remove('about-prose-wrap--clamped');
+    if (prose.textContent.length > 420) wrap.classList.add('about-prose-wrap--clamped');
   }
+
+  const name = ($('#settings-author-name')?.value || appSettings.author_name || 'lobrzut').trim();
+  const url = ($('#settings-author-url')?.value || appSettings.author_url || githubRepo || 'https://github.com/lobrzut').trim();
+  const handle = name.startsWith('@') ? name : `@${name}`;
+  const link = $('#about-author-link');
+  if (link) {
+    link.textContent = handle;
+    link.href = url || 'https://github.com/lobrzut';
+  }
+  const avatar = $('#about-author-avatar');
+  if (avatar) avatar.textContent = authorInitials(name);
 }
 
 function updateFooterNetwork(netLabel) {
@@ -366,11 +428,14 @@ function normalizeService(s) {
   return {
     ...s,
     has_login: !!s.has_login,
-    is_online: s.is_online !== false,
     wol_enabled: !!s.wol_enabled,
     pinned: !!s.pinned,
     customized: !!s.customized,
   };
+}
+
+function isServiceOnline(s) {
+  return s.is_online === true || s.is_online === null;
 }
 
 async function loadServices() {
@@ -430,16 +495,22 @@ async function loadDashboard() {
   startHealthPolling();
 }
 
+let serviceRefreshInterval = null;
+
 function startHealthPolling() {
   if (healthPollInterval) clearInterval(healthPollInterval);
+  if (serviceRefreshInterval) clearInterval(serviceRefreshInterval);
   if (appSettings.health_check_enabled === false) return;
-  const interval = Math.max(15, (appSettings.health_check_interval || 60) * 1000);
+  const intervalSec = Math.max(15, Math.min(900, appSettings.health_check_interval || 60));
+  const interval = intervalSec * 1000;
+  const refreshMs = Math.max(30000, Math.floor(interval / 2));
+  serviceRefreshInterval = setInterval(() => {
+    loadServices().catch(() => {});
+  }, refreshMs);
   healthPollInterval = setInterval(async () => {
     try {
       await api('/api/services/health-check', { method: 'POST' });
-      const fresh = await api('/api/services');
-      services = fresh.map(normalizeService);
-      refreshServiceViews();
+      await loadServices();
     } catch {
       /* ignore background refresh errors */
     }
@@ -448,7 +519,7 @@ function startHealthPolling() {
 
 function updateStats() {
   $('#stat-total').textContent = services.length;
-  $('#stat-online').textContent = services.filter((s) => s.is_online !== false).length;
+  $('#stat-online').textContent = services.filter(isServiceOnline).length;
   $('#stat-login').textContent = services.filter((s) => s.has_login === true).length;
   $('#stat-keys').textContent = apiKeys.length;
   $('#stat-notes').textContent = notes.length;
@@ -1081,22 +1152,25 @@ function statusTooltip(s) {
 }
 
 function serviceHealthState(s) {
-  if (hasServiceAuthError(s)) return 'error';
+  if (hasServiceHealthWarning(s)) return 'error';
   if (s.is_online === false) return 'offline';
-  const intervalSec = appSettings.health_check_interval || 60;
-  if (s.last_checked) {
-    const ageMs = Date.now() - new Date(s.last_checked).getTime();
-    if (ageMs > intervalSec * 3000) return 'stale';
-    return 'online';
+  if (s.is_online === true) return 'online';
+  if (!s.last_checked) {
+    return appSettings.health_check_enabled !== false ? 'unknown' : 'online';
   }
-  if (appSettings.health_check_enabled !== false) return 'unknown';
-  return 'online';
+  const intervalSec = Math.max(15, Math.min(900, appSettings.health_check_interval || 60));
+  const ageMs = Date.now() - new Date(s.last_checked).getTime();
+  if (ageMs > intervalSec * 1000 * 3) return 'stale';
+  return 'unknown';
 }
 
 function serviceUptimeLabel(s) {
   const state = serviceHealthState(s);
   if (state === 'online') {
     if (s.last_checked) {
+      const intervalSec = Math.max(15, Math.min(900, appSettings.health_check_interval || 60));
+      const ageMs = Date.now() - new Date(s.last_checked).getTime();
+      if (ageMs > intervalSec * 1000 * 2) return '';
       const rel = formatRelativeTime(s.last_checked);
       return rel ? t('status.checkedAgo', { time: rel }) : '';
     }
@@ -1142,13 +1216,30 @@ function serviceHealthBadge(s) {
   return code ? code[1] : t('badge.error');
 }
 
-function hasServiceAuthError(s) {
-  return !!(s.health_detail || isHttpErrorName(s.name));
+function isReachableHttpDetail(detail) {
+  if (!detail) return false;
+  const d = String(detail).trim();
+  return /^(?:HTTP\s+)?(?:30[0-9]|401|403)\b/i.test(d)
+    || /\b(authorization\s+required|unauthorized|forbidden)\b/i.test(d);
+}
+
+function hasServiceHealthWarning(s) {
+  const detail = s.health_detail || '';
+  if (/^(?:HTTP\s+)?5\d{2}\b/i.test(detail)) return true;
+  if (isReachableHttpDetail(detail)) return false;
+  if (detail) return true;
+  return s.is_online === false && isHttpErrorName(s.name);
 }
 
 function sanitizeServiceUrl(url) {
   if (!url || url === '#') return url || '';
-  return String(url)
+  let text = String(url);
+  try {
+    text = decodeURIComponent(text);
+  } catch {
+    /* keep raw url when not percent-encoded */
+  }
+  return text
     .replace(/\?b'([^']*)'/g, '?$1')
     .replace(/\?b"([^"]*)"/g, '?$1')
     .replace(/b'([^']*)'/g, '$1')
@@ -1189,7 +1280,7 @@ function serviceCardHtml(s, opts = {}) {
   const urlInfo = isHostOnly ? { display: s.host, full: s.host } : formatServiceUrlDisplay(s.url);
   const pinTitle = s.pinned ? t('action.unpin') : t('action.pin');
   const healthErr = serviceHealthError(s);
-  const hasAuthError = hasServiceAuthError(s);
+  const hasAuthError = hasServiceHealthWarning(s);
   const healthBadge = serviceHealthBadge(s);
   const healthState = serviceHealthState(s);
   const accent = categoryAccentColor(s.category);
@@ -2267,6 +2358,9 @@ $('#settings-btn').addEventListener('click', () => {
   showBackupMessage('');
   settingsSnapshot = { ...appSettings };
   renderPowerDevicesList();
+  renderAboutPanel();
+  const activeTab = $('.settings-tab.active')?.dataset.tab || 'general';
+  updateSettingsFooter(activeTab);
   openModal('settings-modal');
 });
 
@@ -2282,6 +2376,14 @@ $('#settings-homer-file')?.addEventListener('change', (e) => {
   if (file) importHomerConfig(file);
 });
 
+const SETTINGS_READONLY_TABS = new Set(['about', 'backup', 'account']);
+
+function updateSettingsFooter(tabId) {
+  const footer = $('#settings-modal-footer');
+  if (!footer) return;
+  footer.classList.toggle('settings-footer--hidden', SETTINGS_READONLY_TABS.has(tabId));
+}
+
 function switchSettingsTab(tabId) {
   $$('.settings-tab').forEach((t) => {
     t.classList.remove('active');
@@ -2291,7 +2393,11 @@ function switchSettingsTab(tabId) {
   const tab = $(`.settings-tab[data-tab="${tabId}"]`);
   tab?.classList.add('active');
   tab?.setAttribute('aria-selected', 'true');
-  $(`.settings-panel[data-panel="${tabId}"]`)?.classList.add('active');
+  const panel = $(`.settings-panel[data-panel="${tabId}"]`);
+  panel?.classList.add('active');
+  if (panel) panel.scrollTop = 0;
+  updateSettingsFooter(tabId);
+  if (tabId === 'about') renderAboutPanel();
   if (tabId === 'power') {
     solScriptContext = { mac: null, port: null };
     refreshSolScriptPreviews();
@@ -2740,6 +2846,7 @@ const SETTINGS_PREVIEW_IDS = [
   'settings-show-notes', 'settings-show-stats', 'settings-show-category-filters',
   'settings-show-service-urls', 'settings-show-ports', 'settings-services-grouped',
   'settings-default-access', 'settings-services-columns', 'settings-card-style',
+  'settings-about-project', 'settings-author-name', 'settings-author-url',
 ];
 
 SETTINGS_PREVIEW_IDS.forEach((id) => {
@@ -2749,6 +2856,9 @@ SETTINGS_PREVIEW_IDS.forEach((id) => {
   el.addEventListener(evt, () => {
     if ($('#settings-modal').classList.contains('hidden')) return;
     previewSettingsFromForm();
+    if (id === 'settings-about-project' || id === 'settings-author-name' || id === 'settings-author-url') {
+      renderAboutPanel();
+    }
   });
 });
 
@@ -2884,14 +2994,14 @@ $('#edit-save').addEventListener('click', async () => {
   try {
     await saveServiceEdit();
   } catch (err) {
-    alert(err.message || t('error.api.services'));
+    showToast(err.message || t('error.api.services'), 'error');
   }
 });
 $('#add-save').addEventListener('click', async () => {
   try {
     await saveServiceAdd();
   } catch (err) {
-    alert(err.message || t('error.api.services'));
+    showToast(err.message || t('error.api.services'), 'error');
   }
 });
 

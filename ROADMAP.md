@@ -1,5 +1,9 @@
 # NetDash Roadmap
 
+## Done (v1.3.27)
+
+- Uptime indicator semantics: green = reachable (incl. 401/403), amber = genuinely unknown/stale, red = 5xx/offline.
+
 ## Done (v1.3.26)
 
 - [x] Add-service modal parity with edit (icon, category datalist, description, pin/login, Identyfikuj)

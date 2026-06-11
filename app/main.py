@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from contextlib import asynccontextmanager
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -12,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
-from app.config import BASE_DIR, BUILD_DATE, GITHUB_REPO, VERSION, settings
+from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, VERSION, settings
 from app.database import Base, async_session, engine, get_db
 from app.enrich import enrich_all_services, enrich_mac_addresses, should_auto_wol
 from app.health import check_all_services
@@ -74,6 +75,19 @@ from app.schemas import (
 scan_tasks: dict[int, asyncio.Task] = {}
 health_task: asyncio.Task | None = None
 logger = logging.getLogger("netdash")
+
+UPLOADS_DIR = DATA_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_LOGO_TYPES = {
+    "image/png": ".png",
+    "image/svg+xml": ".svg",
+    "image/webp": ".webp",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+}
+LOGO_EXT_BY_SUFFIX = {".png", ".svg", ".webp", ".jpg", ".jpeg", ".gif"}
+MAX_LOGO_SIZE = 2 * 1024 * 1024
 
 PHASE_LABELS = {
     "ping": "Wykrywanie aktywnych hostów",
@@ -159,6 +173,8 @@ def _migrate_db(sync_conn):
             ("card_style", "VARCHAR(16) DEFAULT 'detailed'"),
             ("custom_css", "TEXT"),
             ("favicon_url", "VARCHAR(512)"),
+            ("use_custom_logo", "BOOLEAN DEFAULT 0"),
+            ("custom_logo_url", "VARCHAR(512)"),
             ("wol_broadcast_ip", "VARCHAR(64) DEFAULT '255.255.255.255'"),
             ("wol_port", "INTEGER DEFAULT 9"),
             ("sol_port", "INTEGER DEFAULT 9"),
@@ -248,19 +264,17 @@ async def init_db():
 
 
 async def _health_check_loop():
+    interval = 60
     while True:
         try:
             async with async_session() as db:
                 settings_row = await _get_or_create_settings(db)
-                interval = max(15, settings_row.health_check_interval or 60)
+                interval = max(15, min(900, settings_row.health_check_interval or 60))
                 enabled = settings_row.health_check_enabled
             if enabled:
                 async with async_session() as db:
                     count = await check_all_services(db)
-                    logger.debug("Health check completed for %s services", count)
-            async with async_session() as db:
-                settings_row = await _get_or_create_settings(db)
-                interval = max(15, settings_row.health_check_interval or 60)
+                    logger.info("Health check completed for %s services", count)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -273,6 +287,14 @@ async def _health_check_loop():
 async def lifespan(app: FastAPI):
     global health_task
     await init_db()
+    try:
+        async with async_session() as db:
+            settings_row = await _get_or_create_settings(db)
+            if settings_row.health_check_enabled:
+                count = await check_all_services(db)
+                logger.info("Startup health check completed for %s services", count)
+    except Exception:
+        logger.exception("Startup health check failed")
     health_task = asyncio.create_task(_health_check_loop())
     yield
     if health_task:
@@ -287,6 +309,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NetDash", description="Dashboard sieci z auto-wykrywaniem serwisów", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 
 @app.get("/")
@@ -360,6 +383,52 @@ async def update_settings(
         updates["custom_css"] = _sanitize_custom_css(updates["custom_css"])
     for field, value in updates.items():
         setattr(app_settings, field, value)
+    await db.commit()
+    await db.refresh(app_settings)
+    return app_settings
+
+
+def _logo_extension(content_type: str | None, filename: str | None) -> str | None:
+    ct = (content_type or "").split(";")[0].strip().lower()
+    if ct in ALLOWED_LOGO_TYPES:
+        return ALLOWED_LOGO_TYPES[ct]
+    if filename:
+        suffix = Path(filename).suffix.lower()
+        if suffix == ".jpeg":
+            suffix = ".jpg"
+        if suffix in LOGO_EXT_BY_SUFFIX:
+            return suffix
+    return None
+
+
+@app.post("/api/settings/logo", response_model=AppSettingsOut)
+async def upload_logo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    ext = _logo_extension(file.content_type, file.filename)
+    if not ext:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nieobsługiwany format. Dozwolone: PNG, SVG, WebP, JPEG, GIF.",
+        )
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pusty plik.")
+    if len(content) > MAX_LOGO_SIZE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Plik za duży (max 2 MB).")
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    for old in UPLOADS_DIR.glob("logo.*"):
+        try:
+            old.unlink()
+        except OSError:
+            logger.warning("Could not remove old logo %s", old)
+    dest = UPLOADS_DIR / f"logo{ext}"
+    dest.write_bytes(content)
+    app_settings = await _get_or_create_settings(db)
+    app_settings.custom_logo_url = f"/uploads/logo{ext}"
+    app_settings.use_custom_logo = True
     await db.commit()
     await db.refresh(app_settings)
     return app_settings
