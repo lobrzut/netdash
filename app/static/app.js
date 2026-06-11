@@ -1877,15 +1877,45 @@ function renderServiceWatermark(s) {
   return watermarkFallbackHtml(s);
 }
 
+function pinnedCategoryLabel(category) {
+  const cat = (category || '').trim();
+  return cat || t('modal.key.other');
+}
+
+function pinnedGroupSortKey(category) {
+  const label = pinnedCategoryLabel(category);
+  const idx = DEFAULT_SERVICE_CATEGORIES.indexOf(label);
+  if (idx !== -1) return idx;
+  return DEFAULT_SERVICE_CATEGORIES.length + label.toLowerCase();
+}
+
+function groupPinnedServices(list) {
+  const groups = new Map();
+  list.forEach((s) => {
+    const label = pinnedCategoryLabel(s.category);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(s);
+  });
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      const ka = pinnedGroupSortKey(a);
+      const kb = pinnedGroupSortKey(b);
+      if (ka !== kb) return ka - kb;
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    })
+    .map(([label, items]) => [
+      label,
+      items.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    ]);
+}
+
 function renderPinnedServices() {
   const container = $('#pinned-container');
   const empty = $('#pinned-empty-state');
   const title = $('#pinned-section-title');
   if (!container) return;
 
-  const pinned = services
-    .filter((s) => s.pinned)
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const pinned = services.filter((s) => s.pinned);
 
   if (pinned.length === 0) {
     container.innerHTML = '';
@@ -1896,7 +1926,16 @@ function renderPinnedServices() {
 
   title?.classList.remove('hidden');
   empty?.classList.add('hidden');
-  container.innerHTML = `<div class="services-grid services-grid--pinned">${pinned.map((s) => serviceCardHtml(s, { context: 'pinned' })).join('')}</div>`;
+  const groups = groupPinnedServices(pinned);
+  container.innerHTML = `
+    <div class="pinned-groups">
+      ${groups.map(([label, items]) => `
+        <section class="pinned-group">
+          <h3 class="pinned-group-label">${esc(label)}</h3>
+          <div class="services-grid services-grid--pinned">${items.map((s) => serviceCardHtml(s, { context: 'pinned' })).join('')}</div>
+        </section>
+      `).join('')}
+    </div>`;
   bindServiceCards(container);
 }
 

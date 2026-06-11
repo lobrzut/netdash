@@ -2870,6 +2870,35 @@ body.modal-open {
   margin-bottom: 1.5rem;
 }
 
+.pinned-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: 0.875rem;
+  align-items: start;
+}
+
+.pinned-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.625rem 0.75rem 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.pinned-group-label {
+  margin: 0;
+  padding: 0 0.125rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
 .services-grid--pinned {
   grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
   gap: 0.625rem;
@@ -4166,6 +4195,7 @@ button.service-edit-icon-preview.icon-preview-btn[aria-expanded="true"] {
   .services-grid,
   .services-grid--compact,
   .services-grid--comfortable { grid-template-columns: 1fr; }
+  .pinned-groups { grid-template-columns: 1fr; }
   .services-grid--pinned { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
   .field-row { flex-direction: column; gap: 0; }
   .icon-picker-popover {
