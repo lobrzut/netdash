@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.58
+
+- **Pulpit — scroll (fix)**: usunięty flex-column trap na `#dashboard-view` oraz `overflow-x: hidden` na `#app` / `#dashboard-view` (CSS wymuszał `overflow-y: auto` na kontenerze o wysokości viewportu — kółko myszy nie przewijało dokumentu). Przewijanie strony działa przy 8+ grupach kategorii.
+- **Pulpit — układ Średni (polish)**: stała wysokość mini-kart (52px), wyrównanie ikona+nazwa+port, większe odstępy grup, etykiety kategorii z ellipsis+tooltip, pasek akcji na hover wyśrodkowany po prawej (bez nachodzenia na ★), padding przy hover pod gwiazdkę.
+
 ## v1.3.57
 
 - **Pulpit — ★ odpinanie (fix)**: większy inset gwiazdki od krawędzi karty/chipa (`0.5rem`), przycisk 24px — nie nachodzi na zaokrąglony róg ani border przy `overflow: hidden`. Classic-sm i compact — proporcjonalnie mniejszy przycisk/inset; compact — padding przy hover pod ★.
