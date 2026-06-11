@@ -581,8 +581,10 @@ async def create_service(
         protocol=parsed.scheme or "http",
         category=data.category,
         icon=data.icon,
+        icon_url=data.icon_url,
         description=data.description,
         auto_discovered=False,
+        customized=True,
         has_login=data.has_login,
         pinned=data.pinned,
     )

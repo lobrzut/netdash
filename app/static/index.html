@@ -18,8 +18,8 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css?v=1.3.25" />
-  <script src="/static/i18n.js?v=1.3.25"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.26" />
+  <script src="/static/i18n.js?v=1.3.26"></script>
 </head>
 <body>
   <div id="app">
@@ -878,19 +878,63 @@ sol --udp-port 9
   <!-- Add Modal -->
   <div id="add-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-content">
+    <div class="modal-content modal-wide modal-service-form">
       <h2 data-i18n="modal.add.service">Dodaj serwis</h2>
-      <div class="field">
-        <label for="add-name" data-i18n="modal.add.name">Nazwa</label>
-        <input type="text" id="add-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
+      <p class="modal-desc" data-i18n="modal.add.desc">Dodaj ręcznie serwis homelab — ikona, kategoria i opcje jak przy edycji.</p>
+      <div class="modal-form-section">
+        <h3 class="modal-section-label" data-i18n="modal.add.section.basic">Podstawowe</h3>
+        <div class="field">
+          <label for="add-name" data-i18n="modal.edit.displayName">Nazwa wyświetlana</label>
+          <div class="field-with-action">
+            <input type="text" id="add-name" data-i18n-placeholder="modal.add.namePlaceholder" placeholder="np. Grafana" />
+            <button type="button" class="btn btn-ghost btn-sm" id="add-identify" data-i18n="modal.edit.identify">Identyfikuj</button>
+            <button type="button" class="btn btn-ghost btn-sm hidden" id="add-identify-undo" data-i18n="modal.edit.identifyUndo">Cofnij</button>
+          </div>
+          <p class="hint hidden" id="add-identify-status" role="status" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="add-url" data-i18n="modal.add.url">URL</label>
+          <input type="url" id="add-url" data-i18n-placeholder="modal.add.urlPlaceholder" placeholder="https://192.168.1.10:3000" />
+          <span class="hint" data-i18n="modal.add.urlHint">Pełny adres http:// lub https:// — port opcjonalny</span>
+        </div>
       </div>
-      <div class="field">
-        <label for="add-url" data-i18n="modal.add.url">URL</label>
-        <input type="url" id="add-url" data-i18n-placeholder="modal.add.urlPlaceholder" placeholder="https://192.168.1.10:3000" />
+      <div class="modal-form-section">
+        <h3 class="modal-section-label" data-i18n="modal.add.section.appearance">Wygląd</h3>
+        <div class="field-row">
+          <div class="field">
+            <label for="add-category" data-i18n="modal.add.category">Kategoria</label>
+            <input type="text" id="add-category" list="service-category-suggestions" data-i18n-placeholder="modal.add.categoryPlaceholder" placeholder="np. Monitoring" />
+          </div>
+          <div class="field field-icon-preview">
+            <label data-i18n="modal.edit.icon">Ikona</label>
+            <div class="service-edit-icon-preview" id="add-icon-preview"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="add-icon" data-i18n="modal.edit.iconPreset">Preset ikony</label>
+            <select id="add-icon"></select>
+          </div>
+          <div class="field">
+            <label for="add-icon-url" data-i18n="modal.edit.iconUrl">URL ikony (opcjonalnie)</label>
+            <input type="url" id="add-icon-url" placeholder="https://..." />
+          </div>
+        </div>
+        <div class="field">
+          <label for="add-description" data-i18n="modal.edit.description">Opis (opcjonalnie)</label>
+          <textarea id="add-description" rows="2" data-i18n-placeholder="modal.add.descriptionPlaceholder" placeholder="Krótki opis lub tag (np. homelab, monitoring)"></textarea>
+        </div>
       </div>
-      <div class="field">
-        <label for="add-category" data-i18n="modal.add.category">Kategoria</label>
-        <input type="text" id="add-category" />
+      <div class="modal-form-section modal-form-section--compact">
+        <h3 class="modal-section-label" data-i18n="modal.add.section.options">Opcje</h3>
+        <label class="checkbox-row">
+          <input type="checkbox" id="add-pinned" />
+          <span data-i18n="modal.edit.pinned">Przypnij na pulpicie</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="add-has-login" />
+          <span data-i18n="modal.edit.hasLogin">Wymaga logowania</span>
+        </label>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="add-cancel" data-i18n="modal.cancel">Anuluj</button>
@@ -900,6 +944,6 @@ sol --udp-port 9
   </div>
   </div>
 
-  <script src="/static/app.js?v=1.3.25"></script>
+  <script src="/static/app.js?v=1.3.26"></script>
 </body>
 </html>

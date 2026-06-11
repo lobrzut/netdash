@@ -1422,8 +1422,8 @@ function populateServiceCategorySuggestions() {
     .map((cat) => `<option value="${esc(cat)}"></option>`).join('');
 }
 
-function populateServiceIconSelect(selected = 'globe') {
-  const select = $('#edit-icon');
+function populateServiceIconSelect(selected = 'globe', selectId = 'edit-icon') {
+  const select = $(`#${selectId}`);
   if (!select) return;
   const safe = (selected || 'globe').toLowerCase();
   const icons = new Set(SERVICE_ICON_PRESETS);
@@ -1434,12 +1434,16 @@ function populateServiceIconSelect(selected = 'globe') {
   }).join('');
 }
 
-function updateEditServiceIconPreview() {
-  const preview = $('#edit-icon-preview');
+function updateServiceIconPreview(prefix) {
+  const preview = $(`#${prefix}-icon-preview`);
   if (!preview) return;
-  const icon = $('#edit-icon')?.value || 'globe';
-  const iconUrl = $('#edit-icon-url')?.value.trim() || '';
+  const icon = $(`#${prefix}-icon`)?.value || 'globe';
+  const iconUrl = $(`#${prefix}-icon-url`)?.value.trim() || '';
   preview.innerHTML = renderServiceIcon({ icon, icon_url: iconUrl || null });
+}
+
+function updateEditServiceIconPreview() {
+  updateServiceIconPreview('edit');
 }
 
 const LETTER_WATERMARK_ICONS = new Set(['nginx', 'apache', 'caddy', 'traefik']);
@@ -1523,49 +1527,55 @@ function updateEditMacVisibility() {
   wrap.classList.toggle('hidden', !$('#edit-wol-enabled')?.checked);
 }
 
-let editIdentifySnapshot = null;
+const identifySnapshots = { edit: null, add: null };
 
-function setEditIdentifyUndoVisible(visible) {
-  const undoBtn = $('#edit-identify-undo');
+function setIdentifyUndoVisible(prefix, visible) {
+  const undoBtn = $(`#${prefix}-identify-undo`);
   if (!undoBtn) return;
   undoBtn.classList.toggle('hidden', !visible);
 }
 
-function clearEditIdentifyStatus({ keepUndo = false } = {}) {
-  const status = $('#edit-identify-status');
+function clearIdentifyStatus(prefix, { keepUndo = false } = {}) {
+  const status = $(`#${prefix}-identify-status`);
   if (!status) return;
   status.classList.add('hidden');
   status.textContent = '';
   status.classList.remove('identify-status--ok', 'identify-status--warn');
   if (!keepUndo) {
-    editIdentifySnapshot = null;
-    setEditIdentifyUndoVisible(false);
+    identifySnapshots[prefix] = null;
+    setIdentifyUndoVisible(prefix, false);
   }
 }
 
-function captureEditIdentifySnapshot() {
+function clearEditIdentifyStatus(opts) {
+  clearIdentifyStatus('edit', opts);
+}
+
+function captureIdentifySnapshot(prefix) {
   return {
-    name: $('#edit-name')?.value || '',
-    url: $('#edit-url')?.value || '',
-    category: $('#edit-category')?.value || '',
-    icon: ($('#edit-icon')?.value || 'globe').toLowerCase(),
-    icon_url: $('#edit-icon-url')?.value || '',
-    description: $('#edit-description')?.value || '',
-    has_login: !!$('#edit-has-login')?.checked,
+    name: $(`#${prefix}-name`)?.value || '',
+    url: $(`#${prefix}-url`)?.value || '',
+    category: $(`#${prefix}-category`)?.value || '',
+    icon: ($(`#${prefix}-icon`)?.value || 'globe').toLowerCase(),
+    icon_url: $(`#${prefix}-icon-url`)?.value || '',
+    description: $(`#${prefix}-description`)?.value || '',
+    has_login: !!$(`#${prefix}-has-login`)?.checked,
   };
 }
 
-function applyEditIdentifySnapshot(snapshot) {
+function applyIdentifySnapshot(prefix, snapshot) {
   if (!snapshot) return;
-  $('#edit-name').value = snapshot.name || '';
-  $('#edit-url').value = snapshot.url || '';
-  $('#edit-category').value = snapshot.category || '';
-  populateServiceIconSelect(snapshot.icon || 'globe');
-  $('#edit-icon').value = (snapshot.icon || 'globe').toLowerCase();
-  $('#edit-icon-url').value = snapshot.icon_url || '';
-  $('#edit-description').value = snapshot.description || '';
-  $('#edit-has-login').checked = !!snapshot.has_login;
-  updateEditServiceIconPreview();
+  $(`#${prefix}-name`).value = snapshot.name || '';
+  $(`#${prefix}-url`).value = snapshot.url || '';
+  $(`#${prefix}-category`).value = snapshot.category || '';
+  populateServiceIconSelect(snapshot.icon || 'globe', `${prefix}-icon`);
+  $(`#${prefix}-icon`).value = (snapshot.icon || 'globe').toLowerCase();
+  $(`#${prefix}-icon-url`).value = snapshot.icon_url || '';
+  const descEl = $(`#${prefix}-description`);
+  if (descEl) descEl.value = snapshot.description || '';
+  const loginEl = $(`#${prefix}-has-login`);
+  if (loginEl) loginEl.checked = !!snapshot.has_login;
+  updateServiceIconPreview(prefix);
 }
 
 function formatIdentifyConfidence(confidence) {
@@ -1583,17 +1593,17 @@ function formatIdentifyFields(fields = []) {
   }).join(', ');
 }
 
-async function identifyServiceEdit() {
-  const name = $('#edit-name')?.value.trim() || '';
-  const url = $('#edit-url')?.value.trim() || '';
+async function identifyServiceModal(prefix) {
+  const name = $(`#${prefix}-name`)?.value.trim() || '';
+  const url = $(`#${prefix}-url`)?.value.trim() || '';
   if (!name && !url) {
     alert(t('modal.edit.identifyNeedInput'));
     return;
   }
 
-  const snapshot = captureEditIdentifySnapshot();
-  const btn = $('#edit-identify');
-  const status = $('#edit-identify-status');
+  const snapshot = captureIdentifySnapshot(prefix);
+  const btn = $(`#${prefix}-identify`);
+  const status = $(`#${prefix}-identify-status`);
   const prevLabel = btn?.textContent;
   if (btn) {
     btn.disabled = true;
@@ -1606,32 +1616,34 @@ async function identifyServiceEdit() {
       body: JSON.stringify({
         name: name || null,
         url: url || null,
-        category: $('#edit-category')?.value.trim() || null,
-        icon: ($('#edit-icon')?.value || 'globe').toLowerCase(),
-        icon_url: $('#edit-icon-url')?.value.trim() || null,
-        description: $('#edit-description')?.value.trim() || null,
-        has_login: $('#edit-has-login')?.checked,
+        category: $(`#${prefix}-category`)?.value.trim() || null,
+        icon: ($(`#${prefix}-icon`)?.value || 'globe').toLowerCase(),
+        icon_url: $(`#${prefix}-icon-url`)?.value.trim() || null,
+        description: $(`#${prefix}-description`)?.value.trim() || null,
+        has_login: $(`#${prefix}-has-login`)?.checked,
       }),
     });
 
     const s = result.suggestion || {};
-    if (s.name) $('#edit-name').value = s.name;
-    if (s.url) $('#edit-url').value = s.url;
-    if (s.category) $('#edit-category').value = s.category;
+    if (s.name) $(`#${prefix}-name`).value = s.name;
+    if (s.url) $(`#${prefix}-url`).value = s.url;
+    if (s.category) $(`#${prefix}-category`).value = s.category;
     if (s.icon) {
-      populateServiceIconSelect(s.icon);
-      $('#edit-icon').value = s.icon.toLowerCase();
+      populateServiceIconSelect(s.icon, `${prefix}-icon`);
+      $(`#${prefix}-icon`).value = s.icon.toLowerCase();
     }
-    if (s.icon_url !== undefined && s.icon_url !== null) $('#edit-icon-url').value = s.icon_url;
-    else if (s.icon_url === null && result.matched) $('#edit-icon-url').value = '';
-    if (s.description) $('#edit-description').value = s.description;
-    if (s.has_login !== undefined && s.has_login !== null) {
-      $('#edit-has-login').checked = !!s.has_login;
+    if (s.icon_url !== undefined && s.icon_url !== null) $(`#${prefix}-icon-url`).value = s.icon_url;
+    else if (s.icon_url === null && result.matched) $(`#${prefix}-icon-url`).value = '';
+    const descEl = $(`#${prefix}-description`);
+    if (s.description && descEl) descEl.value = s.description;
+    const loginEl = $(`#${prefix}-has-login`);
+    if (s.has_login !== undefined && s.has_login !== null && loginEl) {
+      loginEl.checked = !!s.has_login;
     }
-    updateEditServiceIconPreview();
+    updateServiceIconPreview(prefix);
     const changed = Array.isArray(result.changed_fields) && result.changed_fields.length > 0;
-    editIdentifySnapshot = changed ? snapshot : null;
-    setEditIdentifyUndoVisible(changed);
+    identifySnapshots[prefix] = changed ? snapshot : null;
+    setIdentifyUndoVisible(prefix, changed);
 
     if (status) {
       status.classList.remove('hidden', 'identify-status--ok', 'identify-status--warn');
@@ -1659,6 +1671,65 @@ async function identifyServiceEdit() {
   }
 }
 
+async function identifyServiceEdit() {
+  return identifyServiceModal('edit');
+}
+
+function openAddServiceModal() {
+  populateServiceCategorySuggestions();
+  populateServiceIconSelect('globe', 'add-icon');
+  clearIdentifyStatus('add');
+  $('#add-name').value = '';
+  $('#add-url').value = '';
+  $('#add-category').value = t('modal.key.other');
+  $('#add-icon').value = 'globe';
+  $('#add-icon-url').value = '';
+  $('#add-description').value = '';
+  $('#add-pinned').checked = false;
+  $('#add-has-login').checked = false;
+  updateServiceIconPreview('add');
+  openModal('add-modal');
+}
+
+function resetAddServiceForm() {
+  $('#add-name').value = '';
+  $('#add-url').value = '';
+  $('#add-category').value = t('modal.key.other');
+  $('#add-icon-url').value = '';
+  $('#add-description').value = '';
+  $('#add-pinned').checked = false;
+  $('#add-has-login').checked = false;
+  clearIdentifyStatus('add');
+}
+
+async function saveServiceAdd() {
+  const name = $('#add-name').value.trim();
+  const url = $('#add-url').value.trim();
+  const category = $('#add-category').value.trim() || t('modal.key.other');
+  const icon = ($('#add-icon').value || 'globe').toLowerCase();
+  const iconUrlRaw = $('#add-icon-url').value.trim();
+  const description = $('#add-description').value.trim() || null;
+  const pinned = $('#add-pinned').checked;
+  const has_login = $('#add-has-login').checked;
+  if (!name || !url) return alert(t('alert.serviceFields'));
+  await api('/api/services', {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      url,
+      category,
+      icon,
+      icon_url: iconUrlRaw || null,
+      description,
+      pinned,
+      has_login,
+    }),
+  });
+  closeModal('add-modal');
+  resetAddServiceForm();
+  await loadDashboard();
+}
+
 function openServiceEditModal(id) {
   const svc = services.find((s) => s.id === id);
   if (!svc) return;
@@ -1681,14 +1752,18 @@ function openServiceEditModal(id) {
   openModal('edit-modal');
 }
 
-function undoServiceIdentifyEdit() {
-  if (!editIdentifySnapshot) return;
-  applyEditIdentifySnapshot(editIdentifySnapshot);
-  clearEditIdentifyStatus();
-  const status = $('#edit-identify-status');
+function undoServiceIdentify(prefix) {
+  if (!identifySnapshots[prefix]) return;
+  applyIdentifySnapshot(prefix, identifySnapshots[prefix]);
+  clearIdentifyStatus(prefix);
+  const status = $(`#${prefix}-identify-status`);
   if (!status) return;
   status.classList.remove('hidden', 'identify-status--ok', 'identify-status--warn');
   status.textContent = t('modal.edit.identifyUndoDone');
+}
+
+function undoServiceIdentifyEdit() {
+  undoServiceIdentify('edit');
 }
 
 async function saveServiceEdit() {
@@ -1924,10 +1999,7 @@ $('#nav-home-btn')?.addEventListener('click', () => navigateTo('home'));
 $('#nav-services-btn')?.addEventListener('click', () => navigateTo('services'));
 $('#goto-services-btn')?.addEventListener('click', () => navigateTo('services'));
 $('#scan-btn').addEventListener('click', () => openModal('scan-modal'));
-$('#add-btn').addEventListener('click', () => {
-  $('#add-category').value = t('modal.key.other');
-  openModal('add-modal');
-});
+$('#add-btn').addEventListener('click', () => openAddServiceModal());
 const debouncedRenderServices = debounce(renderServices, 200);
 
 $('#services-search').addEventListener('input', (e) => {
@@ -2795,8 +2867,12 @@ $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
 $('#edit-identify')?.addEventListener('click', () => identifyServiceEdit());
 $('#edit-identify-undo')?.addEventListener('click', () => undoServiceIdentifyEdit());
+$('#add-identify')?.addEventListener('click', () => identifyServiceModal('add'));
+$('#add-identify-undo')?.addEventListener('click', () => undoServiceIdentify('add'));
 $('#edit-icon')?.addEventListener('change', updateEditServiceIconPreview);
 $('#edit-icon-url')?.addEventListener('input', updateEditServiceIconPreview);
+$('#add-icon')?.addEventListener('change', () => updateServiceIconPreview('add'));
+$('#add-icon-url')?.addEventListener('input', () => updateServiceIconPreview('add'));
 $('#edit-open-notes')?.addEventListener('click', () => {
   const id = $('#edit-id').value;
   if (!id) return;
@@ -2812,18 +2888,11 @@ $('#edit-save').addEventListener('click', async () => {
   }
 });
 $('#add-save').addEventListener('click', async () => {
-  const name = $('#add-name').value.trim();
-  const url = $('#add-url').value.trim();
-  const category = $('#add-category').value.trim() || t('modal.key.other');
-  if (!name || !url) return alert(t('alert.serviceFields'));
-  await api('/api/services', {
-    method: 'POST',
-    body: JSON.stringify({ name, url, category }),
-  });
-  closeModal('add-modal');
-  $('#add-name').value = '';
-  $('#add-url').value = '';
-  await loadDashboard();
+  try {
+    await saveServiceAdd();
+  } catch (err) {
+    alert(err.message || t('error.api.services'));
+  }
 });
 
 $('#service-notes-cancel').addEventListener('click', () => closeModal('service-notes-modal'));

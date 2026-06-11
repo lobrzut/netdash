@@ -23,6 +23,7 @@ class ServiceCreate(BaseModel):
     url: str
     category: str = "Inne"
     icon: str = "globe"
+    icon_url: str | None = None
     description: str | None = None
     pinned: bool = False
     has_login: bool = False

@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.25-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.26-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -43,6 +43,11 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - Online/offline health checks with persistent tiles
 - Docker one-command deploy
 - i18n: English, Polish, German, Ukrainian
+
+## What's new in v1.3.26
+
+- **Add service modal** — icon preview, category suggestions, description, pin/login toggles, Identyfikuj (parity with edit modal)
+- Sectioned layout with URL hint; POST `/api/services` accepts `icon_url`
 
 ## What's new in v1.3.25
 

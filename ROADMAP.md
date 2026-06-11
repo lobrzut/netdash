@@ -1,5 +1,9 @@
 # NetDash Roadmap
 
+## Done (v1.3.26)
+
+- [x] Add-service modal parity with edit (icon, category datalist, description, pin/login, Identyfikuj)
+
 ## Done (v1.3.25)
 
 - [x] Uptime mini-indicator on service cards (online / offline / stale / unknown / error)
