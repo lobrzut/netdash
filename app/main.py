@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -265,6 +266,27 @@ async def _sanitize_stored_urls() -> None:
             await db.commit()
 
 
+async def _maybe_reset_admin_password(db: AsyncSession) -> None:
+    """One-time homelab recovery: NETDASH_RESET_ADMIN_PASSWORD on next start (remove env after)."""
+    new_password = os.environ.get("NETDASH_RESET_ADMIN_PASSWORD", "").strip()
+    if not new_password:
+        return
+    result = await db.execute(select(User).where(User.username == settings.default_admin_user))
+    user = result.scalar_one_or_none()
+    if user is None:
+        logger.warning(
+            "NETDASH_RESET_ADMIN_PASSWORD set but user %r not found — skipping",
+            settings.default_admin_user,
+        )
+        return
+    user.password_hash = hash_password(new_password)
+    await db.commit()
+    logger.warning(
+        "Admin password reset for %r via NETDASH_RESET_ADMIN_PASSWORD — remove env var after login",
+        settings.default_admin_user,
+    )
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -280,6 +302,7 @@ async def init_db():
                 )
             )
             await db.commit()
+        await _maybe_reset_admin_password(db)
         await _get_or_create_settings(db)
 
     await _ensure_local_host_service()

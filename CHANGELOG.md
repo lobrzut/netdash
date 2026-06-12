@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.78
+
+- **Reset hasła admina (QNAP / homelab)**: `NETDASH_RESET_ADMIN_PASSWORD` — jednorazowy reset przy starcie (usuń zmienną po zalogowaniu). Skrypt `scripts/reset-admin-password.py` dla SSH / `docker exec`.
+- **QNAP README**: sekcja „Nie mogę się zalogować” — File Station, stara baza, `admin`/`changeme` tylko przy pustej DB.
+
 ## v1.3.77
 
 - **Port QNAP fix (definitive)**: aplikacja nasłuchuje wyłącznie na `NETDASH_LISTEN_PORT` (domyślnie **18787**). Stare `NETDASH_PORT=8787` z Container Station jest **ignorowane** (log ostrzeżenia) i **usuwane** w `entrypoint.sh` przed startem — koniec crash loop z Readarr.

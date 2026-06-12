@@ -231,6 +231,58 @@ Jeśli log nadal pokazuje `:8787` — usuń aplikację CS i zaimportuj compose o
 | Port hosta | **18787** (nie 8787 przy Readarr) |
 | Watchtower | 0 lub 1 (`netdash-watchtower`) |
 
+### Nie mogę się zalogować (`admin` / `changeme` nie działa)
+
+Portal działa (`http://<IP-QNAP>:18787`), ale formularz logowania odrzuca hasło.
+
+**Dlaczego:** od v1.3.75 domyślne `admin` / `changeme` dotyczy **tylko pierwszego startu z pustą bazą**. Na QNAP wolumen `/share/Container/netdash/data` często **został z wcześniejszej instalacji** — wtedy w SQLite jest **stare hasło** (losowe z dawnego deployu, np. `NetDash-…`, albo hasło ustawione ręcznie). Zmienna `NETDASH_DEFAULT_ADMIN_PASSWORD=changeme` w Container Station **nie nadpisuje** istniejącego użytkownika.
+
+**Co sprawdzić najpierw:**
+
+| Próba | Uwagi |
+|-------|--------|
+| Login: `admin` | Domyślna nazwa użytkownika |
+| Hasło: stare z pierwszej instalacji | Jeśli pamiętasz — użyj go |
+| Hasło: `changeme` | Tylko gdy baza była pusta przy pierwszym starcie (v1.3.75+) |
+| Wielkość liter / spacje | Hasło jest case-sensitive |
+
+**Opcja A — świeży start (bez SSH, File Station)** — tracisz ustawienia i listę usług w portalu:
+
+1. **Container Station** → aplikacja `netdash` → **Stop**
+2. **File Station** → folder **`Container`** → **`netdash`** → **`data`**
+3. Usuń pliki:
+   - `netdash.db`
+   - `netdash.db-wal` i `netdash.db-shm` (jeśli są)
+4. **Start** aplikacji w Container Station
+5. Zaloguj się: **`admin`** / **`changeme`** → od razu **Ustawienia** → **Hasło**
+
+**Opcja B — reset hasła bez kasowania danych (v1.3.78+, bez SSH):**
+
+1. **Container Station** → edycja aplikacji `netdash` → **Environment**
+2. Dodaj zmienną: `NETDASH_RESET_ADMIN_PASSWORD` = `changeme` (lub inne tymczasowe hasło)
+3. **Restart** kontenera
+4. Zaloguj się nowym hasłem
+5. **Usuń** `NETDASH_RESET_ADMIN_PASSWORD` z Environment i zrestartuj ponownie
+6. **Ustawienia** → **Hasło** → własne hasło
+
+> Na obrazie **1.3.77** użyj Opcji A albo zaktualizuj do **1.3.78** (Pull / ponowny import compose) przed Opcją B.
+
+**Opcja C — reset skryptem (wymaga SSH lub terminala na NAS):**
+
+```bash
+# w kontenerze (zachowuje usługi i ustawienia)
+docker exec netdash python /app/scripts/reset-admin-password.py --password changeme
+docker restart netdash
+```
+
+Lub na hoście z dostępem do pliku bazy:
+
+```bash
+python scripts/reset-admin-password.py --db /share/Container/netdash/data/netdash.db --password changeme
+```
+
+**Nie pomaga zmiana `NETDASH_SECRET_KEY`** — dotyczy tokenów JWT po zalogowaniu, nie hasła w bazie. Po resecie wyczyść ciasteczka przeglądarki dla tego hosta, jeśli nadal widzisz dziwne błędy sesji.
+
 ---
 
 ## Więcej szczegółów
