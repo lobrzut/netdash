@@ -5,8 +5,9 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.71"
+VERSION = "1.3.72"
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
+GHCR_IMAGE = "ghcr.io/lobrzut/netdash"
 
 
 def _get_build_date() -> str:
@@ -60,6 +61,12 @@ class Settings(BaseSettings):
     scan_cidr: str | None = None
     # Mask real LAN IP in /api/network (for README screenshots only)
     demo_mode: bool = False
+    # Optional in-container update apply (requires docker.sock mount — see docs/QNAP.md)
+    update_apply_enabled: bool = False
+    docker_image: str = GHCR_IMAGE
+    docker_image_tag: str = "latest"
+    container_name: str = "netdash"
+    docker_socket: str = "/var/run/docker.sock"
 
     class Config:
         env_prefix = "NETDASH_"

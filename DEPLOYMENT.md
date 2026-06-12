@@ -7,7 +7,7 @@ One codebase, two runtime profiles. Repository: [lobrzut/netdash](https://github
 | **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
 | **Server / Docker** | Linux homelab server | `docker compose up -d` | http://&lt;server-ip&gt;:8787 |
 
-Application version: **1.3.71** (`app/config.py` → `VERSION`).
+Application version: **1.3.72** (`app/config.py` → `VERSION`).
 
 ---
 
@@ -44,6 +44,23 @@ curl -s http://127.0.0.1:8787/api/health
 ```
 
 Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
+
+### Pre-built image (GHCR) — no git on host
+
+GitHub Actions publishes `ghcr.io/lobrzut/netdash:latest` on each release tag `v*`.
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Optional auto-update via Watchtower (opt-in profile):
+
+```bash
+docker compose --profile auto-update up -d
+```
+
+**QNAP Container Station:** see **[docs/QNAP.md](docs/QNAP.md)** (Polish, step-by-step).
 
 ---
 

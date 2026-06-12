@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.72
+
+- **Auto-aktualizacja (QNAP / Docker)**: GitHub Actions publikuje obraz na `ghcr.io/lobrzut/netdash` przy tagu `v*`. Compose: `image` + opcjonalny profil **Watchtower** (`docker compose --profile auto-update up -d`). Etykieta `watchtower.enable` tylko na NetDash — brak auto-update bez świadomego włączenia.
+- **Ustawienia → O projekcie — Sprawdź aktualizacje**: `GET /api/updates/check` (GitHub Releases API), status wersji, link do changelogu. Opcjonalnie **Aktualizuj teraz** (`POST /api/updates/apply`) przy `NETDASH_UPDATE_APPLY_ENABLED` + montowany `docker.sock` (dokumentacja ryzyk w `docs/QNAP.md`).
+- **Dokumentacja**: `docs/QNAP.md` (Container Station, GHCR, Watchtower, PL), rozszerzony `DEPLOYMENT.md`.
+
 ## v1.3.71
 
 - **Pulpit — fix nachodzenia ★ na ikonę**: w układach Kompaktowy (duży) i Średni pasek akcji jest z powrotem w prawym górnym rogu (★ po lewej w grupie przycisków, edycja/notatki/WoL po prawej) — bez nachodzenia na ikonę serwisu. Kompaktowy bez zmian (pasek rozwija się na dole).

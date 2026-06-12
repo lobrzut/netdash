@@ -89,7 +89,7 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 | **Linux only** | `network_mode: host` on Docker Desktop (Windows/Mac) does not expose your LAN; use native `python run.py` or `docker-compose.dev.yml` with `NETDASH_SCAN_CIDR`. |
 | **Data** | Bind mount `./data:/app/data` — SQLite `./data/netdash.db`, uploaded icons/logos `./data/uploads/`. Back up `/opt/stacks/netdash/data/`. |
 | **Build date** | Optional in `.env`: `NETDASH_BUILD_DATE=2026-06-11` (About panel; passed as Docker build arg). |
-| **Updates** | `cd /opt/stacks/netdash && git pull &&` redeploy from Dockge or `docker compose up -d --build`. |
+| **Updates** | `docker compose pull && docker compose up -d` (GHCR) or `git pull && docker compose up -d --build`. Optional Watchtower: `docker compose --profile auto-update up -d`. QNAP: [docs/QNAP.md](../docs/QNAP.md). |
 | **Secrets** | Never commit `.env`. Dockge stores compose on disk; keep `.env` gitignored. |
 
 Full deployment guide: **[DEPLOYMENT.md](../DEPLOYMENT.md)**

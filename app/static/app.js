@@ -193,6 +193,9 @@ function authorInitials(name) {
   return clean.slice(0, 2).toUpperCase();
 }
 
+let lastUpdateCheck = null;
+let updateApplyAvailable = false;
+
 function renderAboutPanel() {
   const prose = $('#about-prose-text');
   if (prose) prose.textContent = ($('#settings-about-project')?.value || appSettings.about_project || '').trim();
@@ -213,6 +216,104 @@ function renderAboutPanel() {
   }
   const avatar = $('#about-author-avatar');
   if (avatar) avatar.textContent = authorInitials(name);
+  renderUpdateCheckUI(lastUpdateCheck);
+}
+
+function renderUpdateCheckUI(data) {
+  const statusEl = $('#about-update-status');
+  const notesEl = $('#about-update-notes');
+  const errorEl = $('#about-update-error');
+  const changelogEl = $('#about-changelog-link');
+  const applyBtn = $('#btn-apply-update');
+  if (!statusEl) return;
+
+  statusEl.hidden = true;
+  statusEl.className = 'about-update-status';
+  if (notesEl) {
+    notesEl.hidden = true;
+    notesEl.textContent = '';
+  }
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+  if (changelogEl) changelogEl.hidden = true;
+  if (applyBtn) applyBtn.hidden = true;
+
+  if (!data) return;
+
+  if (data.error) {
+    if (errorEl) {
+      errorEl.hidden = false;
+      errorEl.textContent = data.error;
+    }
+    return;
+  }
+
+  const latest = data.latest_version ? formatVersion(data.latest_version) : '—';
+  statusEl.hidden = false;
+  if (data.update_available) {
+    statusEl.textContent = t('about.updates.available', { version: latest });
+    statusEl.classList.add('about-update-status--available');
+  } else {
+    statusEl.textContent = t('about.updates.current');
+    statusEl.classList.add('about-update-status--current');
+  }
+
+  if (data.release_url && changelogEl) {
+    changelogEl.href = data.release_url;
+    changelogEl.hidden = false;
+  }
+
+  const notes = (data.release_notes || '').trim();
+  if (notes && notesEl) {
+    notesEl.textContent = notes.length > 600 ? `${notes.slice(0, 600)}…` : notes;
+    notesEl.hidden = false;
+  }
+
+  if (applyBtn && data.update_available && (data.update_apply_available || updateApplyAvailable)) {
+    applyBtn.hidden = false;
+  }
+}
+
+async function checkForUpdates({ silent = false } = {}) {
+  const btn = $('#btn-check-updates');
+  if (btn) btn.disabled = true;
+  try {
+    const data = await api('/api/updates/check');
+    lastUpdateCheck = data;
+    updateApplyAvailable = Boolean(data.update_apply_available);
+    renderUpdateCheckUI(data);
+    if (!silent) {
+      if (data.error) showToast(data.error, 'error');
+      else if (data.update_available) {
+        showToast(t('about.updates.toastAvailable', { version: formatVersion(data.latest_version) }), 'info');
+      } else {
+        showToast(t('about.updates.toastCurrent'), 'success');
+      }
+    }
+    return data;
+  } catch (err) {
+    if (!silent) showToast(err.message || t('about.updates.failed'), 'error');
+    throw err;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function applyNetDashUpdate() {
+  if (!confirm(t('about.updates.applyConfirm'))) return;
+  const btn = $('#btn-apply-update');
+  if (btn) btn.disabled = true;
+  try {
+    const result = await api('/api/updates/apply', { method: 'POST' });
+    showToast(result.message || t('about.updates.applyStarted'), 'success');
+    setTimeout(() => location.reload(), 12000);
+  } catch (err) {
+    showToast(err.message || t('about.updates.applyFailed'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function updateFooterNetwork(netLabel) {
@@ -233,6 +334,7 @@ async function checkServerHealth() {
     appVersion = data.version || null;
     buildDate = data.build_date || null;
     if (data.github) githubRepo = data.github;
+    if (data.update_apply_available) updateApplyAvailable = true;
     applyVersionDisplay();
     $('#login-error').classList.add('hidden');
     return data;
@@ -2898,6 +3000,8 @@ $('#login-form').addEventListener('submit', async (e) => {
   }
 });
 
+$('#btn-check-updates')?.addEventListener('click', () => checkForUpdates());
+$('#btn-apply-update')?.addEventListener('click', () => applyNetDashUpdate());
 $('#logout-btn').addEventListener('click', logout);
 $('#nav-home-btn')?.addEventListener('click', () => navigateTo('home'));
 $('#nav-services-btn')?.addEventListener('click', () => navigateTo('services'));

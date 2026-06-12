@@ -449,6 +449,20 @@
             <span class="about-tech-chip" role="listitem">SQLite</span>
           </div>
         </div>
+        <div class="about-update-card" id="about-update-card">
+          <div class="about-update-header">
+            <span class="about-update-label" data-i18n="about.updates.heading">Aktualizacje</span>
+            <span class="about-update-status" id="about-update-status" hidden></span>
+          </div>
+          <p class="about-update-hint" data-i18n="about.updates.hint">Sprawdź najnowszą wersję na GitHub (wymaga dostępu do internetu).</p>
+          <div class="about-update-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-check-updates" data-i18n="about.updates.check">Sprawdź aktualizacje</button>
+            <a class="btn btn-ghost btn-sm" id="about-changelog-link" href="https://github.com/lobrzut/netdash/releases" target="_blank" rel="noopener noreferrer" hidden data-i18n="about.updates.changelog">Changelog</a>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-apply-update" hidden data-i18n="about.updates.apply">Aktualizuj teraz</button>
+          </div>
+          <p class="about-update-notes" id="about-update-notes" hidden></p>
+          <p class="about-update-error hint" id="about-update-error" hidden></p>
+        </div>
       </div>
       <div class="settings-panel" data-panel="scan">
         <details class="settings-accordion" open>

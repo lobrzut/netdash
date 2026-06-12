@@ -1274,6 +1274,78 @@ body.modal-open {
   gap: 0.375rem;
 }
 
+.about-update-card {
+  margin-top: 1.25rem;
+  padding: 1rem 1.125rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+}
+
+.about-update-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.375rem;
+}
+
+.about-update-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.about-update-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.about-update-status--current {
+  color: var(--success, #4ade80);
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.08);
+}
+
+.about-update-status--available {
+  color: var(--accent-bright);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.about-update-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.about-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.about-update-notes {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.about-update-error {
+  margin: 0.5rem 0 0;
+}
+
 .about-tech-chip {
   padding: 0.25rem 0.5625rem;
   border-radius: 999px;

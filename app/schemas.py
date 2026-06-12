@@ -404,3 +404,22 @@ class HomerImportResult(BaseModel):
     imported: int
     skipped: int = 0
     services: list[ServiceOut] = Field(default_factory=list)
+
+
+class UpdateCheckOut(BaseModel):
+    current_version: str
+    latest_version: str | None = None
+    update_available: bool = False
+    release_url: str | None = None
+    release_notes: str | None = None
+    published_at: str | None = None
+    github_repo: str
+    update_apply_available: bool = False
+    error: str | None = None
+
+
+class UpdateApplyOut(BaseModel):
+    ok: bool
+    message: str
+    image: str | None = None
+    container: str | None = None

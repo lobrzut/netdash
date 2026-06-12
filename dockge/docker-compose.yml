@@ -1,27 +1,44 @@
-# Alias for Dockge / docker compose -f dockge/docker-compose.yml
-# Prefer compose.yaml in this folder (Dockge default filename).
-# See dockge/README.md and ../DEPLOYMENT.md
-
-services:
-  netdash:
-    build:
-      context: .
-      args:
-        NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
-    container_name: netdash
-    restart: always
-    network_mode: host
-    env_file: .env
-    environment:
-      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
-    volumes:
-      # SQLite (netdash.db) + uploaded icons/logos (data/uploads/)
-      - ./data:/app/data
-    cap_add:
-      - NET_RAW
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+# Alias for Dockge / docker compose -f dockge/docker-compose.yml
+# Prefer compose.yaml in this folder (Dockge default filename).
+# See dockge/README.md, docs/QNAP.md and ../DEPLOYMENT.md
+
+services:
+  netdash:
+    image: ghcr.io/lobrzut/netdash:${NETDASH_IMAGE_TAG:-latest}
+    build:
+      context: .
+      args:
+        NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
+    container_name: netdash
+    restart: always
+    network_mode: host
+    env_file: .env
+    environment:
+      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
+    volumes:
+      - ./data:/app/data
+    cap_add:
+      - NET_RAW
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: netdash-watchtower
+    restart: unless-stopped
+    profiles:
+      - auto-update
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"

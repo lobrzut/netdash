@@ -1,39 +1,62 @@
-# NetDash — Dockge stack compose
-# Repository: https://github.com/lobrzut/netdash
-#
-# Deploy (recommended):
-#   1. git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
-#   2. cp .env.example .env  &&  edit .env (secrets)
-#   3. Dockge → Scan Stacks Folder → stack "netdash" → Deploy
-#
-# Dockge auto-detects compose.yaml or docker-compose.yml in the stack folder.
-# This file mirrors the root compose with Dockge-oriented comments.
-#
-# IMPORTANT — Linux host only:
-#   network_mode: host is required for LAN scanning (ping/ARP on your /24).
-#   Do NOT add a ports: section — Docker refuses to start (host + ports conflict).
-#   On Windows/Mac Docker Desktop, host mode does not work; use docker-compose.dev.yml instead.
-
-services:
-  netdash:
-    build:
-      context: .
-      args:
-        NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
-    container_name: netdash
-    restart: always
-    network_mode: host
-    env_file: .env
-    environment:
-      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
-    volumes:
-      # SQLite (netdash.db) + uploaded icons/logos (data/uploads/)
-      - ./data:/app/data
-    cap_add:
-      - NET_RAW
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+# NetDash — Dockge stack compose
+# Repository: https://github.com/lobrzut/netdash
+#
+# Deploy (recommended):
+#   1. git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
+#   2. cp .env.example .env  &&  edit .env (secrets)
+#   3. Dockge → Scan Stacks Folder → stack "netdash" → Deploy
+#
+# GHCR image (no git on host — QNAP Container Station):
+#   docker compose pull && docker compose up -d
+#
+# Auto-update (opt-in, admin consent via profile):
+#   docker compose --profile auto-update up -d
+#
+# IMPORTANT — Linux host only:
+#   network_mode: host is required for LAN scanning (ping/ARP on your /24).
+#   Do NOT add a ports: section — Docker refuses to start (host + ports conflict).
+#   On Windows/Mac Docker Desktop, host mode does not work; use docker-compose.dev.yml instead.
+
+services:
+  netdash:
+    image: ghcr.io/lobrzut/netdash:${NETDASH_IMAGE_TAG:-latest}
+    build:
+      context: .
+      args:
+        NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
+    container_name: netdash
+    restart: always
+    network_mode: host
+    env_file: .env
+    environment:
+      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
+    volumes:
+      # SQLite (netdash.db) + uploaded icons/logos (data/uploads/)
+      - ./data:/app/data
+      # Optional: in-app "Aktualizuj teraz" — mount docker.sock (see docs/QNAP.md)
+      # - /var/run/docker.sock:/var/run/docker.sock
+    cap_add:
+      - NET_RAW
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: netdash-watchtower
+    restart: unless-stopped
+    profiles:
+      - auto-update
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"

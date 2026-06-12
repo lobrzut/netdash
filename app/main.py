@@ -14,7 +14,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
-from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, VERSION, settings
+from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, settings
+from app.docker_update import pull_and_restart, update_apply_available
+from app.updates import fetch_latest_release, is_newer_version, normalize_version
 from app.database import Base, async_session, engine, get_db
 from app.enrich import enrich_all_services, enrich_mac_addresses, should_auto_wol
 from app.health import check_all_services
@@ -73,6 +75,8 @@ from app.schemas import (
     ServiceOut,
     ServiceUpdate,
     Token,
+    UpdateApplyOut,
+    UpdateCheckOut,
 )
 
 scan_tasks: dict[int, asyncio.Task] = {}
@@ -348,7 +352,53 @@ async def health():
         "version": VERSION,
         "build_date": BUILD_DATE or None,
         "github": GITHUB_REPO,
+        "ghcr_image": GHCR_IMAGE,
+        "update_apply_available": update_apply_available(),
     }
+
+
+@app.get("/api/updates/check", response_model=UpdateCheckOut)
+async def check_updates(_: User = Depends(get_current_user)):
+    current = normalize_version(VERSION)
+    payload = UpdateCheckOut(
+        current_version=current,
+        github_repo=GITHUB_REPO,
+        update_apply_available=update_apply_available(),
+    )
+    try:
+        release = await fetch_latest_release()
+        latest = release.get("latest_version")
+        payload.latest_version = latest
+        payload.release_url = release.get("release_url")
+        payload.release_notes = release.get("release_notes")
+        payload.published_at = release.get("published_at")
+        if latest:
+            payload.update_available = is_newer_version(current, latest)
+    except httpx.HTTPError as exc:
+        payload.error = f"GitHub API: {exc}"
+    except Exception as exc:
+        payload.error = str(exc)
+    return payload
+
+
+@app.post("/api/updates/apply", response_model=UpdateApplyOut)
+async def apply_update(_: User = Depends(get_current_user)):
+    if not update_apply_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Aktualizacja z poziomu aplikacji jest wyłączona (brak docker.sock lub NETDASH_UPDATE_APPLY_ENABLED)",
+        )
+    image = f"{settings.docker_image}:{settings.docker_image_tag}"
+    try:
+        result = await pull_and_restart(image, settings.container_name)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return UpdateApplyOut(
+        ok=True,
+        message="Pobrano obraz i zrestartowano kontener. Odśwież stronę za chwilę.",
+        image=result.get("image"),
+        container=result.get("container"),
+    )
 
 
 @app.post("/api/auth/login", response_model=Token)
