@@ -501,6 +501,8 @@
   "scan.phase.default": "Scanning",
   "scan.localNetwork": "local network",
   "scan.starting": "Starting scan of {network}...",
+  "scan.started": "Scan #{id} started — {network}",
+  "scan.completed": "Scan complete — found {count} items",
   "scan.foundCount": "found {count}",
   "error.serviceNotFound": "Service not found",
   "error.keyNotFound": "Key not found",

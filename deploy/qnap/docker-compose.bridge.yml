@@ -9,7 +9,7 @@
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.106
+    image: ghcr.io/lobrzut/netdash:1.3.107
     container_name: netdash
     restart: always
     # Limit RAM 512 MB: Container Station → netdash → Resource → Memory limit (patrz deploy/qnap/README.md)

@@ -316,6 +316,22 @@ async def lookup_mac_for_ip(ip: str, *, ping_first: bool = True) -> str | None:
     return entries.get(ip)
 
 
+def read_arp_hosts_in_cidr(cidr: str) -> list[str]:
+    """IPs from system ARP/neighbor table that fall inside the given CIDR."""
+    try:
+        network = ipaddress.ip_network(cidr.strip(), strict=False)
+    except ValueError:
+        return []
+    hosts: list[str] = []
+    for ip in _read_arp_table():
+        try:
+            if ipaddress.ip_address(ip) in network:
+                hosts.append(ip)
+        except ValueError:
+            continue
+    return sorted(hosts)
+
+
 async def scan_arp_network(cidr: str | None = None) -> list[ArpDevice]:
     """Ping-sweep local subnet then read system ARP table."""
     network = cidr or get_local_network()

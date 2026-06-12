@@ -1295,13 +1295,35 @@ async def _update_scan_progress(job_id: int, phase: str, current: int, total: in
         await db.commit()
 
 
-async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
+async def _collect_known_scan_hosts(db: AsyncSession) -> list[str]:
+    result = await db.execute(select(Service.host))
+    hosts: list[str] = []
+    seen: set[str] = set()
+    for (host,) in result.all():
+        if not host or host in seen:
+            continue
+        seen.add(host)
+        hosts.append(host)
+    return hosts
+
+
+async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quick_scan: bool = False):
+    cidr_label = format_cidr_list(cidrs)
+    logger.info(
+        "Scan %s started CIDR=%s full_scan=%s quick_scan=%s safe_mode=%s",
+        job_id,
+        cidr_label,
+        full_scan,
+        quick_scan,
+        settings.scan_safe_mode,
+    )
     async with async_session() as db:
         result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
         job = result.scalar_one()
         job.status = "running"
         job.started_at = datetime.now(timezone.utc)
         job.found_count = 0
+        job.progress_phase = "ping"
         await db.commit()
 
     found_count = 0
@@ -1321,6 +1343,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
         app_settings = await _get_or_create_settings(db)
         host_ports = parse_host_scan_ports(app_settings.host_scan_ports)
         host_only = app_settings.host_only_entries is not False
+        known_hosts = await _collect_known_scan_hosts(db)
 
     scan_timeout = settings.effective_scan_max_duration
     try:
@@ -1328,6 +1351,8 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
             scan_networks(
                 cidrs,
                 full_scan=full_scan,
+                quick_scan=quick_scan,
+                known_hosts=known_hosts,
                 host_scan_ports=host_ports,
                 host_only_entries=host_only,
                 progress_callback=on_progress,
@@ -1368,10 +1393,12 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
                     job.error_message = " ".join(hints)
             await db.commit()
         logger.info(
-            "Scan %s completed: %s services across %s",
+            "Scan %s completed: %s services across %s (quick=%s full=%s)",
             job_id,
             len(discovered),
-            format_cidr_list(cidrs),
+            cidr_label,
+            quick_scan,
+            full_scan,
         )
     except asyncio.TimeoutError:
         msg = (
@@ -1420,6 +1447,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
             await db.commit()
     finally:
         scan_tasks.pop(job_id, None)
+        logger.debug("Scan %s task finished (removed from scan_tasks)", job_id)
 
 
 @app.post("/api/scan", response_model=ScanStatus)
@@ -1428,8 +1456,9 @@ async def start_scan(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    logger.info("POST /api/scan body=%s", data.model_dump())
+    logger.info("POST /api/scan body=%s user=%s", data.model_dump(), _.username)
     if any(not t.done() for t in scan_tasks.values()):
+        logger.warning("POST /api/scan rejected: scan already in progress")
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
 
     full_scan = data.full_scan
@@ -1437,10 +1466,18 @@ async def start_scan(
         logger.warning("full_scan requested but scan_safe_mode=true — forcing quick scan")
         full_scan = False
 
+    docker_br = is_likely_docker_bridge()
+    quick_scan = data.quick_scan
+    if quick_scan is None:
+        quick_scan = settings.scan_safe_mode or docker_br
+    if full_scan:
+        quick_scan = False
+
     app_settings = await _get_or_create_settings(db)
     try:
         cidrs = resolve_scan_cidrs(data.cidr, app_settings.scan_cidr_default)
     except ValueError as exc:
+        logger.warning("POST /api/scan invalid CIDR: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if is_likely_docker_bridge() and not settings.scan_cidr and not app_settings.scan_cidr_default:
@@ -1464,20 +1501,24 @@ async def start_scan(
     ping_ok = await icmp_ping_available()
     if ping_ok:
         logger.info(
-            "Network scan started CIDR=%s full_scan=%s safe_mode=%s concurrency=%s max_hosts=%s timeout=%ss",
+            "Network scan job CIDR=%s quick_scan=%s full_scan=%s safe_mode=%s concurrency=%s max_hosts=%s timeout=%ss docker_bridge=%s",
             cidr_label,
+            quick_scan,
             full_scan,
             settings.scan_safe_mode,
             settings.effective_scan_concurrency,
             settings.effective_scan_max_hosts,
             int(settings.effective_scan_max_duration),
+            docker_br,
         )
     else:
         logger.warning(
-            "Network scan started CIDR=%s full_scan=%s safe_mode=%s — ICMP ping unavailable (Docker), using TCP discovery",
+            "Network scan job CIDR=%s quick_scan=%s full_scan=%s safe_mode=%s docker_bridge=%s — ICMP ping unavailable, using TCP discovery",
             cidr_label,
+            quick_scan,
             full_scan,
             settings.scan_safe_mode,
+            docker_br,
         )
 
     job = ScanJob(cidr=cidr_label, status="pending")
@@ -1490,8 +1531,20 @@ async def start_scan(
     await db.commit()
     await db.refresh(job)
 
-    task = asyncio.create_task(_run_scan(job.id, cidrs, full_scan))
+    task = asyncio.create_task(_run_scan(job.id, cidrs, full_scan, quick_scan))
+
+    def _log_scan_task_result(t: asyncio.Task) -> None:
+        scan_tasks.pop(job.id, None)
+        if t.cancelled():
+            logger.warning("Scan %s task cancelled", job.id)
+            return
+        exc = t.exception()
+        if exc:
+            logger.exception("Scan %s task died unexpectedly", job.id, exc_info=exc)
+
+    task.add_done_callback(_log_scan_task_result)
     scan_tasks[job.id] = task
+    logger.info("Scan job %s queued (pending → background task)", job.id)
     return job
 
 

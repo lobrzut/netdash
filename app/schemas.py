@@ -125,6 +125,10 @@ class ScanRequest(BaseModel):
         description="Sieć(e) w formacie CIDR — wiele oddzielonych przecinkiem lub nową linią",
     )
     full_scan: bool = Field(default=False, description="Skanuj wszystkie porty (wolniejsze)")
+    quick_scan: bool | None = Field(
+        default=None,
+        description="Szybki skan (gateway, ARP, znane hosty) — domyślnie auto na Docker bridge / safe mode",
+    )
 
     @field_validator("cidr")
     @classmethod

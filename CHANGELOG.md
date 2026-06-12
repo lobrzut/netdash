@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.107
+
+- **Fix krytyczny QNAP — zły CIDR 172.x**: modal skanu domyślnie wybierał sieć Docker (172.16–172.31), więc POST `/api/scan` szedł z `172.x.0/24` zamiast `NETDASH_SCAN_CIDR` (192.168.1.0/24) — skan „nic nie znajdował”. UI preferuje teraz `env_scan_cidr`; serwer ignoruje Docker-internal CIDR gdy ustawiony `NETDASH_SCAN_CIDR`.
+- **Szybki skan (quick_scan)**: na Docker bridge / `scan_safe_mode` — gateway, ARP, znane hosty z bazy, pierwsze /32 adresy; mniejsze obciążenie NAS.
+- **UI skanu**: toast przy starcie i po sukcesie; natychmiastowy polling postępu; wznowienie skanu po F5; anulowanie confirm wraca do modala CIDR.
+- **Logi serwera**: `Scan N started/completed`, odrzucenia 409/400, śmierć taska w tle.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.107`.
+
 ## v1.3.106
 
 - **Fix sesji F5 (QNAP) — root cause**: serwer brał **pierwsze** cookie nawet gdy było nieważne, ignorując poprawny Bearer z `localStorage`; `get_current_user` próbuje teraz Bearer → cookie → legacy, aż znajdzie ważny JWT.

@@ -497,6 +497,8 @@
   "scan.phase.default": "Сканування",
   "scan.localNetwork": "локальної мережі",
   "scan.starting": "Початок скану {network}...",
+  "scan.started": "Скан #{id} запущено — {network}",
+  "scan.completed": "Скан завершено — знайдено {count} позицій",
   "scan.foundCount": "знайдено {count}",
   "error.serviceNotFound": "Сервіс не знайдено",
   "error.keyNotFound": "Ключ не знайдено",

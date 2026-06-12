@@ -1,5 +1,6 @@
 import asyncio
 import ipaddress
+import logging
 import platform
 import re
 import socket
@@ -12,6 +13,8 @@ import httpx
 
 from app.config import settings
 from app.icons import resolve_brand_icon, resolve_icon_url
+
+logger = logging.getLogger("netdash")
 from app.url_utils import ensure_str, sanitize_service_url
 
 WEB_PORTS = [
@@ -272,9 +275,20 @@ def is_running_in_docker() -> bool:
         return False
 
 
+DOCKER_INTERNAL_NET = ipaddress.ip_network("172.16.0.0/12")
+
+
 def is_docker_bridge_ip(ip: str) -> bool:
     try:
-        return ipaddress.ip_address(ip) in ipaddress.ip_network("172.16.0.0/12")
+        return ipaddress.ip_address(ip) in DOCKER_INTERNAL_NET
+    except ValueError:
+        return False
+
+
+def is_docker_internal_cidr(cidr: str) -> bool:
+    """True when CIDR is Docker bridge range (172.16–172.31), not user LAN."""
+    try:
+        return ipaddress.ip_network(cidr.strip(), strict=False).subnet_of(DOCKER_INTERNAL_NET)
     except ValueError:
         return False
 
@@ -298,9 +312,10 @@ def get_local_network() -> str:
 
 
 def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
-    """CIDR options for scan UI: auto /24+/28, env NETDASH_SCAN_CIDR, settings default."""
+    """CIDR options for scan UI: env/settings first on Docker bridge, then auto /24+/28."""
     cidrs: list[str] = []
     seen: set[str] = set()
+    docker_br = is_likely_docker_bridge()
 
     def add(text: str | None) -> None:
         if not text or not text.strip():
@@ -310,16 +325,26 @@ def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
                 seen.add(cidr)
                 cidrs.append(cidr)
 
+    # On QNAP bridge the container IP is 172.x — LAN CIDR must appear first in the dropdown.
+    if docker_br:
+        if settings.scan_cidr:
+            add(settings.scan_cidr)
+        if scan_cidr_default:
+            add(scan_cidr_default)
     try:
         local_ip = get_local_ip()
-        add(str(ipaddress.ip_network(f"{local_ip}/24", strict=False)))
-        add(str(ipaddress.ip_network(f"{local_ip}/28", strict=False)))
+        auto24 = str(ipaddress.ip_network(f"{local_ip}/24", strict=False))
+        auto28 = str(ipaddress.ip_network(f"{local_ip}/28", strict=False))
+        if not docker_br or not is_docker_internal_cidr(auto24):
+            add(auto24)
+            add(auto28)
     except (OSError, ValueError):
         pass
-    if settings.scan_cidr:
-        add(settings.scan_cidr)
-    if scan_cidr_default:
-        add(scan_cidr_default)
+    if not docker_br:
+        if settings.scan_cidr:
+            add(settings.scan_cidr)
+        if scan_cidr_default:
+            add(scan_cidr_default)
     if not cidrs:
         add("192.168.1.0/24")
     return cidrs
@@ -362,13 +387,30 @@ def resolve_scan_cidrs(
     cidr: str | None = None,
     scan_cidr_default: str | None = None,
 ) -> list[str]:
+    env_cidrs = parse_scan_cidrs(settings.scan_cidr) if settings.scan_cidr else []
+    settings_cidrs = parse_scan_cidrs(scan_cidr_default) if scan_cidr_default else []
+
     if cidr and cidr.strip():
-        return parse_scan_cidrs(cidr)
-    if scan_cidr_default and scan_cidr_default.strip():
-        return parse_scan_cidrs(scan_cidr_default)
-    # Docker bridge: prefer NETDASH_SCAN_CIDR over auto-detected container /24.
-    if settings.scan_cidr and settings.scan_cidr.strip():
-        return parse_scan_cidrs(settings.scan_cidr)
+        requested = parse_scan_cidrs(cidr)
+        # UI often sends Docker 172.x when env LAN CIDR is configured — ignore wrong subnet.
+        if (
+            is_likely_docker_bridge()
+            and requested
+            and all(is_docker_internal_cidr(c) for c in requested)
+            and (env_cidrs or settings_cidrs)
+        ):
+            fallback = env_cidrs or settings_cidrs
+            logger.warning(
+                "Ignoring Docker-internal CIDR from client (%s), using LAN CIDR %s",
+                format_cidr_list(requested),
+                format_cidr_list(fallback),
+            )
+            return fallback
+        return requested
+    if settings_cidrs:
+        return settings_cidrs
+    if env_cidrs:
+        return env_cidrs
     return [get_local_network()]
 
 
@@ -620,6 +662,87 @@ async def discover_live_hosts(
         tcp_live = await discover_live_hosts_tcp(cidr, progress_callback=progress_callback)
         live.update(tcp_live)
 
+    return sorted(live)
+
+
+async def discover_live_hosts_quick(
+    cidr: str,
+    *,
+    extra_hosts: list[str] | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> list[str]:
+    """Lightweight discovery: gateway, ARP table, known hosts, first /28 — for NAS/Docker bridge."""
+    network = ipaddress.ip_network(cidr.strip(), strict=False)
+    seeds: set[str] = set(_discovery_extras(cidr))
+    seeds.add(str(network.network_address + 1))
+    if network.num_addresses > 2:
+        seeds.add(str(network.broadcast_address - 1))
+
+    for host in parse_cidr(cidr, max_hosts=32):
+        seeds.add(host)
+
+    if extra_hosts:
+        for host in extra_hosts:
+            try:
+                if ipaddress.ip_address(host) in network:
+                    seeds.add(host)
+            except ValueError:
+                continue
+
+    try:
+        from app.arp_scan import read_arp_hosts_in_cidr
+
+        for host in await asyncio.to_thread(read_arp_hosts_in_cidr, cidr):
+            seeds.add(host)
+    except Exception:
+        pass
+
+    seed_list = sorted(seeds)
+    total = len(seed_list)
+    if progress_callback:
+        await progress_callback("ping", 0, total)
+
+    icmp_ok = await icmp_ping_available()
+    live: set[str] = set(seeds)
+    done = 0
+    sem = asyncio.Semaphore(max(4, settings.effective_scan_concurrency))
+
+    if icmp_ok:
+        async def ping_one(host: str) -> None:
+            nonlocal done
+            async with sem:
+                if await _ping_host(host):
+                    live.add(host)
+            done += 1
+            if progress_callback:
+                await progress_callback("ping", done, total)
+
+        batch = max(4, settings.effective_scan_concurrency)
+        for i in range(0, len(seed_list), batch):
+            await asyncio.gather(*(ping_one(host) for host in seed_list[i : i + batch]))
+            await asyncio.sleep(settings.scan_batch_delay)
+    elif progress_callback:
+        await progress_callback("ping", 0, total)
+
+    ping_found = sum(1 for h in seed_list if h in live and h not in _discovery_extras(cidr))
+    if not icmp_ok or ping_found <= 1:
+        probe_ports = SAFE_TCP_DISCOVERY_PORTS if settings.scan_safe_mode else TCP_DISCOVERY_PORTS
+        tcp_sem = asyncio.Semaphore(settings.effective_scan_concurrency)
+        done = 0
+        for host in seed_list:
+            for port in probe_ports:
+                if await _check_port(host, port, tcp_sem):
+                    live.add(host)
+                    break
+                done += 1
+                await _scan_batch_pause(done)
+            done += 1
+            if progress_callback:
+                await progress_callback("ping", min(done, total), total)
+
+    if progress_callback:
+        await progress_callback("ping", total, total)
+    logger.info("Quick scan discovery: %s live host(s) in %s (seeds=%s)", len(live), cidr, len(seed_list))
     return sorted(live)
 
 
@@ -1003,6 +1126,8 @@ async def scan_network(
     cidr: str,
     *,
     full_scan: bool = False,
+    quick_scan: bool = False,
+    known_hosts: list[str] | None = None,
     host_scan_ports: list[int] | None = None,
     host_only_entries: bool = True,
     progress_callback: ProgressCallback | None = None,
@@ -1019,7 +1144,14 @@ async def scan_network(
 
     if progress_callback:
         await progress_callback("ping", 0, 1)
-    live_hosts = await discover_live_hosts(cidr, progress_callback)
+    if quick_scan:
+        live_hosts = await discover_live_hosts_quick(
+            cidr,
+            extra_hosts=known_hosts,
+            progress_callback=progress_callback,
+        )
+    else:
+        live_hosts = await discover_live_hosts(cidr, progress_callback)
 
     if progress_callback:
         await progress_callback("ports", 0, len(live_hosts) * len(ports))
@@ -1092,6 +1224,8 @@ async def scan_networks(
     cidrs: list[str],
     *,
     full_scan: bool = False,
+    quick_scan: bool = False,
+    known_hosts: list[str] | None = None,
     host_scan_ports: list[int] | None = None,
     host_only_entries: bool = True,
     progress_callback: ProgressCallback | None = None,
@@ -1102,6 +1236,8 @@ async def scan_networks(
         discovered = await scan_network(
             cidr,
             full_scan=full_scan,
+            quick_scan=quick_scan,
+            known_hosts=known_hosts,
             host_scan_ports=host_scan_ports,
             host_only_entries=host_only_entries,
             progress_callback=progress_callback,
