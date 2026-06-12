@@ -540,14 +540,16 @@ async def _discovery_loop() -> None:
     _state["profile"] = profile.name
     _state["interval_sec"] = interval
 
-    startup_delay = max(5, min(60, interval // 6))
+    startup_delay = max(0, settings.discovery_startup_delay)
     logger.info(
-        "Adaptive discovery scheduler started (profile=%s, interval=%ss, cidr=%s)",
+        "Adaptive discovery scheduler started (profile=%s, interval=%ss, first_cycle_in=%ss, cidr=%s)",
         profile.name,
         interval,
+        startup_delay,
         settings.scan_cidr or get_local_network(),
     )
-    await asyncio.sleep(startup_delay)
+    if startup_delay:
+        await asyncio.sleep(startup_delay)
 
     while True:
         try:

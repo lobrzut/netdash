@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.122"
+VERSION = "1.3.123"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -145,6 +145,12 @@ class Settings(BaseSettings):
     arp_iface: str | None = None
     # Comma-separated IPs always probed each cycle (e.g. homelab servers)
     arp_extra_hosts: str | None = None
+    # Defer first health pass to background (None = auto: true when scan_safe_mode)
+    startup_health_defer: bool | None = None
+    # Seconds before first health check when defer enabled (None = 30 safe / 5 normal)
+    startup_health_defer_seconds: int | None = None
+    # Seconds before first adaptive/ARP discovery cycle (portal ready first)
+    discovery_startup_delay: int = 60
     # Ping/TCP sweep when arp-scan returns 0 hosts
     arp_ping_fallback: bool = True
     arp_ping_max_hosts: int = 128
@@ -258,6 +264,29 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)
+
+    @field_validator("startup_health_defer", mode="before")
+    @classmethod
+    def _startup_health_defer(cls, v: object) -> bool | None:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("startup_health_defer_seconds", mode="before")
+    @classmethod
+    def _startup_health_defer_seconds(cls, v: object) -> int | None:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return max(0, int(v))
+
+    @field_validator("discovery_startup_delay", mode="before")
+    @classmethod
+    def _discovery_startup_delay(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 60
+        return max(0, int(v))
 
     @field_validator("arp_ping_fallback", mode="before")
     @classmethod
@@ -376,6 +405,18 @@ class Settings(BaseSettings):
     @property
     def auto_discovery_enabled(self) -> bool:
         return self.adaptive_discovery_enabled or self.arp_discovery_enabled
+
+    @property
+    def effective_startup_health_defer(self) -> bool:
+        if self.startup_health_defer is not None:
+            return self.startup_health_defer
+        return self.scan_safe_mode
+
+    @property
+    def effective_startup_health_defer_seconds(self) -> int:
+        if self.startup_health_defer_seconds is not None:
+            return self.startup_health_defer_seconds
+        return 30 if self.scan_safe_mode else 5
 
     @property
     def health_check_concurrency(self) -> int:

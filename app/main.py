@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -459,8 +460,17 @@ async def init_db():
     await _ensure_local_host_service()
     await _sanitize_stored_urls()
     await _cancel_stale_scan_jobs()
-    await enrich_mac_addresses()
-    await enrich_all_services()
+
+
+async def _deferred_startup_enrich():
+    """MAC/icon enrichment can ping 100+ hosts — run after portal is up."""
+    await asyncio.sleep(2)
+    try:
+        mac_count = await enrich_mac_addresses()
+        svc_count = await enrich_all_services()
+        logger.info("Startup enrich completed (%s MAC, %s metadata)", mac_count, svc_count)
+    except Exception:
+        logger.exception("Startup enrich failed")
 
 
 async def _cancel_stale_scan_jobs() -> None:
@@ -485,6 +495,11 @@ def _scan_in_progress() -> bool:
 
 async def _health_check_loop():
     interval = 60
+    first_pass = True
+    defer_secs = settings.effective_startup_health_defer_seconds if settings.effective_startup_health_defer else 0
+    if defer_secs:
+        logger.info("Startup health check deferred %ss (background)", defer_secs)
+        await asyncio.sleep(defer_secs)
     while True:
         try:
             async with async_session() as db:
@@ -494,34 +509,30 @@ async def _health_check_loop():
             if enabled and not _scan_in_progress():
                 async with async_session() as db:
                     count = await check_all_services(db)
-                    logger.info("Health check completed for %s services", count)
+                    if first_pass and defer_secs:
+                        logger.info(
+                            "Startup health check completed for %s services (after %ss)",
+                            count,
+                            defer_secs,
+                        )
+                    else:
+                        logger.info("Health check completed for %s services", count)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Health check loop error")
             interval = 60
+        first_pass = False
         await asyncio.sleep(interval)
-
-
-async def _deferred_startup_health_check():
-    """Defer first health pass on weak hosts so container boot stays responsive."""
-    delay = 30 if settings.scan_safe_mode else 5
-    await asyncio.sleep(delay)
-    try:
-        async with async_session() as db:
-            settings_row = await _get_or_create_settings(db)
-            if settings_row.health_check_enabled:
-                count = await check_all_services(db)
-                logger.info("Startup health check completed for %s services (after %ss)", count, delay)
-    except Exception:
-        logger.exception("Startup health check failed")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global health_task
+    boot_t0 = time.monotonic()
     await init_db()
-    asyncio.create_task(_deferred_startup_health_check())
+    logger.info("Database ready in %.1fs — accepting traffic", time.monotonic() - boot_t0)
+    asyncio.create_task(_deferred_startup_enrich())
     health_task = asyncio.create_task(_health_check_loop())
     if settings.adaptive_discovery_enabled:
         if _DISCOVERY_PIPELINE_AVAILABLE:
@@ -587,6 +598,9 @@ async def health(db: AsyncSession = Depends(get_db)):
         "secret_key_stable": settings.secret_key_stable,
         "scan_safe_mode": settings.scan_safe_mode,
         "scan_disabled": settings.scan_disabled,
+        "startup_health_defer": settings.effective_startup_health_defer,
+        "startup_health_defer_seconds": settings.effective_startup_health_defer_seconds,
+        "discovery_startup_delay": settings.discovery_startup_delay,
         "discovery_mode": settings.effective_discovery_mode,
         "resource_profile": settings.resource_profile,
         "scan_safe_min_prefix": settings.scan_safe_min_prefix,

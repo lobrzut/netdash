@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-ENTRYPOINT_VERSION="1.3.122"
+ENTRYPOINT_VERSION="1.3.123"
 
 echo "================================================================"
 echo " NetDash entrypoint v${ENTRYPOINT_VERSION}"

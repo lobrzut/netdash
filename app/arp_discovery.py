@@ -469,15 +469,17 @@ async def run_arp_discovery_cycle() -> int:
 async def _arp_discovery_loop() -> None:
     """Background scheduler — runs arp-scan every NETDASH_ARP_INTERVAL seconds."""
     _state["enabled"] = True
-    startup_delay = max(5, min(60, settings.arp_interval // 6))
+    startup_delay = max(0, settings.discovery_startup_delay)
     logger.info(
-        "ARP discovery scheduler started (interval=%ss, cidr=%s, iface=%s, probe_new=%s)",
+        "ARP discovery scheduler started (interval=%ss, first_cycle_in=%ss, cidr=%s, iface=%s, probe_new=%s)",
         settings.arp_interval,
+        startup_delay,
         settings.scan_cidr or get_local_network(),
         settings.arp_iface or "auto",
         settings.arp_probe_new_hosts,
     )
-    await asyncio.sleep(startup_delay)
+    if startup_delay:
+        await asyncio.sleep(startup_delay)
 
     while True:
         try:

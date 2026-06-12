@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.123
+
+- **Fix wolny start QNAP (153+ serwisów)**: `init_db()` nie blokuje już startu na `enrich_mac_addresses()` / `enrich_all_services()` (ping/ARP dla każdego hosta) — portal gotowy w kilka sekund, enrich w tle.
+- **Health check w tle**: pierwszy przebieg odroczony (`NETDASH_STARTUP_HEALTH_DEFER`, domyślnie `true` przy safe mode, 30 s); pętla health nie odpala się od razu przy starcie.
+- **Discovery odroczone**: pierwszy cykl adaptive/ARP po `NETDASH_DISCOVERY_STARTUP_DELAY` (domyślnie 60 s) — ping/arp-scan nie konkurują z bootem.
+- **Compose QNAP**: `start_period: 90s`, env defer w komentarzach; `/api/health` zwraca `startup_health_defer`, `discovery_startup_delay`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.123`.
+
 ## v1.3.122
 
 - **Fix arp-scan on QNAP**: `--interval=100` (milliseconds, no suffix). BusyBox/QNAP `arp-scan` rejects `--interval=100ms` with `ERROR: "100m" is not a valid numeric value`.

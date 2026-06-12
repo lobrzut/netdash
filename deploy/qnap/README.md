@@ -1,8 +1,8 @@
-# NetDash na QNAP — szybki start (v1.3.122)
+# NetDash na QNAP — szybki start (v1.3.123)
 
-Obraz: `ghcr.io/lobrzut/netdash:1.3.122` — **Adaptive Tiered Discovery** na NAS (ping → ARP → lekkie porty). Bez agenta na innym hoście.
+Obraz: `ghcr.io/lobrzut/netdash:1.3.123` — **Adaptive Tiered Discovery** na NAS (ping → ARP → lekkie porty). Bez agenta na innym hoście.
 
-> **v1.3.119 nie startuje** (`ModuleNotFoundError: discovery_pipeline`) — natychmiast **Pull** `:1.3.122` (lub minimum `:1.3.120`).
+> **v1.3.119 nie startuje** (`ModuleNotFoundError: discovery_pipeline`) — natychmiast **Pull** `:1.3.123` (lub minimum `:1.3.120`).
 
 ## Import z GitHub (zalecane)
 
