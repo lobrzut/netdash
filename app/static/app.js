@@ -945,11 +945,28 @@ function isScanSafeBannerDismissed() {
 }
 
 let pendingScanStart = null;
+let scanConfirmGeneration = 0;
+
+function resolvePendingScanStart(accepted) {
+  const pending = pendingScanStart;
+  if (!pending) {
+    console.log('[NetDash] scan: resolvePending — brak oczekującego', { accepted });
+    return;
+  }
+  pendingScanStart = null;
+  console.log('[NetDash] scan: resolvePending', { accepted, gen: pending.gen });
+  pending.resolve(accepted);
+}
 
 function confirmScanStart(netRes, cidrLabel) {
-  if (!scanNeedsConfirm(netRes)) return Promise.resolve(true);
+  if (!scanNeedsConfirm(netRes)) {
+    console.log('[NetDash] scan: confirm pominięty (scanNeedsConfirm=false)');
+    return Promise.resolve(true);
+  }
+  const gen = ++scanConfirmGeneration;
+  console.log('[NetDash] scan: showScanConfirm', { gen, cidrLabel });
   return new Promise((resolve) => {
-    pendingScanStart = resolve;
+    pendingScanStart = { resolve, gen };
     const cidrEl = $('#scan-confirm-cidr');
     if (cidrEl) {
       cidrEl.textContent = cidrLabel
@@ -3395,15 +3412,15 @@ function openModal(id) {
   syncPageScrollLock();
 }
 
-function closeModal(id) {
+function closeModal(id, opts = {}) {
   if (id === 'update-modal' && updateInProgress) return;
   const el = $(`#${id}`);
   if (!el || el.classList.contains('hidden')) return;
   if (id === 'update-modal') stopUpdatePolling();
   let reopenScanModal = false;
-  if (id === 'scan-confirm-modal' && pendingScanStart) {
-    pendingScanStart(false);
-    pendingScanStart = null;
+  if (id === 'scan-confirm-modal' && pendingScanStart && !opts.scanConfirmOk) {
+    console.log('[NetDash] scan: closeModal anuluje confirm');
+    resolvePendingScanStart(false);
     reopenScanModal = true;
   }
   el.classList.add('hidden');
@@ -3608,17 +3625,21 @@ function resumeActiveScan(scans) {
   if (active) attachScanPolling(active);
 }
 
-async function startScan(cidr, fullScan = false) {
+async function startScan(cidr, fullScan = false, opts = {}) {
+  const { skipConfirm = false } = opts;
+  console.log('[NetDash] scan: startScan', { cidr, fullScan, skipConfirm });
   clearScanError();
   const netRes = window.__netdashNetwork;
   let resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   if (resolvedCidr && isDockerInternalCidr(resolvedCidr) && netRes?.env_scan_cidr) {
     resolvedCidr = parseScanCidrList(netRes.env_scan_cidr)[0] || netRes.env_scan_cidr;
+    console.log('[NetDash] scan: CIDR Docker → env', { resolvedCidr });
   }
   const networkLabel = resolvedCidr || t('scan.localNetwork');
-  const confirmed = await confirmScanStart(netRes, networkLabel);
+  const confirmed = skipConfirm ? true : await confirmScanStart(netRes, networkLabel);
   if (!confirmed) {
-    openScanModal();
+    console.log('[NetDash] scan: anulowano przed POST');
+    if ($('#scan-modal')?.classList.contains('hidden')) openScanModal();
     return;
   }
   if (netRes?.scan_safe_mode && fullScan) {
@@ -3631,27 +3652,32 @@ async function startScan(cidr, fullScan = false) {
   const statusEl = $('#scan-status-text');
   if (statusEl) statusEl.textContent = t('scan.starting', { network: networkLabel });
 
+  const body = {
+    cidr: resolvedCidr || null,
+    full_scan: !!fullScan,
+    quick_scan: null,
+  };
+  console.log('[NetDash] scan: POST /api/scan', body);
   let job;
   try {
     job = await api('/api/scan', {
       method: 'POST',
-      body: JSON.stringify({
-        cidr: resolvedCidr || null,
-        full_scan: !!fullScan,
-        quick_scan: null,
-      }),
+      body: JSON.stringify(body),
     });
   } catch (err) {
+    console.log('[NetDash] scan: POST failed', err);
     stopScanPolling();
     showScanError(formatScanStartError(err));
     return;
   }
 
+  console.log('[NetDash] scan: POST ok', { id: job.id });
   showToast(t('scan.started', { network: networkLabel, id: job.id }), 'info');
   attachScanPolling(job);
 }
 
 function openScanModal() {
+  console.log('[NetDash] scan: openScanModal');
   const net = window.__netdashNetwork;
   populateScanCidrSelect(net, appSettings);
   const cidrInput = $('#cidr-input');
@@ -3665,44 +3691,93 @@ function openScanModal() {
   openModal('scan-modal');
 }
 
+const SCAN_LONG_PRESS_MS = 800;
+
+function bindScanLongPress(btn) {
+  if (!btn) return;
+  let timer = null;
+  const clearTimer = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+  const onPress = () => {
+    if (btn.disabled) return;
+    clearTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      const cidr = defaultScanCidrValue(window.__netdashNetwork, appSettings);
+      console.log('[NetDash] scan: long-press — bez modali', { cidr });
+      showToast(t('scan.starting', { network: cidr || t('scan.localNetwork') }), 'info');
+      void startScan(cidr, false, { skipConfirm: true });
+    }, SCAN_LONG_PRESS_MS);
+  };
+  btn.addEventListener('mousedown', onPress);
+  btn.addEventListener('touchstart', onPress, { passive: true });
+  ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach((ev) => {
+    btn.addEventListener(ev, clearTimer);
+  });
+}
+
 function bindScanUi() {
   document.addEventListener('click', (e) => {
     const startBtn = e.target.closest('#scan-start');
     if (startBtn) {
       e.preventDefault();
       e.stopPropagation();
-      if (startBtn.disabled) return;
+      if (startBtn.disabled) {
+        console.log('[NetDash] scan: #scan-start disabled');
+        return;
+      }
       const fullScan = $('#full-scan')?.checked ?? false;
-      void startScan(resolveScanCidrInput(), fullScan);
+      const cidr = resolveScanCidrInput();
+      console.log('[NetDash] scan: #scan-start click', { cidr, fullScan });
+      void startScan(cidr, fullScan);
       return;
     }
     const quickScanBtn = e.target.closest('#scan-btn, #empty-scan-btn');
     if (quickScanBtn) {
       e.preventDefault();
-      if (quickScanBtn.disabled) return;
+      if (quickScanBtn.disabled) {
+        console.log('[NetDash] scan: przycisk skanu disabled', { id: quickScanBtn.id });
+        return;
+      }
+      console.log('[NetDash] scan: przycisk skanu click', { id: quickScanBtn.id });
       openScanModal();
       return;
     }
   });
-  $('#scan-cancel')?.addEventListener('click', () => closeModal('scan-modal'));
+  bindScanLongPress($('#scan-btn'));
+  bindScanLongPress($('#empty-scan-btn'));
+  $('#scan-cancel')?.addEventListener('click', () => {
+    console.log('[NetDash] scan: anuluj modal CIDR');
+    closeModal('scan-modal');
+  });
   $('#scan-cidr-select')?.addEventListener('change', () => {
     syncScanCidrCustomVisibility();
     updateScanCidrPreview();
   });
   $('#cidr-input')?.addEventListener('input', updateScanCidrPreview);
-  $('#scan-confirm-cancel')?.addEventListener('click', () => {
+  $('#scan-confirm-cancel')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[NetDash] scan: anuluj confirm');
     closeModal('scan-confirm-modal');
   });
-  $('#scan-confirm-ok')?.addEventListener('click', () => {
-    if ($('#scan-confirm-skip')?.checked) {
-      localStorage.setItem(SCAN_CONFIRM_SKIP_KEY, '1');
-    }
-    if (pendingScanStart) {
-      pendingScanStart(true);
-      pendingScanStart = null;
-    }
-    closeModal('scan-confirm-modal');
-  });
+  const confirmOk = $('#scan-confirm-ok');
+  if (confirmOk) {
+    confirmOk.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[NetDash] scan: Kontynuuj skan');
+      if ($('#scan-confirm-skip')?.checked) {
+        localStorage.setItem(SCAN_CONFIRM_SKIP_KEY, '1');
+      }
+      resolvePendingScanStart(true);
+      closeModal('scan-confirm-modal', { scanConfirmOk: true });
+    }, true);
+  } else {
+    console.warn('[NetDash] scan: brak #scan-confirm-ok w DOM');
+  }
   $('#scan-config-warning-dismiss')?.addEventListener('click', () => {
     localStorage.setItem(SCAN_SAFE_BANNER_DISMISS_KEY, '1');
     updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);

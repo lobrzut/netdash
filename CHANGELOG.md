@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.108
+
+- **Fix krytyczny — POST /api/scan po „Kontynuuj skan”**: `closeModal('scan-confirm-modal')` wołał `pendingScanStart(false)` zanim promise się rozwiązał (wyścig z handlerem OK / backdrop). Teraz `resolvePendingScanStart(true)` + `closeModal(..., { scanConfirmOk: true })` — confirm nie jest anulowany przy zamykaniu po akceptacji.
+- **Debug**: `console.log('[NetDash] scan: …')` na każdym kroku (klik przycisku, modal CIDR, confirm, POST).
+- **Fallback**: przytrzymaj ~0,8 s „Skanuj sieć” na Serwisach — bezpośredni POST z domyślnym CIDR (pomija confirm).
+- **UI**: `z-index` na `.modal-content` — klik w przyciski modala nie trafia w backdrop.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.108`.
+
 ## v1.3.107
 
 - **Fix krytyczny QNAP — zły CIDR 172.x**: modal skanu domyślnie wybierał sieć Docker (172.16–172.31), więc POST `/api/scan` szedł z `172.x.0/24` zamiast `NETDASH_SCAN_CIDR` (192.168.1.0/24) — skan „nic nie znajdował”. UI preferuje teraz `env_scan_cidr`; serwer ignoruje Docker-internal CIDR gdy ustawiony `NETDASH_SCAN_CIDR`.

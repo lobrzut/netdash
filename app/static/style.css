@@ -5140,6 +5140,7 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 
 .modal-content {
   position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 440px;
   max-height: min(90vh, calc(100vh - 2rem));
