@@ -91,6 +91,26 @@ class DiscoveryImportHealthDecouplingTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(by_port[0].is_online)
             self.assertTrue(by_port[3000].is_online)
 
+    async def test_offline_scope_skips_hosts_outside_cidr(self) -> None:
+        async with self.session_factory() as db:
+            db.add(AppSettings())
+            await self._seed_service(db, host="192.168.1.150", port=0, protocol="host", is_online=True)
+            await self._seed_service(db, host="192.168.1.200", port=0, protocol="host", is_online=True)
+
+            await import_discovery_hosts(
+                db,
+                [DiscoveryHostEntry(ip="192.168.1.151", online=True)],
+                source="test",
+                source_hostname="test",
+                mark_missing_offline=True,
+                offline_scope_cidrs=["192.168.1.144/28"],
+            )
+
+            rows = (await db.execute(select(Service).where(Service.port == 0))).scalars().all()
+            by_host = {s.host: s for s in rows}
+            self.assertFalse(by_host["192.168.1.150"].is_online)
+            self.assertTrue(by_host["192.168.1.200"].is_online)
+
 
 if __name__ == "__main__":
     unittest.main()

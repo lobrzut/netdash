@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.122
+
+- **Fix arp-scan on QNAP**: `--interval=100` (milliseconds, no suffix). BusyBox/QNAP `arp-scan` rejects `--interval=100ms` with `ERROR: "100m" is not a valid numeric value`.
+- **EXTRA_HOSTS always probed**: `NETDASH_ARP_EXTRA_HOSTS` ping/TCP every cycle regardless of /28 rotation — no longer filtered to the current chunk CIDR.
+- **Weak-mode multi-chunk**: adaptive discovery scans the rotated /28 **and** any /28 containing extra hosts (e.g. `.144/28` + `.192/28` for `.200`/`.201` in one cycle).
+- **Safer offline marking**: no mass-offline when arp-scan returns 0, when ≤2 hosts found in a /28, or for hosts outside the scanned chunk(s).
+- **UI cache bust**: `index.html` static assets bumped to `v=1.3.122` (fixes stale `app.js?v=1.3.119` in browser).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.122`.
+
 ## v1.3.121
 
 - **Hotfix: crash on startup** (`ModuleNotFoundError: app.discovery_pipeline`): v1.3.119 tagged `main.py` imports before `discovery_pipeline.py` was committed (fixed in v1.3.120). Users on `:1.3.119` could not start NetDash at all.

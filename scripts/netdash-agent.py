@@ -66,7 +66,7 @@ def scan_arp_scan(cidr: str) -> list[HostRecord]:
     cmd = [
         "arp-scan",
         cidr,
-        "--interval=100ms",
+        "--interval=100",
         "--retry=1",
         "--ignoredups",
         "--quiet",

@@ -9,6 +9,7 @@ from app.arp_discovery import (
     _merge_entries,
     _parse_arp_scan_output,
     _parse_extra_hosts,
+    _probe_explicit_hosts,
 )
 from app.config import settings
 from app.schemas import DiscoveryHostEntry
@@ -28,6 +29,11 @@ class ParseArpScanOutputTests(unittest.TestCase):
 
 
 class BuildArpScanCmdTests(unittest.TestCase):
+    def test_interval_is_plain_milliseconds(self):
+        cmd = _build_arp_scan_cmd("192.168.1.0/24", None)
+        self.assertIn("--interval=100", cmd)
+        self.assertNotIn("100ms", cmd)
+
     def test_includes_interface_when_set(self):
         cmd = _build_arp_scan_cmd("192.168.1.0/24", "bond0")
         self.assertEqual(cmd[:3], ["arp-scan", "-I", "bond0"])
@@ -53,6 +59,17 @@ class ExtraHostsTests(unittest.TestCase):
         try:
             settings.arp_extra_hosts = "192.168.1.200, 192.168.1.201"
             self.assertEqual(_parse_extra_hosts(), ["192.168.1.200", "192.168.1.201"])
+        finally:
+            settings.arp_extra_hosts = original
+
+    def test_probe_explicit_hosts_not_filtered_by_cidr(self):
+        """Extra hosts outside current /28 must still be probed (mocked unreachable)."""
+        original = settings.arp_extra_hosts
+        try:
+            settings.arp_extra_hosts = "192.168.1.200"
+            # cidr arg is ignored — function probes all extra IPs
+            found = _probe_explicit_hosts(["192.168.1.200"], "192.168.1.144/28")
+            self.assertEqual(found, [])
         finally:
             settings.arp_extra_hosts = original
 

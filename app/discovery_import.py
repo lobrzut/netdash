@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 from datetime import datetime, timezone
@@ -18,6 +19,17 @@ from app.wol import normalize_mac
 logger = logging.getLogger("netdash")
 
 _IP_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+
+
+def _ip_in_any_cidr(ip: str, cidrs: list[str]) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+        for cidr in cidrs:
+            if addr in ipaddress.ip_network(cidr.strip(), strict=False):
+                return True
+    except ValueError:
+        pass
+    return False
 
 
 def _valid_ip(ip: str) -> bool:
@@ -164,6 +176,7 @@ async def import_discovery_hosts(
     source: str,
     source_hostname: str | None,
     mark_missing_offline: bool,
+    offline_scope_cidrs: list[str] | None = None,
 ) -> DiscoveryImportResult:
     now = datetime.now(timezone.utc)
     seen_ips: set[str] = set()
@@ -196,6 +209,8 @@ async def import_discovery_hosts(
             if not _is_host_only_service(svc):
                 continue
             if svc.host in seen_ips:
+                continue
+            if offline_scope_cidrs and not _ip_in_any_cidr(svc.host, offline_scope_cidrs):
                 continue
             if svc.is_online:
                 svc.is_online = False

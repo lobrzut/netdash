@@ -133,10 +133,11 @@ def _parse_arp_scan_output(stdout: str) -> list[DiscoveryHostEntry]:
 
 
 def _build_arp_scan_cmd(cidr: str, iface: str | None) -> list[str]:
+    # Plain milliseconds — QNAP/BusyBox arp-scan rejects suffixes (e.g. "100ms" → "100m" error).
     cmd = [
         "arp-scan",
         cidr.strip(),
-        "--interval=100ms",
+        "--interval=100",
         "--retry=1",
         "--ignoredups",
         "--quiet",
@@ -279,25 +280,14 @@ def _run_ping_sweep_fallback(cidr: str) -> list[DiscoveryHostEntry]:
     return found
 
 
-def _probe_explicit_hosts(ips: list[str], cidr: str) -> list[DiscoveryHostEntry]:
-    """Always probe NETDASH_ARP_EXTRA_HOSTS — ping/TCP even when arp-scan works."""
-    try:
-        network = ipaddress.ip_network(cidr.strip(), strict=False)
-    except ValueError:
-        network = None
-
+def _probe_explicit_hosts(ips: list[str], cidr: str | None = None) -> list[DiscoveryHostEntry]:
+    """Always probe NETDASH_ARP_EXTRA_HOSTS — ping/TCP regardless of cycle CIDR rotation."""
     found: list[DiscoveryHostEntry] = []
     for ip in ips:
         try:
             ipaddress.ip_address(ip)
         except ValueError:
             continue
-        if network is not None:
-            try:
-                if ipaddress.ip_address(ip) not in network:
-                    continue
-            except ValueError:
-                continue
         if not _host_is_live_sync(ip):
             logger.debug("extra host probe: %s not reachable", ip)
             continue
