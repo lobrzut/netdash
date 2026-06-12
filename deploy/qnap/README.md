@@ -144,23 +144,28 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesiątki portów × wysoka równoległość TCP, szczególnie gdy ping ICMP jest zablokowany).
 
-**Od v1.3.94+** safe mode i limity zasobów są domyślne **w całym projekcie NetDash** (każdy deploy, nie tylko QNAP): `NETDASH_SCAN_SAFE_MODE=true`, `mem_limit: 512m`. Na słabym sprzęcie użyj węższego CIDR (`/28`). Opcjonalny limit CPU: Container Station → edycja kontenera `netdash` → **Resource** → **CPU limit** (compose QNAP nie ustawia twardego limitu CPU — unikamy ostrzeżeń IDE).
+**Od v1.3.94+** safe mode i limity zasobów są domyślne **w całym projekcie NetDash** (każdy deploy, nie tylko QNAP): `NETDASH_SCAN_SAFE_MODE=true`, limit RAM **512 MB**. Na słabym sprzęcie użyj węższego CIDR (`/28`).
 
-### Żółty trójkąt na `mem_limit` w Cursor / VS Code
+### Limit RAM (512 MB) w compose
 
-To **kosmetyka IDE**, nie błąd deployu na QNAP. `mem_limit` (Compose 2.4) jest poprawny i Container Station go stosuje.
+Compose QNAP używa standardowego [Compose Specification](https://docs.docker.com/compose/compose-file/) — **bez** klucza `version` i **bez** legacy `mem_limit`:
 
-Yaml-language-server domyślnie ładuje schemat z [Schema Store](https://www.schemastore.org) (`docker-compose.json`, Compose v3+), który **nie zna** `mem_limit` na poziomie serwisu → żółte „additional property”.
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 512M
+```
 
-**Fix (v1.3.102+):** pierwsza linia compose ma modeline z **pełnym URL** schematu NetDash na GitHubie + `.vscode/settings.json` z `yaml.schemaStore.enable: false` i mapowaniem schematu (żeby Schema Store nie narzucał `docker-compose.json` v3+).
+**Docker Compose v2** (`docker compose`, bez myślnika) stosuje `deploy.resources.limits` na pojedynczym hoście — **bez trybu Swarm**. **Container Station 3.x** (QTS 5.1+) opiera się na Compose v2 i powinien zastosować ten limit przy imporcie YAML z GitHub.
 
-| Gdzie edytujesz | Co zrobić |
-|-----------------|-----------|
-| **`C:\opt\netdash` jako folder główny** | Użyj ustawień z `C:\opt\netdash\.vscode\settings.json` (w repo). |
-| **`brain-client` jako folder główny** | Użyj `brain-client\.vscode\settings.json` — mapuje `C:/opt/netdash/deploy/qnap/*.yml` na schemat NetDash. |
-| Inny workspace | Skopiuj blok `yaml.schemas` + `yaml.schemaStore.enable: false` do `.vscode/settings.json` tego workspace albo otwórz `C:\opt\netdash` jako osobny folder. |
+**Stary Container Station (< 3.0) lub brak limitu po imporcie:** ustaw ręcznie w UI:
 
-Po aktualizacji: **Developer: Reload Window** (albo zamknij i otwórz plik). Jeśli żółty trójkąt zostaje — to kosmetyka IDE; deploy na QNAP jest poprawny. Container Station nie używa yaml-language-server.
+1. **Container Station** → aplikacja `netdash` → edycja kontenera `netdash`
+2. Zakładka **Resource** (Zasoby)
+3. **Memory limit** → **512 MB** → zapisz i zrestartuj kontener
+
+Opcjonalny limit CPU: ta sama zakładka **Resource** → **CPU limit** (compose QNAP nie ustawia twardego limitu CPU).
 
 | Parametr (safe mode) | Wartość |
 |----------------------|---------|

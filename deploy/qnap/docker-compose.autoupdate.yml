@@ -1,7 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/qnap-compose.schema.json
 # Watchtower bez profilu — dla Container Station (Import drugiego pliku lub merge w UI)
-
-version: "2.4"
 
 services:
   watchtower:
