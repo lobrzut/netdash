@@ -1,5 +1,5 @@
-{
-  "yaml.schemas": {
-    "https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json": "deploy/qnap/*.yml"
-  }
-}
+{
+  "yaml.schemas": {
+    "https://json.schemastore.org/docker-compose.json": "deploy/qnap/*.yml"
+  }
+}

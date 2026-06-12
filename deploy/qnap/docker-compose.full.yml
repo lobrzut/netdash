@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json
+# yaml-language-server: $schema=https://json.schemastore.org/docker-compose.json
 # NetDash + Watchtower — QNAP Container Station (jeden plik, auto-update)
 
 # Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
@@ -23,10 +23,10 @@
 
 # Po starcie sprawdź logi: PIERWSZE linie MUSZĄ zawierać LISTEN_PORT=18787 i "NetDash entrypoint".
 
-# Jeśli widzisz 8787 lub brak entrypoint → usuń aplikację CS, Pull ghcr.io/lobrzut/netdash:1.3.98, import od nowa.
+# Jeśli widzisz 8787 lub brak entrypoint → usuń aplikację CS, Pull ghcr.io/lobrzut/netdash:1.3.99, import od nowa.
 #
 # version 2.4: QNAP Container Station nie stosuje deploy.resources — limity na poziomie serwisu.
-# IDE (yaml-language-server) może ostrzegać przy cpus — używamy cpu_quota/cpu_period (Compose 2.4 / QNAP CS).
+# cpu_quota/cpu_period = 1 rdzeń (Compose 2.4); schemat IDE: json.schemastore.org/docker-compose.json
 
 version: "2.4"
 
@@ -34,7 +34,7 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.98
+    image: ghcr.io/lobrzut/netdash:1.3.99
 
     container_name: netdash
 

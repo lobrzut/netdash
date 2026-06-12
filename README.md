@@ -270,6 +270,11 @@ netdash/
 - [x] ARP scan for device discovery
 - [ ] Multi-user support
 
+## Acknowledgements
+
+- **[Homer](https://github.com/bastienwirtz/homer)** (Apache-2.0) — UI inspiration and YAML import compatibility.
+- **[GPTWOL](https://github.com/Misterbabou/gptwol)** (MIT, Misterbabou) — Wake/Sleep-on-LAN ideas and optional HTTP gateway integration (`gptwol_url` in settings). NetDash implements WoL/SOL and ARP discovery independently; it is not a fork of GPTWOL.
+
 ## License
 
 MIT — use in portfolio, homelab, or commercial projects.

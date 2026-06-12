@@ -1,5 +1,8 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-go/master/schema/compose-spec.json
+# yaml-language-server: $schema=https://json.schemastore.org/docker-compose.json
 # Watchtower bez profilu — dla Container Station (Import drugiego pliku lub merge w UI)
+
+version: "2.4"
+
 services:
   watchtower:
     profiles: []

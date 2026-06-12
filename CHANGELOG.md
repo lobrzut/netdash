@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.99
+
+- **Compose (QNAP)**: schemat IDE zmieniony z compose-spec na `json.schemastore.org/docker-compose.json` (Compose 2.4: `mem_limit`, `cpu_quota`, `cpu_period` bez ostrzeżeń yaml-language-server).
+- **README**: sekcja Acknowledgements (Homer, GPTWOL).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.99`.
+
 ## v1.3.98
 
 - **Compose (QNAP)**: `yaml-language-server` schema override + `.vscode/settings.json` — walidacja względem compose-spec (pola Compose 2.4). `cpus` zastąpione przez `cpu_quota`/`cpu_period` (= 1 rdzeń) — zero fałszywych ostrzeżeń IDE; limity nadal działają na QNAP CS.
