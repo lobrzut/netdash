@@ -78,7 +78,26 @@ NETDASH_SCAN_CIDR=192.168.1.0/24
 
 ---
 
-## Auto-aktualizacja (opcjonalnie, jeden krok)
+## Jeden plik z auto-update (zalecane)
+
+NetDash + Watchtower w **jednym** compose — jeden import w Container Station, bez profili i bez drugiego pliku.
+
+1. **Create** → **Create Application** → **Import from URL**
+2. Wklej:
+
+   ```
+   https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
+   ```
+
+3. Ustaw zmienne środowiskowe (patrz Krok 3 powyżej) → **Create** → **Start**
+
+**Opis ekranu:** zobaczysz dwa serwisy — `netdash` (portal na porcie **18787**) i `netdash-watchtower` (aktualizacja co 24 h). To normalne.
+
+Opcjonalna zmienna: `WATCHTOWER_POLL_INTERVAL=86400` (sekundy, domyślnie 24 h).
+
+---
+
+## Auto-aktualizacja (inne metody)
 
 Watchtower co 24 h sprawdza nowy obraz i restartuje NetDash.
 

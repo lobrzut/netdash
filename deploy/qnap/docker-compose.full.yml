@@ -1,0 +1,45 @@
+# NetDash + Watchtower — QNAP Container Station (jeden plik, auto-update)
+# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
+#
+# Folder danych: /share/Container/netdash/data
+# Portal: http://<IP-QNAP>:18787  (NETDASH_PORT; 8787 = Readarr conflict)
+#
+# Watchtower co 24 h aktualizuje obraz NetDash (etykieta com.centurylinklabs.watchtower.enable).
+
+services:
+  netdash:
+    image: ghcr.io/lobrzut/netdash:latest
+    container_name: netdash
+    restart: always
+    network_mode: host
+    environment:
+      NETDASH_SECRET_KEY: ${NETDASH_SECRET_KEY}
+      NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD}
+      NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
+      NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-}
+      NETDASH_PORT: ${NETDASH_PORT:-18787}
+    volumes:
+      - /share/Container/netdash/data:/app/data
+    cap_add:
+      - NET_RAW
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:$${NETDASH_PORT:-18787}/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: netdash-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
