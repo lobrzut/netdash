@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -268,7 +267,7 @@ async def _sanitize_stored_urls() -> None:
 
 async def _maybe_reset_admin_password(db: AsyncSession) -> None:
     """One-time homelab recovery: NETDASH_RESET_ADMIN_PASSWORD on next start (remove env after)."""
-    new_password = os.environ.get("NETDASH_RESET_ADMIN_PASSWORD", "").strip()
+    new_password = (settings.reset_admin_password or "").strip()
     if not new_password:
         return
     result = await db.execute(select(User).where(User.username == settings.default_admin_user))

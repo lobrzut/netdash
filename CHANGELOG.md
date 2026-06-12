@@ -2,7 +2,7 @@
 
 ## v1.3.78
 
-- **Reset hasła admina (QNAP / homelab)**: `NETDASH_RESET_ADMIN_PASSWORD` — jednorazowy reset przy starcie (usuń zmienną po zalogowaniu). Skrypt `scripts/reset-admin-password.py` dla SSH / `docker exec`.
+- **Reset hasła admina (QNAP / homelab)**: `NETDASH_RESET_ADMIN_PASSWORD` — jednorazowy reset przy starcie (bcrypt, log ostrzeżenia; usuń zmienną po zalogowaniu). Skrypt `scripts/reset-admin-password.py` w obrazie Docker (`docker exec`) lub offline na `netdash.db`.
 - **QNAP README**: sekcja „Nie mogę się zalogować” — File Station, stara baza, `admin`/`changeme` tylko przy pustej DB.
 
 ## v1.3.77

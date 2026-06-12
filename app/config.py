@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     scan_concurrency: int = 80
     default_admin_user: str = "admin"
     default_admin_password: str = "changeme"
+    # One-time recovery on startup — remove env after login (see deploy/qnap/README.md)
+    reset_admin_password: str | None = None
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
     scan_cidr: str | None = None
     # Mask real LAN IP in /api/network (for README screenshots only)

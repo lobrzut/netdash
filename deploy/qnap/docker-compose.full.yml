@@ -17,6 +17,8 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-}
+      # One-time password recovery (v1.3.78+): set in CS Environment, restart, login, remove env.
+      # NETDASH_RESET_ADMIN_PASSWORD: ${NETDASH_RESET_ADMIN_PASSWORD:-}
       # NETDASH_LISTEN_PORT — app ignores stale CS NETDASH_PORT=8787 (entrypoint unsets it).
       NETDASH_LISTEN_PORT: "18787"
     volumes:
