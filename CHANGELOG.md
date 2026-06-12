@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.100
+
+- **Compose (QNAP)**: usunięto `cpu_quota`/`cpu_period` (fałszywe ostrzeżenia yaml-language-server przy schemastore). Zamiast tego `cpus: 1.0` + `mem_limit: 512m` (Compose 2.4, schemat `json.schemastore.org/docker-compose.json`).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.100`.
+
 ## v1.3.99
 
 - **Compose (QNAP)**: schemat IDE zmieniony z compose-spec na `json.schemastore.org/docker-compose.json` (Compose 2.4: `mem_limit`, `cpu_quota`, `cpu_period` bez ostrzeżeń yaml-language-server).
