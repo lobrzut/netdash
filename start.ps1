@@ -1,6 +1,6 @@
 # NetDash — uruchom / zrestartuj serwer
 $ErrorActionPreference = "Stop"
-$Port = if ($env:NETDASH_PORT) { [int]$env:NETDASH_PORT } else { 18787 }
+$Port = if ($env:NETDASH_LISTEN_PORT) { [int]$env:NETDASH_LISTEN_PORT } else { 18787 }
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Python = "C:\Users\Admin\AppData\Local\Programs\Python\Python312\python.exe"
 

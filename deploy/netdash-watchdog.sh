@@ -3,7 +3,7 @@
 set -euo pipefail
 
 NETDASH_DIR="${NETDASH_DIR:-/opt/netdash}"
-HEALTH_URL="${NETDASH_HEALTH_URL:-http://127.0.0.1:${NETDASH_PORT:-18787}/api/health}"
+HEALTH_URL="${NETDASH_HEALTH_URL:-http://127.0.0.1:${NETDASH_LISTEN_PORT:-18787}/api/health}"
 LOG_TAG="netdash-watchdog"
 
 if curl -sf --max-time 10 "$HEALTH_URL" >/dev/null; then

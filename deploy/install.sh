@@ -48,7 +48,7 @@ docker compose pull 2>/dev/null || true
 docker compose build --pull
 docker compose up -d
 docker compose ps
-echo "NetDash: http://\$(hostname -I | awk '{print \$1}'):\${NETDASH_PORT:-18787}"
+echo "NetDash: http://\$(hostname -I | awk '{print \$1}'):\${NETDASH_LISTEN_PORT:-18787}"
 REMOTE
 
 echo "✓ Deploy complete"

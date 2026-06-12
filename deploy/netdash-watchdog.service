@@ -6,6 +6,6 @@ Wants=docker.service network-online.target
 [Service]
 Type=oneshot
 Environment=NETDASH_DIR=/opt/netdash
-Environment=NETDASH_PORT=18787
+Environment=NETDASH_LISTEN_PORT=18787
 Environment=NETDASH_HEALTH_URL=http://127.0.0.1:18787/api/health
 ExecStart=/opt/netdash/deploy/netdash-watchdog.sh

@@ -32,7 +32,7 @@ services:
 
       NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
 
-      NETDASH_PORT: ${NETDASH_PORT:-18787}
+      NETDASH_LISTEN_PORT: "18787"
 
     volumes:
 
@@ -48,7 +48,7 @@ services:
 
     healthcheck:
 
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:$${NETDASH_PORT:-18787}/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
 
       interval: 30s
 

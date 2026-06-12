@@ -2,7 +2,7 @@
 # NetDash — uruchom / zrestartuj serwer (Linux bare metal)
 set -euo pipefail
 
-PORT="${NETDASH_PORT:-18787}"
+PORT="${NETDASH_LISTEN_PORT:-18787}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 

@@ -2,13 +2,13 @@
 # Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
 #
 # Folder danych: /share/Container/netdash/data
-# Portal: http://<IP-QNAP>:18787  (NETDASH_PORT; 8787 = Readarr conflict)
+# Portal: http://<IP-QNAP>:18787  (NETDASH_LISTEN_PORT; never 8787 — Readarr)
 #
 # Watchtower co 24 h aktualizuje obraz NetDash (etykieta com.centurylinklabs.watchtower.enable).
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:latest
+    image: ghcr.io/lobrzut/netdash:1.3.77
     container_name: netdash
     restart: always
     network_mode: host
@@ -17,8 +17,8 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-}
-      # Hardcoded 18787 — remove NETDASH_PORT=8787 from Container Station env if set (Readarr conflict).
-      NETDASH_PORT: "18787"
+      # NETDASH_LISTEN_PORT — app ignores stale CS NETDASH_PORT=8787 (entrypoint unsets it).
+      NETDASH_LISTEN_PORT: "18787"
     volumes:
       - /share/Container/netdash/data:/app/data
     cap_add:

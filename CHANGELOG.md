@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.77
+
+- **Port QNAP fix (definitive)**: aplikacja nasłuchuje wyłącznie na `NETDASH_LISTEN_PORT` (domyślnie **18787**). Stare `NETDASH_PORT=8787` z Container Station jest **ignorowane** (log ostrzeżenia) i **usuwane** w `entrypoint.sh` przed startem — koniec crash loop z Readarr.
+- **QNAP compose**: obraz przypięty do `ghcr.io/lobrzut/netdash:1.3.77` (nie `:latest` — unika cache CS).
+- **Wszystkie compose**: `NETDASH_LISTEN_PORT: "18787"` na stałe (bez `${NETDASH_PORT:-…}`).
+- **Dockerfile**: `ENV NETDASH_LISTEN_PORT=18787`, `entrypoint.sh`, healthcheck na 18787.
+
 ## v1.3.76
 
 - **QNAP compose**: `NETDASH_PORT` ustawiony na stałe na **18787** w `deploy/qnap/docker-compose.yml` i `docker-compose.full.yml` — stara zmienna `NETDASH_PORT=8787` w Container Station nie nadpisuje już portu przez `${NETDASH_PORT:-18787}`.

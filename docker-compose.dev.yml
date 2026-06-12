@@ -8,7 +8,7 @@ services:
     container_name: netdash-dev
     restart: unless-stopped
     ports:
-      - "${NETDASH_PORT:-18787}:${NETDASH_PORT:-18787}"
+      - "18787:18787"
     volumes:
       - ./data:/app/data
     environment:
@@ -17,11 +17,11 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:?Set NETDASH_DEFAULT_ADMIN_PASSWORD in .env}
       NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
       NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-192.168.1.0/24}
-      NETDASH_PORT: ${NETDASH_PORT:-18787}
+      NETDASH_LISTEN_PORT: "18787"
     cap_add:
       - NET_RAW
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import os,urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\\\"NETDASH_PORT\\\",\\\"18787\\\")}/api/health')\""]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

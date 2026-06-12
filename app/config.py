@@ -5,8 +5,9 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.76"
-DEFAULT_PORT = 18787
+VERSION = "1.3.77"
+DEFAULT_LISTEN_PORT = 18787
+FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
 GHCR_IMAGE = "ghcr.io/lobrzut/netdash"
 
@@ -48,6 +49,22 @@ DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 
+def resolve_listen_port() -> int:
+    """Resolve HTTP listen port; ignore stale QNAP CS NETDASH_PORT=8787."""
+    listen = os.environ.get("NETDASH_LISTEN_PORT", "").strip()
+    if listen:
+        return int(listen)
+
+    legacy = os.environ.get("NETDASH_PORT", "").strip()
+    if legacy:
+        port = int(legacy)
+        if port == FORBIDDEN_LISTEN_PORT:
+            return DEFAULT_LISTEN_PORT
+        return port
+
+    return DEFAULT_LISTEN_PORT
+
+
 class Settings(BaseSettings):
     secret_key: str = "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env"
     algorithm: str = "HS256"
@@ -68,11 +85,13 @@ class Settings(BaseSettings):
     docker_image_tag: str = "latest"
     container_name: str = "netdash"
     docker_socket: str = "/var/run/docker.sock"
-    # Listen port (avoid 8787 — conflicts with Readarr in *arr homelabs)
-    port: int = DEFAULT_PORT
 
     class Config:
         env_prefix = "NETDASH_"
+
+    @property
+    def port(self) -> int:
+        return resolve_listen_port()
 
 
 settings = Settings()

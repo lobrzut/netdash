@@ -61,7 +61,7 @@ docker compose up -d --remove-orphans
 echo "Waiting for health..."
 ok=0
 for i in $(seq 1 45); do
-  PORT="\${NETDASH_PORT:-18787}"
+  PORT="\${NETDASH_LISTEN_PORT:-18787}"
   if curl -sf --max-time 5 "http://127.0.0.1:\${PORT}/api/health" >/dev/null 2>&1 || \
      docker exec netdash curl -sf --max-time 5 "http://127.0.0.1:\${PORT}/api/health" >/dev/null 2>&1; then
     ok=1
@@ -75,7 +75,7 @@ if [ "$ok" != "1" ]; then
   exit 1
 fi
 docker compose ps
-curl -sf "http://127.0.0.1:\${NETDASH_PORT:-18787}/api/health"
+curl -sf "http://127.0.0.1:\${NETDASH_LISTEN_PORT:-18787}/api/health"
 if command -v systemctl >/dev/null 2>&1; then
   sudo cp deploy/netdash-watchdog.service deploy/netdash-watchdog.timer /etc/systemd/system/ 2>/dev/null || true
   sudo systemctl daemon-reload 2>/dev/null || true
