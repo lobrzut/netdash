@@ -1,4 +1,4 @@
-# NetDash na QNAP — import raz, zero edycji YAML (v1.3.126)
+# NetDash na QNAP — import raz, zero edycji YAML (v1.3.127)
 
 > **Container Station nie pozwala edytować compose po deployu.** Użyj **jednego** URL poniżej — wszystko (discovery, Watchtower, auto-update) jest już w pliku.
 
@@ -34,7 +34,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 ### Auto-aktualizacja (Watchtower)
 
-- GitHub Actions publikuje `:latest` + `:1.3.126` przy każdym tagu `v*`
+- GitHub Actions publikuje `:latest` + `:1.3.127` przy każdym tagu `v*`
 - Watchtower co ~1 h sprawdza nowy digest `:latest` na GHCR i **sam** restartuje NetDash
 - Portal pokazuje: *„Aktualizacja automatyczna przez Watchtower (co ~1 h)”* — przycisk „Aktualizuj teraz” nie działa na QNAP (brak docker.sock w kontenerze) i **nie jest potrzebny**
 - Samo-aktualizacja z wnętrza kontenera bez docker.sock jest **niemożliwa** — Watchtower **jest** rozwiązaniem

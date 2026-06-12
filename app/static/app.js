@@ -1070,6 +1070,21 @@ function isAutoDiscovery(netRes) {
   return isAdaptiveDiscovery(netRes) || isArpDiscovery(netRes) || isRemoteDiscovery(netRes);
 }
 
+function isWeakDiscoveryProfile(netRes) {
+  const net = resolveNetwork(netRes);
+  return (net.discovery_profile || '').toLowerCase() === 'weak';
+}
+
+function canUseManualScan(netRes) {
+  if (isRemoteDiscovery(netRes)) return false;
+  if (isAdaptiveDiscovery(netRes)) return !isWeakDiscoveryProfile(netRes);
+  return true;
+}
+
+function shouldHideQuickScan(netRes) {
+  return isAutoDiscovery(netRes) || isRemoteDiscovery(netRes);
+}
+
 function formatRelativeAgo(when) {
   if (!when) return '';
   const ms = Date.now() - when.getTime();
@@ -1138,11 +1153,13 @@ function buildDiscoveryInstallCommand() {
 function updateDiscoveryStatusBar(netRes, settings) {
   const bar = $('#discovery-status-bar');
   const textEl = $('#discovery-status-bar-text');
+  const settingsLink = $('#discovery-settings-scan-link');
   if (!bar || !textEl) return;
   if (!isAutoDiscovery(netRes)) {
     bar.classList.add('hidden');
     bar.classList.remove('discovery-status-bar--ok', 'discovery-status-bar--wait', 'discovery-status-bar--info');
     textEl.textContent = '';
+    settingsLink?.classList.add('hidden');
     return;
   }
   const line = formatDiscoveryStatusLine(netRes, settings);
@@ -1150,6 +1167,7 @@ function updateDiscoveryStatusBar(netRes, settings) {
     ? getArpDiscoveryMeta(netRes).when
     : getDiscoveryMeta(netRes, settings).when;
   textEl.textContent = line;
+  settingsLink?.classList.toggle('hidden', !isAdaptiveDiscovery(netRes));
   bar.classList.remove('hidden');
   bar.classList.toggle('discovery-status-bar--ok', !!when);
   bar.classList.toggle('discovery-status-bar--wait', !when);
@@ -1165,7 +1183,17 @@ function updateDiscoverySettingsPanel(netRes, settings) {
   const line = formatDiscoveryStatusLine(netRes, settings);
   if (detail) detail.textContent = line;
   if (cmd) cmd.textContent = buildDiscoveryInstallCommand();
-  if (arpIntro) arpIntro.classList.toggle('hidden', !isArpDiscovery(netRes) && !isAdaptiveDiscovery(netRes));
+  if (arpIntro) {
+    if (isAdaptiveDiscovery(netRes)) {
+      arpIntro.textContent = t('discovery.adaptiveIntro');
+      arpIntro.classList.remove('hidden');
+    } else if (isArpDiscovery(netRes)) {
+      arpIntro.textContent = t('discovery.arpIntro');
+      arpIntro.classList.remove('hidden');
+    } else {
+      arpIntro.classList.add('hidden');
+    }
+  }
   if (card) {
     const when = isArpDiscovery(netRes)
       ? getArpDiscoveryMeta(netRes).when
@@ -1180,19 +1208,16 @@ function updateRemoteDiscoveryUI(netRes, settings) {
     const arp = isArpDiscovery(netRes);
     const adaptive = isAdaptiveDiscovery(netRes);
     const auto = isAutoDiscovery(netRes);
-    document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
-    $('#scan-btn')?.classList.toggle('hidden', auto);
-    $('#empty-scan-btn')?.classList.toggle('hidden', auto);
-    $('#scan-options-btn')?.classList.toggle('hidden', remote);
-    $('#empty-scan-options-btn')?.classList.toggle('hidden', auto);
+    const manual = canUseManualScan(netRes);
+    const hideQuick = shouldHideQuickScan(netRes);
+    const hideManualOptions = remote || adaptive;
+    document.querySelector('.scan-actions')?.classList.toggle('hidden', remote || (adaptive && !manual));
+    $('#scan-btn')?.classList.toggle('hidden', hideQuick);
+    $('#empty-scan-btn')?.classList.toggle('hidden', hideQuick);
+    $('#scan-options-btn')?.classList.toggle('hidden', hideManualOptions);
+    $('#empty-scan-options-btn')?.classList.toggle('hidden', hideManualOptions);
     $('.settings-tab[data-tab="scan"]')?.classList.toggle('hidden', remote);
     $('#scan-error')?.classList.add('hidden');
-    const emptyHint = $('#empty-hint');
-    if (emptyHint) {
-      emptyHint.textContent = auto
-        ? formatDiscoveryStatusLine(netRes, settings)
-        : t('empty.services.hint');
-    }
     updateDiscoveryStatusBar(netRes, settings);
     updateDiscoverySettingsPanel(netRes, settings);
   } catch (err) {
@@ -1208,9 +1233,19 @@ function updateScanButtonsState(netRes) {
   const remote = isRemoteDiscovery(netRes);
   const arp = isArpDiscovery(netRes);
   const adaptive = isAdaptiveDiscovery(netRes);
+  const manual = canUseManualScan(netRes);
   $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !remote);
-  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp && !adaptive);
-  $('#settings-scan-profile-card')?.classList.toggle('hidden', remote);
+  $('#settings-adaptive-scan-hint')?.classList.toggle('hidden', !adaptive);
+  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp || adaptive);
+  $('#settings-manual-scan-advanced')?.classList.toggle('hidden', !manual);
+  $('.scan-test-row')?.classList.toggle('hidden', adaptive);
+  $('#settings-full-scan-row')?.classList.toggle('hidden', !!netRes?.scan_safe_mode);
+  $('#settings-scan-profile-card')?.classList.toggle('hidden', remote || adaptive);
+  $('#settings-scan-profile-weak-hint')?.classList.toggle('hidden', remote || adaptive);
+  if (adaptive) {
+    const adaptiveHint = $('#settings-adaptive-scan-hint');
+    if (adaptiveHint) adaptiveHint.textContent = t('discovery.adaptiveModeHint');
+  }
   if (remote) {
     ['#scan-btn', '#empty-scan-btn', '#scan-start', '#scan-options-btn', '#empty-scan-options-btn', '#scan-test-btn'].forEach((sel) => {
       const el = $(sel);
@@ -1393,7 +1428,20 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
     dismissBtn?.classList.add('hidden');
     return;
   }
-  if (scanNeedsCidrConfig(net, settings)) {
+  if (isAdaptiveDiscovery(netRes)) {
+    if (scanNeedsCidrConfig(net, settings)) {
+      message = t('scan.configWarning', {
+        ip: net.local_ip,
+        network: net.local_network,
+      });
+    } else {
+      el.classList.add('hidden');
+      textEl.textContent = '';
+      dismissBtn?.classList.add('hidden');
+      updateRemoteDiscoveryUI(netRes, settings);
+      return;
+    }
+  } else if (scanNeedsCidrConfig(net, settings)) {
     message = t('scan.configWarning', {
       ip: net.local_ip,
       network: net.local_network,
@@ -2109,10 +2157,19 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
   if (services.length === 0) {
     icon?.classList.remove('empty-icon--search');
     title.textContent = t('empty.services');
-    hint.textContent = t('empty.services.hint');
+    const netRes = window.__netdashNetwork;
+    if (isAutoDiscovery(netRes)) {
+      const line = formatDiscoveryStatusLine(netRes, appSettings);
+      hint.innerHTML = `${esc(line)} <button type="button" class="link-btn" id="empty-settings-scan-link">${esc(t('scan.settingsCidrLink'))}</button>`;
+      scanBtn?.classList.add('hidden');
+      $('#empty-scan-options-btn')?.classList.add('hidden');
+    } else {
+      hint.textContent = t('empty.services.hint');
+      scanBtn?.classList.toggle('hidden', shouldHideQuickScan(netRes));
+      $('#empty-scan-options-btn')?.classList.toggle('hidden', isAdaptiveDiscovery(netRes) || isRemoteDiscovery(netRes));
+    }
     hint.classList.remove('hidden');
     clearBtn?.classList.add('hidden');
-    scanBtn?.classList.remove('hidden');
     return;
   }
 
@@ -3910,6 +3967,7 @@ function populateScanCidrSelect(netRes, settings) {
     orderedCidrs.unshift(defaultVal);
   }
   orderedCidrs.forEach((cidr) => {
+    if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) return;
     if (!seen.has(cidr)) {
       seen.add(cidr);
       options.push({ value: cidr, label: cidrOptionLabel(cidr, netRes, settings) });
@@ -3922,6 +3980,15 @@ function populateScanCidrSelect(netRes, settings) {
     el.textContent = opt.label;
     select.appendChild(el);
   });
+  if (!options.length && netRes?.scan_safe_mode) {
+    const fallback = ONE_CLICK_SCAN_CIDR_FALLBACK;
+    const el = document.createElement('option');
+    el.value = fallback;
+    el.textContent = t('modal.scan.cidrDetected', { cidr: fallback });
+    select.appendChild(el);
+    seen.add(fallback);
+    options.push({ value: fallback, label: el.textContent });
+  }
   const customOpt = document.createElement('option');
   customOpt.value = SCAN_CIDR_CUSTOM;
   customOpt.textContent = t('modal.scan.cidrCustomOption');
@@ -4066,6 +4133,7 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   clearScanError();
   const netRes = window.__netdashNetwork;
   if (isRemoteDiscovery(netRes)) return;
+  if (!canUseManualScan(netRes) && opts.advanced) return;
   if (isArpDiscovery(netRes) && !opts.advanced) return;
   let resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   if (resolvedCidr && isDockerInternalCidr(resolvedCidr)) {
@@ -4135,9 +4203,51 @@ async function oneClickScan() {
   await startScan(cidr, false, { skipConfirm: false, suppressStartToast: false });
 }
 
+function updateScanModalUI(netRes, settings) {
+  const net = resolveNetwork(netRes);
+  const adaptive = isAdaptiveDiscovery(netRes);
+  const safe = net.scan_safe_mode;
+  const titleEl = $('#scan-modal-title');
+  if (titleEl) titleEl.textContent = t('modal.scan.titleAdvanced');
+  const descEl = $('#scan-modal-desc');
+  if (descEl) {
+    descEl.textContent = adaptive
+      ? t('modal.scan.descAdaptive')
+      : t('modal.scan.desc');
+  }
+  const warning = $('#scan-modal-adaptive-warning');
+  if (warning) {
+    let msg = '';
+    if (adaptive) msg = t('modal.scan.adaptiveWarning');
+    else if (safe) msg = t('modal.scan.safeModeWarning');
+    warning.textContent = msg;
+    warning.classList.toggle('hidden', !msg);
+  }
+  $('#scan-full-scan-row')?.classList.toggle('hidden', !!safe);
+  const fullNote = $('#scan-full-scan-hidden-note');
+  if (fullNote) {
+    fullNote.textContent = safe ? t('settings.scanProfile.safeFullScanNote') : '';
+    fullNote.classList.toggle('hidden', !safe);
+  }
+}
+
+function openSettingsScanTab() {
+  fillSettingsForm();
+  clearPasswordForm();
+  settingsSnapshot = { ...appSettings };
+  updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+  switchSettingsTab('scan');
+  updateSettingsFooter('scan');
+  openModal('settings-modal');
+}
+
 function openScanModal() {
   console.log('[NetDash] scan: openScanModal');
   const net = window.__netdashNetwork;
+  if (!canUseManualScan(net)) {
+    openSettingsScanTab();
+    return;
+  }
   populateScanCidrSelect(net, appSettings);
   const cidrInput = $('#cidr-input');
   if (cidrInput) {
@@ -4146,12 +4256,25 @@ function openScanModal() {
       || '';
   }
   $('#full-scan').checked = !!appSettings?.full_scan_default;
+  updateScanModalUI(net, appSettings);
   updateScanCidrPreview();
   openModal('scan-modal');
 }
 
 function bindScanUi() {
   document.addEventListener('click', (e) => {
+    const settingsLink = e.target.closest('#empty-settings-scan-link, #discovery-settings-scan-link');
+    if (settingsLink) {
+      e.preventDefault();
+      openSettingsScanTab();
+      return;
+    }
+    const manualBtn = e.target.closest('#settings-manual-scan-btn');
+    if (manualBtn) {
+      e.preventDefault();
+      openScanModal();
+      return;
+    }
     const optionsBtn = e.target.closest('#scan-options-btn, #empty-scan-options-btn');
     if (optionsBtn) {
       e.preventDefault();

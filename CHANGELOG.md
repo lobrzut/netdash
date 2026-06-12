@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.127
+
+- **UX — ukryj niedostępne opcje skanu**: w trybie adaptive (QNAP) ukryte przyciski „Skanuj sieć" i „Opcje skanu…"; pasek statusu discovery + link do Ustawienia → Skanowanie (CIDR).
+- **Modal**: „Skan ręczny (zaawansowany)" z ostrzeżeniem QNAP; ukryty „Pełny skan" w safe mode; dropdown CIDR bez /24 gdy zablokowane.
+- **Ustawienia → Skanowanie**: główne miejsce na CIDR; ukryty pełny skan i test skanu w adaptive; sekcja zaawansowana tylko profil strong.
+- **Komunikaty**: „Discovery automatyczne — TCP w tle"; „Ręczny skan tylko Docker (profil strong)".
+
 ## v1.3.126
 
 - **Weak profile — dual /28 per cycle**: każdy cykl skanuje chunk rotowany (N) **oraz** chunk przeciwnej połowy sieci `(N + 8) % 16` — np. chunk 1+9/16 obejmuje `.0-.15` i `.128-.143` w jednym cyklu.

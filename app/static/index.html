@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.126" />
-  <script src="/static/i18n.js?v=1.3.126"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.127" />
+  <script src="/static/i18n.js?v=1.3.127"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -117,6 +117,7 @@
     </div>
     <div id="discovery-status-bar" class="discovery-status-bar hidden" role="status">
       <span id="discovery-status-bar-text"></span>
+      <button type="button" class="link-btn discovery-settings-link hidden" id="discovery-settings-scan-link" data-i18n="scan.settingsCidrLink">Ustawienia → Skanowanie (CIDR)</button>
     </div>
 
     <main class="main">
@@ -506,6 +507,7 @@
           <summary data-i18n="settings.tab.scan">Skanowanie</summary>
           <div class="settings-accordion-body">
             <p id="settings-discovery-import-status" class="hint discovery-import-status hidden" role="status"></p>
+            <p class="hint discovery-info-banner hidden" id="settings-adaptive-scan-hint" data-i18n="discovery.adaptiveModeHint"></p>
             <p class="hint discovery-info-banner hidden" id="settings-arp-discovery-hint" data-i18n="discovery.arpModeHint"></p>
             <p class="hint hint-warning hidden" id="settings-remote-discovery-hint" data-i18n="discovery.remoteOnlyHint">Lokalny skan wyłączony na tym hoście — uruchom agenta zdalnego na maszynie z dostępem do LAN (deploy/agent).</p>
             <div class="scan-profile-card" id="settings-scan-profile-card">
@@ -522,7 +524,8 @@
               <span class="hint" data-i18n="settings.scanCidrHint">Jedna sieć na linię lub oddzielone przecinkiem. Obsługiwane maski /24–/22.</span>
             </div>
             <p id="docker-scan-warning" class="hint hint-warning hidden" role="alert"></p>
-            <label class="checkbox-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
+            <label class="checkbox-row hidden" id="settings-full-scan-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
+            <p class="hint hidden" id="settings-full-scan-hidden-note" data-i18n="settings.scanProfile.safeFullScanNote">Pełny skan jest wyłączony dopóki NETDASH_SCAN_SAFE_MODE=true.</p>
             <div class="field">
               <label for="settings-host-ports" data-i18n="settings.hostPorts">Porty urządzeń (SSH, SMB, RDP…)</label>
               <input type="text" id="settings-host-ports" placeholder="22,445,3389,5900" />
@@ -534,6 +537,11 @@
               <span id="scan-test-status" class="hint scan-test-status"></span>
             </div>
             <div id="scan-test-results" class="scan-test-results hidden" role="status"></div>
+            <details class="settings-manual-advanced hidden" id="settings-manual-scan-advanced">
+              <summary data-i18n="settings.manualScanAdvanced">Skan ręczny (zaawansowany)</summary>
+              <p class="hint" data-i18n="settings.manualScanAdvancedDesc">Ręczny skan TCP dostępny tylko na serwerze Docker (profil strong). Na QNAP discovery działa automatycznie w tle.</p>
+              <button type="button" class="btn btn-secondary btn-sm" id="settings-manual-scan-btn" data-i18n="modal.scan.start">Rozpocznij skan</button>
+            </details>
             <div class="field">
               <label for="settings-stale-days" data-i18n="settings.staleDays">Usuń nieaktywne po (dni)</label>
               <input type="number" id="settings-stale-days" min="0" max="365" placeholder="0 = nigdy" />
@@ -805,8 +813,9 @@ sol --udp-port 9
   <div id="scan-modal" class="modal hidden" role="dialog" aria-labelledby="scan-modal-title" aria-modal="true">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-form">
-      <h2 id="scan-modal-title" data-i18n="modal.scan.title">Skanowanie sieci</h2>
-      <p class="modal-desc" data-i18n="modal.scan.desc">Wybierz sieć (CIDR) do skanowania lub wpisz własną. Na słabym NAS użyj mniejszej maski, np. /28.</p>
+      <h2 id="scan-modal-title" data-i18n="modal.scan.titleAdvanced">Skan ręczny (zaawansowany)</h2>
+      <p class="modal-desc" id="scan-modal-desc" data-i18n="modal.scan.desc">Wybierz sieć (CIDR) do skanowania lub wpisz własną. Na słabym NAS użyj mniejszej maski, np. /28.</p>
+      <p class="hint hint-warning hidden" id="scan-modal-adaptive-warning" role="alert"></p>
       <div class="field">
         <label for="scan-cidr-select" data-i18n="modal.scan.cidrSelect">Sieć do skanowania</label>
         <select id="scan-cidr-select" class="scan-cidr-select"></select>
@@ -817,10 +826,11 @@ sol --udp-port 9
         <span class="hint" id="local-network-hint"></span>
       </div>
       <p class="scan-cidr-preview" id="scan-cidr-preview" aria-live="polite"></p>
-      <label class="checkbox-row">
+      <label class="checkbox-row" id="scan-full-scan-row">
         <input type="checkbox" id="full-scan" />
         <span data-i18n="modal.scan.fullLong">Pełny skan (wszystkie porty — wolniejszy, więcej wyników)</span>
       </label>
+      <p class="hint hidden" id="scan-full-scan-hidden-note"></p>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="scan-cancel" data-i18n="modal.cancel">Anuluj</button>
         <button type="button" class="btn btn-accent" id="scan-start" data-i18n="modal.scan.start">Rozpocznij skan</button>
@@ -1236,6 +1246,6 @@ sol --udp-port 9
       }
     })();
   </script>
-  <script src="/static/app.js?v=1.3.126"></script>
+  <script src="/static/app.js?v=1.3.127"></script>
 </body>
 </html>
