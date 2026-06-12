@@ -15,8 +15,8 @@
 
 # Portal: http://<IP-QNAP>:18787
 #
-# version 2.4: QNAP Container Station nie stosuje deploy.resources — limity na poziomie serwisu.
-# cpus + mem_limit (Compose 2.4); schemat IDE: json.schemastore.org/docker-compose.json
+# version 2.4: QNAP Container Station nie stosuje deploy.resources — mem_limit na poziomie serwisu.
+# schemat IDE: json.schemastore.org/docker-compose.json (bez cpus — zero ostrzeżeń yaml-language-server)
 
 version: "2.4"
 
@@ -24,14 +24,14 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.100
+    image: ghcr.io/lobrzut/netdash:1.3.101
 
     container_name: netdash
 
     restart: always
 
     mem_limit: 512m
-    cpus: 1.0
+    # CPU: brak twardego limitu w compose (QNAP CS); opcjonalnie w CS ustaw CPU limit ręcznie
 
     ports:
 
