@@ -52,7 +52,7 @@ if [ ! -f .env ]; then
     SECRET_KEY=$(head -c 48 /dev/urandom | base64 | tr -d '/+=' | head -c 43)
   fi
   sed -i "s/^NETDASH_SECRET_KEY=.*/NETDASH_SECRET_KEY=${SECRET_KEY}/" .env
-  echo "Utworzono .env (login: admin / changeme — zmien haslo po pierwszym logowaniu)"
+  echo "Utworzono .env — login admin/changeme, zmien haslo po pierwszym logowaniu"
 fi
 export NETDASH_BUILD_DATE=$(date -u +%Y-%m-%d)
 docker compose config >/dev/null
