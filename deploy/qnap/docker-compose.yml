@@ -8,7 +8,7 @@
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.90
+    image: ghcr.io/lobrzut/netdash:1.3.91
     container_name: netdash
     restart: always
     ports:
@@ -21,6 +21,7 @@ services:
       NETDASH_SYNC_ADMIN_PASSWORD: "false"
       # QNAP CS ignores ${VAR:-default} — literal CIDR required for LAN scan.
       NETDASH_SCAN_CIDR: "192.168.1.0/24"
+      NETDASH_COOKIE_SECURE: "false"
       # One-time override (optional): NETDASH_RESET_ADMIN_PASSWORD — remove after login
       # NETDASH_RESET_ADMIN_PASSWORD: ${NETDASH_RESET_ADMIN_PASSWORD:-}
       # NETDASH_LISTEN_PORT — app ignores stale CS NETDASH_PORT=8787 (entrypoint unsets it).

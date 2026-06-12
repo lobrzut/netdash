@@ -3375,7 +3375,15 @@ function bindScanUi() {
       void startScan(resolveScanCidrInput(), fullScan);
       return;
     }
-    const openBtn = e.target.closest('#scan-btn, #scan-btn-home, #empty-scan-btn');
+    const quickScanBtn = e.target.closest('#scan-btn-home, #empty-scan-btn');
+    if (quickScanBtn) {
+      e.preventDefault();
+      if (quickScanBtn.disabled) return;
+      const fullScan = appSettings?.full_scan_default ?? $('#full-scan')?.checked ?? false;
+      void startScan(resolveScanCidrInput(), fullScan);
+      return;
+    }
+    const openBtn = e.target.closest('#scan-btn');
     if (openBtn) {
       e.preventDefault();
       if (openBtn.disabled) return;
@@ -4471,7 +4479,17 @@ initServiceIconPickers();
 setupSettingsFaviconUpload();
 
 document.addEventListener('visibilitychange', reconcilePageScrollLock);
-window.addEventListener('pageshow', reconcilePageScrollLock);
+window.addEventListener('pageshow', (event) => {
+  reconcilePageScrollLock();
+  if (event.persisted && authBootComplete && !sessionEstablished) {
+    restoreSession().then((ok) => {
+      if (ok) {
+        showView('dashboard-view');
+        loadDashboard().catch(handleDashboardLoadError);
+      }
+    });
+  }
+});
 
 function clearStoredSession() {
   token = null;
@@ -4479,13 +4497,24 @@ function clearStoredSession() {
   sessionEstablished = false;
 }
 
+async function fetchAuthMe(extraHeaders = {}) {
+  return fetchWithTimeout(
+    `${API}/api/auth/me`,
+    { credentials: 'include', headers: extraHeaders },
+    AUTH_ME_TIMEOUT_MS,
+  );
+}
+
 async function restoreSession() {
   try {
-    const res = await fetchWithTimeout(
-      `${API}/api/auth/me`,
-      { credentials: 'include' },
-      AUTH_ME_TIMEOUT_MS,
-    );
+    let res = await fetchAuthMe();
+    if (res.status === 401) {
+      const stored = localStorage.getItem('netdash_token');
+      if (stored) {
+        console.info('[NetDash] Brak cookie — próba sesji z Bearer (localStorage)');
+        res = await fetchAuthMe({ Authorization: `Bearer ${stored}` });
+      }
+    }
     if (!res.ok) {
       if (res.status === 401) {
         console.info('[NetDash] Brak aktywnej sesji (401) — pokazuję logowanie');
@@ -4565,9 +4594,12 @@ $('#scan-test-btn')?.addEventListener('click', async () => {
       refreshIconPickerTabs(prefix);
       refreshIconPickerGrid(prefix);
     });
-    await checkServerHealth();
+    const [, sessionOk] = await Promise.all([
+      checkServerHealth(),
+      restoreSession(),
+    ]);
     reconcilePageScrollLock();
-    if (await restoreSession()) {
+    if (sessionOk) {
       showView('dashboard-view');
       loadDashboard().catch(handleDashboardLoadError);
     } else {

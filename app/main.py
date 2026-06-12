@@ -15,6 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import (
+    AUTH_COOKIE_LEGACY,
+    AUTH_COOKIE_NAME,
     clear_auth_cookie,
     create_access_token,
     get_current_user,
@@ -410,8 +412,25 @@ async def init_db():
 
     await _ensure_local_host_service()
     await _sanitize_stored_urls()
+    await _cancel_stale_scan_jobs()
     await enrich_mac_addresses()
     await enrich_all_services()
+
+
+async def _cancel_stale_scan_jobs() -> None:
+    """Mark in-flight scan jobs failed after container restart (in-memory tasks are gone)."""
+    async with async_session() as db:
+        result = await db.execute(select(ScanJob).where(ScanJob.status.in_(["running", "pending"])))
+        jobs = result.scalars().all()
+        if not jobs:
+            return
+        now = datetime.now(timezone.utc)
+        for job in jobs:
+            job.status = "failed"
+            job.error_message = "Skan przerwany — restart kontenera. Uruchom skan ponownie."
+            job.finished_at = now
+        await db.commit()
+        logger.info("Marked %s stale scan job(s) as failed after restart", len(jobs))
 
 
 async def _health_check_loop():
@@ -461,6 +480,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="NetDash", description="Dashboard sieci z auto-wykrywaniem serwisów", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+_STATIC_NO_CACHE = frozenset({"/static/app.js", "/static/i18n.js", "/static/style.css"})
+
+
+@app.middleware("http")
+async def static_no_cache_middleware(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path in _STATIC_NO_CACHE:
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/")
@@ -561,6 +591,16 @@ async def logout(request: Request, response: Response):
 async def auth_me(request: Request, response: Response, user: User = Depends(get_current_user)):
     access_token = create_access_token(user.username)
     set_auth_cookie(response, request, access_token, username=user.username)
+    had_cookie = bool(request.cookies.get(AUTH_COOKIE_NAME) or request.cookies.get(AUTH_COOKIE_LEGACY))
+    had_bearer = (request.headers.get("Authorization") or "").lower().startswith("bearer ")
+    client = request.client.host if request.client else "?"
+    logger.info(
+        "GET /api/auth/me OK user=%s client=%s cookie=%s bearer=%s",
+        user.username,
+        client,
+        had_cookie,
+        had_bearer,
+    )
     return UserMe(username=user.username, access_token=access_token)
 
 

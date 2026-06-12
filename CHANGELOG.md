@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.91
+
+- **Fix sesji QNAP (F5) — root cause**: v1.3.89+ nie czytał tokena z localStorage przy starcie, a cookie `netdash_session` czasem nie wraca na HTTP — boot teraz próbuje cookie, potem Bearer z localStorage; `/api/auth/me` odświeża cookie przy sukcesie.
+- **Boot równoległy**: `/api/health` i `/api/auth/me` równolegle — szybsze ładowanie, zawsze widać auth/me w logach.
+- **Cache JS**: `Cache-Control: no-cache` na `app.js`, `i18n.js`, `style.css` — koniec starego JS po aktualizacji obrazu.
+- **Skan**: przyciski Pulpit/pusty stan uruchamiają `POST /api/scan` od razu (bez drugiego kliknięcia w modalu); stare joby `running` po restarcie oznaczane jako failed.
+- **QNAP compose**: `NETDASH_COOKIE_SECURE: "false"` jawnie; obraz `1.3.91`.
+- **Logi**: `GET /api/auth/me OK user=… cookie=… bearer=…` przy każdym udanym odświeżeniu sesji.
+
 ## v1.3.90
 
 - **Fix „Ładowanie sesji…” (QNAP)**: `GET /api/auth/me` ma timeout 5 s — po błędzie/timeout natychmiast ekran logowania (bez wiecznego spinnera).
