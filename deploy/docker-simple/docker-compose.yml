@@ -13,6 +13,9 @@ services:
     image: ghcr.io/lobrzut/netdash:latest
     container_name: netdash
     restart: always
+    # Weak hardware (QNAP, RPi, old NAS, N100): cap CPU/RAM — use smaller CIDR (/28) if needed.
+    mem_limit: 512m
+    cpus: 1.0
     network_mode: host
     env_file: .env
     environment:
@@ -20,6 +23,7 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:-changeme}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_SYNC_ADMIN_PASSWORD: ${NETDASH_SYNC_ADMIN_PASSWORD:-true}
+      NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
     volumes:
       - ./data:/app/data
     cap_add:

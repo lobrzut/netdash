@@ -158,7 +158,8 @@ class NetworkInfo(BaseModel):
     docker_bridge: bool = False
     scan_cidr_configured: bool = False
     ping_available: bool = True
-    scan_safe_mode: bool = False
+    scan_safe_mode: bool = True
+    resource_profile: str = "safe"
 
 
 class NetworkDiagnostics(BaseModel):

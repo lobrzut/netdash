@@ -67,6 +67,25 @@ curl -s http://127.0.0.1:18787/api/health
 
 Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 
+### Słaby sprzęt (QNAP, Raspberry Pi, stary NAS, N100)
+
+Od **v1.3.94** wszystkie oficjalne pliki compose ustawiają:
+
+- `NETDASH_SCAN_SAFE_MODE=true` (domyślnie też w kodzie aplikacji)
+- `mem_limit: 512m`, `cpus: 1.0`
+
+| Zmienna | Zalecenie na słabym hoście |
+|---------|----------------------------|
+| `NETDASH_SCAN_SAFE_MODE` | `true` (domyślnie) — nie wyłączaj bez potrzeby |
+| `NETDASH_SCAN_CIDR` | Węższa podsieć, np. `192.168.1.0/28` zamiast `/24` |
+| Pełny skan w UI | Wyłączony w safe mode; profil agresywny tylko po świadomym opt-in |
+
+Weryfikacja po deployu:
+
+```bash
+curl -s http://127.0.0.1:18787/api/health | jq '{version, scan_safe_mode, resource_profile}'
+```
+
 ### Pre-built image (GHCR) — zalecane
 
 Użyj **[deploy/docker-simple/](deploy/docker-simple/)** — compose bez `build:`, tylko pull z GHCR.

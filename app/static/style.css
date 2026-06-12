@@ -1720,6 +1720,47 @@ body.modal-open {
   line-height: 1.45;
 }
 
+.scan-profile-card {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(var(--surface-rgb, 30, 30, 30), 0.35);
+}
+
+.scan-profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.scan-profile-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.scan-profile-badge[data-profile="safe"] {
+  color: var(--success, #22c55e);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.scan-profile-badge[data-profile="normal"] {
+  color: var(--warning);
+  border-color: var(--warning-border);
+}
+
+.scan-profile-badge[data-profile="aggressive"] {
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+
 .error {
   color: var(--accent);
   font-size: 0.875rem;

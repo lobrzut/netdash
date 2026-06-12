@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.92" />
-  <script src="/static/i18n.js?v=1.3.92"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.94" />
+  <script src="/static/i18n.js?v=1.3.94"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -477,6 +477,14 @@
         <details class="settings-accordion" open>
           <summary data-i18n="settings.tab.scan">Skanowanie</summary>
           <div class="settings-accordion-body">
+            <div class="scan-profile-card" id="settings-scan-profile-card">
+              <div class="scan-profile-header">
+                <span data-i18n="settings.scanProfile.heading">Profil skanu</span>
+                <span class="scan-profile-badge" id="settings-scan-profile-badge" data-profile="safe">Bezpieczny</span>
+              </div>
+              <p class="hint" id="settings-scan-profile-desc"></p>
+              <p class="hint hint-warning" id="settings-scan-profile-weak-hint" data-i18n="settings.scanProfile.weakHardwareHint">Na słabym sprzęcie (QNAP, Raspberry Pi, stary NAS) zostaw tryb bezpieczny i mniejszy CIDR (/28 zamiast /24).</p>
+            </div>
             <div class="field">
               <label for="settings-scan-cidr" data-i18n="settings.scanCidr">Domyślne sieci (CIDR)</label>
               <textarea id="settings-scan-cidr" rows="3" data-i18n-placeholder="settings.scanCidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.0.0/24&#10;10.0.0.0/24"></textarea>
@@ -1128,6 +1136,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.92"></script>
+  <script src="/static/app.js?v=1.3.94"></script>
 </body>
 </html>

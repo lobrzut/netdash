@@ -14,6 +14,9 @@ services:
         NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
     container_name: netdash
     restart: always
+    # Weak hardware (QNAP, RPi, old NAS, N100): cap resources so LAN scan cannot starve the host.
+    mem_limit: 512m
+    cpus: 1.0
     network_mode: host
     env_file: .env
     environment:
@@ -22,6 +25,8 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:-changeme}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_SYNC_ADMIN_PASSWORD: ${NETDASH_SYNC_ADMIN_PASSWORD:-true}
+      # Safe scan default — set false only on powerful hosts (see README „Słaby sprzęt”).
+      NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
     volumes:
       - ./data:/app/data
       # Optional: enable in-app "Update now" (security risk — see docs/QNAP.md)

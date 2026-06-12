@@ -938,6 +938,26 @@ function updateDockerScanWarning(netRes, settings) {
   el.classList.remove('hidden');
 }
 
+function computeScanProfile(netRes, settings) {
+  if (netRes?.scan_safe_mode !== false) return 'safe';
+  if (settings?.full_scan_default) return 'aggressive';
+  return 'normal';
+}
+
+function updateScanProfileUI(netRes, settings) {
+  const badge = $('#settings-scan-profile-badge');
+  const desc = $('#settings-scan-profile-desc');
+  if (!badge || !desc) return;
+  const profile = computeScanProfile(netRes, settings);
+  badge.dataset.profile = profile;
+  badge.textContent = t(`settings.scanProfile.${profile}`);
+  let description = t(`settings.scanProfile.${profile}Desc`);
+  if (netRes?.scan_safe_mode && settings?.full_scan_default) {
+    description += ` ${t('settings.scanProfile.safeFullScanNote')}`;
+  }
+  desc.textContent = description;
+}
+
 function updateScanConfigWarning(netRes, settings, lastScan) {
   const el = $('#scan-config-warning');
   if (!el) return;
@@ -3523,6 +3543,7 @@ function fillSettingsForm() {
   $('#settings-scan-cidr').value = appSettings.scan_cidr_default || '';
   updateDockerScanWarning(window.__netdashNetwork || null, appSettings);
   updateScanConfigWarning(window.__netdashNetwork || null, appSettings, window.__lastScanStatus);
+  updateScanProfileUI(window.__netdashNetwork || null, appSettings);
   $('#settings-full-scan').checked = !!appSettings.full_scan_default;
   $('#settings-host-ports').value = appSettings.host_scan_ports || '22,445,3389,5900';
   $('#settings-host-only').checked = appSettings.host_only_entries !== false;
@@ -4288,6 +4309,20 @@ $('#settings-password-change').addEventListener('click', async () => {
   } finally {
     btn.disabled = false;
   }
+});
+
+$('#settings-full-scan')?.addEventListener('change', (e) => {
+  const netRes = window.__netdashNetwork;
+  if (e.target.checked) {
+    const wouldBeAggressive = netRes?.scan_safe_mode === false;
+    const msg = wouldBeAggressive
+      ? t('settings.scanProfile.confirmAggressive')
+      : t('settings.scanProfile.confirmFullScanSafe');
+    if (!confirm(msg)) {
+      e.target.checked = false;
+    }
+  }
+  updateScanProfileUI(netRes, { ...appSettings, full_scan_default: e.target.checked });
 });
 
 $('#settings-save').addEventListener('click', async () => {

@@ -154,6 +154,28 @@ Windows shortcut: `.\start.ps1` · Linux: `./start.sh`
 
 > **Docker:** without `network_mode: host`, the container scans its bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/Mac, comment out host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings → Scanning.
 
+## Słaby sprzęt (QNAP, Raspberry Pi, stary NAS)
+
+NetDash **domyślnie** działa w trybie bezpiecznym skanu (`NETDASH_SCAN_SAFE_MODE=true` od v1.3.94) — niska równoległość, krótka lista portów, limit hostów. Compose ogranicza też kontener do **512 MB RAM** i **1 CPU**.
+
+| Problem | Zalecenie |
+|---------|-----------|
+| NAS zawiesza się przy skanie | Zostaw safe mode; użyj **mniejszego CIDR** (`192.168.1.0/28` zamiast `/24`) w `NETDASH_SCAN_CIDR` lub Ustawienia → Skanowanie |
+| Skan za wolny, ale host mocny | `NETDASH_SCAN_SAFE_MODE=false` w `.env` / compose + restart |
+| Pełny skan portów | Tylko na mocnym sprzęcie; w UI wymaga potwierdzenia (profil **Agresywny**) |
+| Health check obciąża host | Ustawienia → zwiększ interwał health check (np. 120 s) lub wyłącz |
+
+Przykład `.env` na słabym QNAP / RPi:
+
+```env
+NETDASH_SCAN_SAFE_MODE=true
+NETDASH_SCAN_CIDR=192.168.1.0/28
+```
+
+Sprawdź profil: `curl -s http://127.0.0.1:18787/api/health` → `scan_safe_mode`, `resource_profile`.
+
+Szczegóły QNAP: **[deploy/qnap/README.md](deploy/qnap/README.md)** · **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
 ## Deployment profiles
 
 | Profile | How to run | URL |

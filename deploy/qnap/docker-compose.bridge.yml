@@ -20,7 +20,7 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.93
+    image: ghcr.io/lobrzut/netdash:1.3.94
 
     container_name: netdash
 

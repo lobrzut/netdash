@@ -9,6 +9,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import Service
 from app.scanner import HTTP_TITLE_RE, _is_generic_title, get_local_ip, is_http_error_name
 from app.url_utils import sanitize_service_url
@@ -106,7 +107,7 @@ async def check_all_services(db: AsyncSession) -> int:
     if not services:
         return 0
 
-    sem = asyncio.Semaphore(10)
+    sem = asyncio.Semaphore(settings.health_check_concurrency)
 
     async def check_one(svc: Service):
         async with sem:

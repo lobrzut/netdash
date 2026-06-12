@@ -22,7 +22,7 @@
 
 # Po starcie sprawdź logi: PIERWSZE linie MUSZĄ zawierać LISTEN_PORT=18787 i "NetDash entrypoint".
 
-# Jeśli widzisz 8787 lub brak entrypoint → usuń aplikację CS, Pull ghcr.io/lobrzut/netdash:1.3.93, import od nowa.
+# Jeśli widzisz 8787 lub brak entrypoint → usuń aplikację CS, Pull ghcr.io/lobrzut/netdash:1.3.94, import od nowa.
 
 
 
@@ -30,7 +30,7 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.93
+    image: ghcr.io/lobrzut/netdash:1.3.94
 
     container_name: netdash
 

@@ -453,18 +453,25 @@ async def _health_check_loop():
         await asyncio.sleep(interval)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global health_task
-    await init_db()
+async def _deferred_startup_health_check():
+    """Defer first health pass on weak hosts so container boot stays responsive."""
+    delay = 30 if settings.scan_safe_mode else 5
+    await asyncio.sleep(delay)
     try:
         async with async_session() as db:
             settings_row = await _get_or_create_settings(db)
             if settings_row.health_check_enabled:
                 count = await check_all_services(db)
-                logger.info("Startup health check completed for %s services", count)
+                logger.info("Startup health check completed for %s services (after %ss)", count, delay)
     except Exception:
         logger.exception("Startup health check failed")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global health_task
+    await init_db()
+    asyncio.create_task(_deferred_startup_health_check())
     health_task = asyncio.create_task(_health_check_loop())
     yield
     if health_task:
@@ -516,6 +523,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "secret_key_configured": settings.secret_key_configured,
         "secret_key_stable": settings.secret_key_stable,
         "scan_safe_mode": settings.scan_safe_mode,
+        "resource_profile": settings.resource_profile,
     }
 
 
@@ -628,6 +636,7 @@ async def network_info(_: User = Depends(get_current_user)):
             scan_cidr_configured=True,
             ping_available=True,
             scan_safe_mode=settings.scan_safe_mode,
+            resource_profile=settings.resource_profile,
         )
     ping_ok = await icmp_ping_available()
     return NetworkInfo(
@@ -637,6 +646,7 @@ async def network_info(_: User = Depends(get_current_user)):
         scan_cidr_configured=bool(settings.scan_cidr),
         ping_available=ping_ok,
         scan_safe_mode=settings.scan_safe_mode,
+        resource_profile=settings.resource_profile,
     )
 
 

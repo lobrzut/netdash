@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.94
+
+- **Słaby sprzęt (domyślnie)**: `NETDASH_SCAN_SAFE_MODE=true` w kodzie i we wszystkich compose — nie tylko QNAP. `mem_limit: 512m`, `cpus: 1.0` w docker-simple, root compose, Dockge, dev.
+- **Health**: `/api/health` zwraca `resource_profile` (`safe` / `normal`); mniejsza równoległość health checków w safe mode; opóźniony pierwszy health check przy starcie (30 s).
+- **UI**: Ustawienia → Skanowanie — profil (Bezpieczny / Normalny / Agresywny), ostrzeżenia; pełny skan wymaga potwierdzenia.
+- **Dokumentacja**: README i DEPLOYMENT — sekcja „Słaby sprzęt” (CIDR /28, env vars).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.94`.
+
 ## v1.3.93
 
 - **Fix krytyczny QNAP (crash NAS przy skanie)**: `NETDASH_SCAN_SAFE_MODE=true` domyślnie w compose QNAP — niska równoległość (8), krótka lista portów, opóźnienia między partiami, limit hostów (64), twardy timeout (300 s). Pełny skan zablokowany w safe mode.
