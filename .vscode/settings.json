@@ -1,6 +1,6 @@
 {
   "yaml.validate": true,
   "yaml.schemas": {
-    "deploy/qnap/qnap-compose.schema.json": "deploy/qnap/*.yml"
+    "https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/qnap-compose.schema.json": "deploy/qnap/*.yml"
   }
 }

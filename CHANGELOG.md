@@ -2,7 +2,7 @@
 
 ## v1.3.102
 
-- **Compose (QNAP)**: własny schemat IDE `deploy/qnap/qnap-compose.schema.json` (Compose 2.4: `mem_limit`, `cpus`, `cpu_quota`/`cpu_period` bez ostrzeżeń yaml-language-server). Schemastore `docker-compose.json` celuje w v3+ i nie zna `mem_limit` na poziomie serwisu.
+- **Compose (QNAP)**: własny schemat IDE `deploy/qnap/qnap-compose.schema.json` (Compose 2.4: `mem_limit` bez ostrzeżeń yaml-language-server). Modeline + `.vscode/settings.json` używają **URL GitHub** (nie `./` ani ścieżki względem repo) — inaczej przy workspace `brain-client` yaml-language-server nie znajduje schematu i wraca do schemastore `docker-compose.json` (v3+, bez `mem_limit`).
 - **Obraz**: `ghcr.io/lobrzut/netdash:1.3.102`.
 
 ## v1.3.101

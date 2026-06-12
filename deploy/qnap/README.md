@@ -146,6 +146,16 @@ Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesi
 
 **Od v1.3.94+** safe mode i limity zasobów są domyślne **w całym projekcie NetDash** (każdy deploy, nie tylko QNAP): `NETDASH_SCAN_SAFE_MODE=true`, `mem_limit: 512m`. Na słabym sprzęcie użyj węższego CIDR (`/28`). Opcjonalny limit CPU: Container Station → edycja kontenera `netdash` → **Resource** → **CPU limit** (compose QNAP nie ustawia twardego limitu CPU — unikamy ostrzeżeń IDE).
 
+### Żółty trójkąt na `mem_limit` w Cursor / VS Code
+
+To **kosmetyka IDE**, nie błąd deployu na QNAP. `mem_limit` (Compose 2.4) jest poprawny i Container Station go stosuje.
+
+Yaml-language-server domyślnie ładuje schemat z [Schema Store](https://www.schemastore.org) (`docker-compose.json`, Compose v3+), który **nie zna** `mem_limit` na poziomie serwisu → żółte „additional property”.
+
+**Fix (v1.3.102+):** pierwsza linia compose ma modeline z **pełnym URL** schematu NetDash na GitHubie. Działa gdy plik otwierasz z `C:\opt\netdash`, z innego workspace (np. `brain-client`) lub po imporcie URL — nie wymaga lokalnego `qnap-compose.schema.json` obok pliku.
+
+Po aktualizacji modeline: zamknij i otwórz plik albo **Developer: Reload Window**. QNAP Container Station (web UI) nie używa yaml-language-server — tam tego ostrzeżenia nie ma.
+
 | Parametr (safe mode) | Wartość |
 |----------------------|---------|
 | Równoległość | 8 połączeń |
