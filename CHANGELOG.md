@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.105
+
+- **Fix krytyczny — modal „Kontynuuj skan”**: kliknięcie potwierdzenia wywoływało `closeModal` przed `pendingScanStart(true)`, więc skan był anulowany i **POST /api/scan nigdy nie szedł** (regresja z v1.3.104 po zamianie `confirm()` na modal).
+- **Błędy skanu po polsku**: toast przy wygaśnięciu sesji (401), odrzuceniu przez serwer i utracie połączenia podczas pollingu postępu.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.105`.
+
 ## v1.3.104
 
 - **Skan sieci — wybór CIDR**: przycisk „Skanuj sieć” otwiera modal z listą wykrytych sieci (`/api/network` → `detected_cidrs`: /24, /28, NETDASH_SCAN_CIDR, ustawienia), podglądem wyboru i opcją „Własny wpis”.

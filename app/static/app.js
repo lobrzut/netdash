@@ -210,6 +210,15 @@ function showScanError(message) {
   showToast(message, 'error');
 }
 
+function formatScanStartError(err) {
+  const msg = err?.message || '';
+  if (msg === 'Unauthorized') return t('scan.error.sessionExpired');
+  if (msg.startsWith('HTTP ')) return t('scan.error.server', { status: msg.replace('HTTP ', '') });
+  const translated = translateApiDetail(msg);
+  if (translated) return translated;
+  return t('alert.scanStart');
+}
+
 function clearScanError() {
   const el = $('#scan-error');
   if (el) {
@@ -3535,7 +3544,7 @@ async function startScan(cidr, fullScan = false) {
   } catch (err) {
     $('#scan-bar')?.classList.add('hidden');
     setScanControlsDisabled(false);
-    showScanError(err.message || t('alert.scanStart'));
+    showScanError(formatScanStartError(err));
     return;
   }
 
@@ -3573,7 +3582,7 @@ async function startScan(cidr, fullScan = false) {
       clearInterval(scanPollInterval);
       $('#scan-bar')?.classList.add('hidden');
       setScanControlsDisabled(false);
-      showScanError(err?.message || t('scan.failed'));
+      showScanError(formatScanStartError(err) || t('scan.error.pollFailed'));
     }
   }, 1500);
 }
@@ -3619,20 +3628,16 @@ function bindScanUi() {
   $('#cidr-input')?.addEventListener('input', updateScanCidrPreview);
   $('#scan-confirm-cancel')?.addEventListener('click', () => {
     closeModal('scan-confirm-modal');
-    if (pendingScanStart) {
-      pendingScanStart(false);
-      pendingScanStart = null;
-    }
   });
   $('#scan-confirm-ok')?.addEventListener('click', () => {
     if ($('#scan-confirm-skip')?.checked) {
       localStorage.setItem(SCAN_CONFIRM_SKIP_KEY, '1');
     }
-    closeModal('scan-confirm-modal');
     if (pendingScanStart) {
       pendingScanStart(true);
       pendingScanStart = null;
     }
+    closeModal('scan-confirm-modal');
   });
   $('#scan-config-warning-dismiss')?.addEventListener('click', () => {
     localStorage.setItem(SCAN_SAFE_BANNER_DISMISS_KEY, '1');
