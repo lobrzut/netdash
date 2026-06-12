@@ -7,6 +7,8 @@
 
 **Homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer) — with automatic LAN service discovery.**
 
+**NetDash = port 18787** — własny port serwisu; unika kolizji z Readarr (8787) i typowymi portami homelab/Docker/QNAP.
+
 ## Szybki start (Docker, bez git)
 
 Na dowolnym **Linuxie z Dockerem** — trzy kroki:
