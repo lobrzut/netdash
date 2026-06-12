@@ -133,23 +133,17 @@ def effective_interval(profile: ProfileConfig) -> int:
 
 
 def format_status_line(tiers: dict[str, int], profile: str) -> str:
-    tcp_n = tiers.get("tcp", 0)
-    arp_mac = tiers.get("arp_mac_added", 0)
     services_n = tiers.get("services", 0)
-    parts = [f"tcp {tcp_n}"]
-    if tiers.get("arp_skipped"):
-        parts.append("arp wyłączony")
-    elif arp_mac:
-        parts.append(f"arp +{arp_mac} MAC")
-    else:
-        parts.append("arp 0 MAC")
-    if services_n:
-        parts.append(f"{services_n} usług")
-    chunk = tiers.get("chunk")
-    if chunk:
-        parts.append(f"chunk {chunk}")
-    parts.append(f"profil: {profile}")
-    return " → ".join(parts)
+    hosts_n = tiers.get("tcp", 0)
+    chunk_idx = tiers.get("chunk_index")
+    chunk_total = tiers.get("chunk_total")
+
+    if chunk_total and chunk_total > 1 and chunk_idx:
+        return (
+            f"Skan TCP: chunk {chunk_idx}/{chunk_total}, "
+            f"znaleziono {services_n} serwisów ({hosts_n} hostów, profil: {profile})"
+        )
+    return f"Skan TCP: {hosts_n} hostów, {services_n} serwisów (profil: {profile})"
 
 
 def _select_cycle_cidr(cidr: str, profile: ProfileConfig) -> str:
@@ -359,7 +353,8 @@ async def run_discovery_cycle() -> int:
         _state["cidr"] = cycle_cidrs[0] if len(cycle_cidrs) == 1 else ", ".join(cycle_cidrs)
 
         if _state.get("chunk_total", 0) > 1:
-            tiers["chunk"] = _state.get("chunk_index", 0)
+            tiers["chunk_index"] = _state.get("chunk_index", 0)
+            tiers["chunk_total"] = _state.get("chunk_total", 0)
 
         tcp_ips: set[str] = set()
         merged_map: dict[str, DiscoveryHostEntry] = {}

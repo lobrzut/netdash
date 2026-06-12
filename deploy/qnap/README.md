@@ -46,6 +46,28 @@ Dane w `/share/Container/netdash/data` zostają (hasło, serwisy, ustawienia CID
 
 ---
 
+## Architektura discovery: QNAP vs serwer Docker
+
+NetDash **automatycznie wykrywa wszystkie serwisy** na LAN (TCP + identyfikacja HTTP) — bez ręcznego „Dodaj serwis”. Jeden produkt, dwa profile wydajności:
+
+| | **weak (QNAP .150)** | **strong (serwer .201)** |
+|---|---|---|
+| Wykrywanie | TCP-first, te same porty | TCP-first, pełny CIDR co cykl |
+| Zakres /24 | Rotacja **16 chunków /28** (~5 min/cykl → pełna sieć ~80 min) | Cały CIDR **co 2 min** |
+| Równoległość | 8 IP, 4 porty | 32 IP, 16 portów |
+| Wynik końcowy | **Ten sam** — wszystkie serwisy | **Ten sam**, szybciej |
+| Dlaczego wolniej? | QNAP: mało RAM, kernel pada przy floodzie TCP na /24 | Docker na serwerze: więcej CPU/RAM |
+
+**Profil `auto`:** `NETDASH_SCAN_SAFE_MODE=true` lub mało RAM → `weak`; serwer z 4+ CPU → `strong`.
+
+**CIDR to jedyna konfiguracja sieci** — Ustawienia → Skanowanie (działa na `10.0.0.0/24`, `192.168.88.0/24` itd.).
+
+Przykłady auto-wykrywania: Proxmox `:8006`, QNAP `:8080`, NetDash `:18787`, SSH `:22`, HTTP `:80`/`:443`.
+
+Pasek statusu: *„Skan TCP: chunk 3/16, znaleziono 12 serwisów"*.
+
+---
+
 ## Szczegóły techniczne
 
 > Poniżej: troubleshooting, bridge mode, agent zdalny, historia wersji.

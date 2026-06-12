@@ -771,6 +771,10 @@ async def network_info(
         discovery_status_line=(auto_status or {}).get("last_status_line"),
         discovery_current_tier=(auto_status or {}).get("current_tier"),
         discovery_interval_sec=(auto_status or {}).get("interval_sec"),
+        discovery_chunk_index=(adaptive or {}).get("chunk_index"),
+        discovery_chunk_total=(adaptive or {}).get("chunk_total"),
+        discovery_services_found=((adaptive or {}).get("last_tiers") or {}).get("services"),
+        discovery_method=(adaptive or {}).get("discovery_method"),
         arp_interval_sec=settings.arp_interval if settings.arp_discovery_enabled else None,
         arp_last_cycle_at=(auto_status or {}).get("last_cycle_at"),
         arp_last_cycle_hosts=(auto_status or {}).get("last_cycle_hosts"),
@@ -793,15 +797,15 @@ async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
         disc = get_discovery_pipeline_status()
         line = disc.get("last_status_line")
         if line:
-            hints.append(f"Discovery adaptacyjne — {line}. Pełny skan TCP tylko w Opcje skanu.")
+            hints.append(f"Discovery TCP-first — {line}")
         elif disc.get("current_tier"):
             hints.append(
-                f"Discovery adaptacyjne — cykl w toku (tier: {disc.get('current_tier')}, profil: {disc.get('profile')})."
+                f"Skan TCP w toku (tier: {disc.get('current_tier')}, profil: {disc.get('profile')})."
             )
         else:
             hints.append(
-                "Discovery adaptacyjne — pierwszy cykl w toku (ping → ARP → lekki skan portów). "
-                "Wymaga network_mode: host i cap_add: NET_RAW."
+                "Discovery TCP-first — pierwszy cykl w toku. Ustaw CIDR w Ustawienia → Skanowanie. "
+                "Wymaga network_mode: host."
             )
     elif settings.arp_discovery_enabled:
         arp = get_arp_discovery_status()

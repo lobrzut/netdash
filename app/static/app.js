@@ -1103,15 +1103,15 @@ function formatDiscoveryStatusLine(netRes, settings) {
   if (isAdaptiveDiscovery(netRes)) {
     const net = resolveNetwork(netRes);
     if (net.discovery_status_line) {
-      return `Discovery: ${net.discovery_status_line}`;
+      return net.discovery_status_line;
     }
     if (net.discovery_current_tier) {
-      return t('discovery.adaptiveRunning', {
+      return t('discovery.tcpRunning', {
         tier: net.discovery_current_tier,
         profile: net.discovery_profile || 'auto',
       });
     }
-    return t('discovery.adaptiveWaiting');
+    return t('discovery.tcpWaiting');
   }
   if (isArpDiscovery(netRes)) {
     const { when, hosts } = getArpDiscoveryMeta(netRes);

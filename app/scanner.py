@@ -26,7 +26,7 @@ WEB_PORTS = [
 SAFE_WEB_PORTS = [80, 443, 8080, 5000, 18787]
 
 # Primary TCP discovery ports — Tier 1 adaptive discovery (any open = host live).
-TCP_DISCOVERY_PRIMARY_PORTS = [22, 80, 443, 8006, 8080, 3000, 5000, 8000, 8443, 9000]
+TCP_DISCOVERY_PRIMARY_PORTS = [22, 80, 443, 8006, 8080, 3000, 5000, 8000, 8443, 9000, 18787]
 
 # Optional bonus probe for NETDASH_ARP_EXTRA_HOSTS (not required for discovery).
 EXTRA_HOST_PROBE_PORTS = list(TCP_DISCOVERY_PRIMARY_PORTS)

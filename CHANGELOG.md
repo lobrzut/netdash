@@ -7,7 +7,8 @@
 - **ARP tylko jako enrichment** (MAC) — nie blokuje wykrywania hostów bez ping/ARP (np. Proxmox bez ICMP).
 - **Profil weak (QNAP)**: rotacja /28 co cykl (~16 chunków /24 = pełna sieć w ~80 min przy 5 min interwale); 8 równoległych TCP, max 16 hostów/chunk.
 - **Usunięto zależność od `NETDASH_ARP_EXTRA_HOSTS`** — opcjonalny bonus, nie wymagany.
-- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.125` + `:latest`.
+- **UI**: pasek statusu „Skan TCP: chunk 3/16, znaleziono 12 serwisów" + i18n TCP-first.
+- **Architektura**: README QNAP — weak (chunk /28) vs strong (pełny /24 na serwerze Docker).
 
 ## v1.3.124
 
