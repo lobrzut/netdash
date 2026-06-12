@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.106
+
+- **Fix sesji F5 (QNAP) — root cause**: serwer brał **pierwsze** cookie nawet gdy było nieważne, ignorując poprawny Bearer z `localStorage`; `get_current_user` próbuje teraz Bearer → cookie → legacy, aż znajdzie ważny JWT.
+- **Boot**: `restoreSession()` od razu wysyła Bearer z `localStorage` (razem z cookie), nie czyści tokena przy timeout/5xx — tylko przy 401; ponowienie po timeout.
+- **Skan — jeden modal naraz**: modal CIDR zamyka się przed potwierdzeniem; anulowanie confirm wraca do wyboru CIDR (koniec „kręcenia” między oknami).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.106`.
+
 ## v1.3.105
 
 - **Fix krytyczny — modal „Kontynuuj skan”**: kliknięcie potwierdzenia wywoływało `closeModal` przed `pendingScanStart(true)`, więc skan był anulowany i **POST /api/scan nigdy nie szedł** (regresja z v1.3.104 po zamianie `confirm()` na modal).

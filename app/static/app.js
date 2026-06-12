@@ -171,6 +171,7 @@ function showView(id) {
 
 async function logout() {
   token = null;
+  sessionEstablished = false;
   localStorage.removeItem('netdash_token');
   try {
     await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' });
@@ -957,6 +958,7 @@ function confirmScanStart(netRes, cidrLabel) {
     }
     const skipEl = $('#scan-confirm-skip');
     if (skipEl) skipEl.checked = false;
+    closeModal('scan-modal');
     openModal('scan-confirm-modal');
   });
 }
@@ -3524,7 +3526,10 @@ async function startScan(cidr, fullScan = false) {
   const resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   const networkLabel = resolvedCidr || t('scan.localNetwork');
   const confirmed = await confirmScanStart(netRes, networkLabel);
-  if (!confirmed) return;
+  if (!confirmed) {
+    openScanModal();
+    return;
+  }
   if (netRes?.scan_safe_mode && fullScan) {
     fullScan = false;
     showToast(t('scan.safeModeFullScanDisabled'), 'info');
@@ -4772,36 +4777,51 @@ async function fetchAuthMe(extraHeaders = {}) {
   );
 }
 
+function applyAuthMeResponse(data) {
+  if (data?.access_token) {
+    token = data.access_token;
+    localStorage.setItem('netdash_token', token);
+  }
+  sessionEstablished = true;
+}
+
 async function restoreSession() {
+  const stored = localStorage.getItem('netdash_token');
+  const bearerHeaders = stored ? { Authorization: `Bearer ${stored}` } : {};
+
+  const finish = async (res) => {
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => ({}));
+    applyAuthMeResponse(data);
+    return true;
+  };
+
   try {
-    let res = await fetchAuthMe();
+    const res = await fetchAuthMe(bearerHeaders);
     if (res.status === 401) {
-      const stored = localStorage.getItem('netdash_token');
-      if (stored) {
-        console.info('[NetDash] Brak cookie — próba sesji z Bearer (localStorage)');
-        res = await fetchAuthMe({ Authorization: `Bearer ${stored}` });
-      }
-    }
-    if (!res.ok) {
-      if (res.status === 401) {
-        console.info('[NetDash] Brak aktywnej sesji (401) — pokazuję logowanie');
-      } else {
-        console.warn('[NetDash] /api/auth/me HTTP', res.status);
-      }
+      console.info('[NetDash] Brak aktywnej sesji (401) — pokazuję logowanie');
       clearStoredSession();
       return false;
     }
-    const data = await res.json().catch(() => ({}));
-    if (data.access_token) {
-      token = data.access_token;
-      localStorage.setItem('netdash_token', token);
+    if (!res.ok) {
+      console.warn('[NetDash] /api/auth/me HTTP', res.status);
+      return false;
     }
-    sessionEstablished = true;
-    return true;
+    return finish(res);
   } catch (err) {
     const reason = err?.name === 'AbortError' ? 'timeout (5s)' : (err?.message || 'unknown');
     console.warn('[NetDash] /api/auth/me failed:', reason);
-    clearStoredSession();
+    if (stored) {
+      try {
+        const retry = await fetchAuthMe(bearerHeaders);
+        if (retry.ok) {
+          console.info('[NetDash] Sesja przywrócona po ponowieniu /api/auth/me');
+          return finish(retry);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     return false;
   }
 }

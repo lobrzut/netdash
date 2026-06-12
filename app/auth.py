@@ -89,6 +89,21 @@ def _extract_bearer_token(request: Request) -> str | None:
     return None
 
 
+def _candidate_auth_tokens(
+    request: Request,
+    session_token: str | None,
+    legacy_token: str | None,
+) -> list[str]:
+    """Bearer first — stale HttpOnly cookie must not block valid localStorage token (QNAP F5)."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in (_extract_bearer_token(request), session_token, legacy_token):
+        if raw and raw not in seen:
+            seen.add(raw)
+            out.append(raw)
+    return out
+
+
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -100,28 +115,27 @@ async def get_current_user(
         detail="Nieprawidłowe dane logowania",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    token = session_token or legacy_token or _extract_bearer_token(request)
-    if not token:
+    candidates = _candidate_auth_tokens(request, session_token, legacy_token)
+    if not candidates:
         if request.url.path == "/api/auth/me":
             client = request.client.host if request.client else "?"
             logger.info("GET /api/auth/me: brak cookie sesji (client=%s)", client)
         raise credentials_error
-    try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        username: str | None = payload.get("sub")
-        if username is None:
-            if request.url.path == "/api/auth/me":
-                logger.info("GET /api/auth/me: token bez subject")
-            raise credentials_error
-    except JWTError:
-        if request.url.path == "/api/auth/me":
-            logger.info("GET /api/auth/me: nieprawidłowy lub wygasły token")
-        raise credentials_error
 
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
-    if user is None:
-        if request.url.path == "/api/auth/me":
-            logger.info("GET /api/auth/me: użytkownik %s nie istnieje", username)
-        raise credentials_error
-    return user
+    for token in candidates:
+        try:
+            payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+            username: str | None = payload.get("sub")
+            if username is None:
+                continue
+        except JWTError:
+            continue
+
+        result = await db.execute(select(User).where(User.username == username))
+        user = result.scalar_one_or_none()
+        if user is not None:
+            return user
+
+    if request.url.path == "/api/auth/me":
+        logger.info("GET /api/auth/me: nieprawidłowy lub wygasły token")
+    raise credentials_error

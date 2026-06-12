@@ -404,9 +404,15 @@ python scripts/reset-admin-password.py --db /share/Container/netdash/data/netdas
 
 ### Po odświeżeniu strony (F5) trzeba logować się od nowa
 
-**Naprawa od v1.3.90:**
+**Naprawa od v1.3.106:**
 
-- Przy starcie strony: **„Ładowanie sesji…”** → `GET /api/auth/me` z cookie (bez starego tokena z localStorage).
+- Przy starcie: **„Ładowanie sesji…”** → `GET /api/auth/me` z cookie **i** Bearer z `localStorage` (serwer akceptuje Bearer nawet gdy cookie jest przestarzałe).
+- W logach kontenera po F5: `GET /api/auth/me OK user=… cookie=… bearer=…`.
+- Timeout sieci **nie** kasuje tokena z `localStorage` — tylko jawne 401.
+
+**Wcześniej (v1.3.90–105):**
+
+- Przy starcie strony: **„Ładowanie sesji…”** → `GET /api/auth/me` z cookie; nieważne cookie blokowało Bearer z localStorage.
 - Przy logowaniu w logach kontenera: `Session cookie set for user admin`.
 - `NETDASH_SYNC_ADMIN_PASSWORD=false` w compose — restart **nie** resetuje hasła do `changeme`.
 
