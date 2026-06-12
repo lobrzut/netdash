@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.128
+
+- **Audyt release (2026-06-13)**: pełny przegląd v1.3.124–v1.3.127 — `discovery_pipeline.py`, `main.py`, UI skanu (`app.js`), spójność wersji, `compose.full.yml` (`:latest`, Watchtower 3600 s), CI `:latest`, 24/24 testów, `node --check app.js`, importy OK.
+- **Docs**: odświeżono badge wersji w `README.md` i `DEPLOYMENT.md` (było `1.3.76`).
+- **Watchtower**: po push tagu `v1.3.128` GHCR `:latest` aktualizuje się w CI; QNAP z `compose.full` (`WATCHTOWER_POLL_INTERVAL=3600`) — auto-restart NetDash w ciągu ~1 h.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.128`.
+
 ## v1.3.127
 
 - **UX — ukryj niedostępne opcje skanu**: w trybie adaptive (QNAP) ukryte przyciski „Skanuj sieć" i „Opcje skanu…"; pasek statusu discovery + link do Ustawienia → Skanowanie (CIDR).
