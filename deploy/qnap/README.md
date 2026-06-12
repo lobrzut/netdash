@@ -142,7 +142,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 ### Skan wywalił cały QNAP (OOM / sieć — potwierdzone)
 
-Skan `/24` może **zawiesić cały NAS** nawet z `mem_limit: 768m` na kontenerze — limit RAM chroni kontener Docker, **nie** kernel sieciowy QNAP (TCP/ARP/ping flood, CPU, I/O).
+Skan `/24` może **zawiesić cały NAS** — limit RAM kontenera (ustawiany w UI) chroni kontener Docker, **nie** kernel sieciowy QNAP (TCP/ARP/ping flood, CPU, I/O).
 
 **Od v1.3.111** skan `/24` jest **zablokowany** przy `NETDASH_SCAN_SAFE_MODE=true`. Domyślne CIDR: `192.168.1.144/28`. One-click „Skanuj sieć” wymaga potwierdzenia.
 
@@ -167,9 +167,11 @@ Szczegóły: [`deploy/agent/README.md`](../../deploy/agent/README.md).
 
 ### Limit RAM + CPU na QNAP
 
+Limity **nie są w compose YAML** (fałszywe ostrzeżenia IDE; Container Station może i tak ignorować te klucze). Ustaw ręcznie po deploy:
+
 1. **Container Station** → `netdash` → **Resource**
-2. **Memory limit** → **512 MB** (v1.3.111 compose) — mniejszy limit = wcześniejsze ubicie kontenera zamiast NAS
-3. **CPU limit** → **50%** (`cpus: 0.5` w compose)
+2. **Memory limit** → **512 MB**
+3. **CPU limit** → **50%**
 4. `NETDASH_SCAN_CIDR` → **/28** (np. `192.168.1.144/28` dla NAS `.150`)
 
 | Parametr (safe mode v1.3.111) | Wartość |

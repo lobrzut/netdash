@@ -4,7 +4,13 @@
 
 #
 
-# !!! /24 skan = ryzyko crash całego QNAP. Używaj /28. mem_limit + cpus poniżej.
+# !!! /24 skan = ryzyko crash całego QNAP. Używaj /28.
+
+#
+
+# Limity RAM/CPU — NIE w YAML (ostrzeżenia IDE; Container Station może ignorować klucze).
+
+# Po deploy: Container Station → netdash → Resource → Memory 512 MB, CPU 50%.
 
 
 
@@ -12,17 +18,11 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.112
+    image: ghcr.io/lobrzut/netdash:1.3.113
 
     container_name: netdash
 
     restart: always
-
-    mem_limit: 512m
-
-    memswap_limit: 512m
-
-    cpus: 0.5
 
     ports:
 

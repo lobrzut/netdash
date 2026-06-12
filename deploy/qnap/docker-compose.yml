@@ -6,9 +6,15 @@
 
 # !!! KRYTYCZNE — QNAP OOM / crash całego NAS !!!
 
-# Limit RAM kontenera (768 MB) NIE chroni hosta przed przeciążeniem sieci/CPU.
+# Limit RAM kontenera NIE chroni hosta przed przeciążeniem sieci/CPU.
 
-# Skan /24 może zawiesić CAŁY QNAP nawet z mem_limit. Używaj TYLKO /28 w NETDASH_SCAN_CIDR.
+# Skan /24 może zawiesić CAŁY QNAP. Używaj TYLKO /28 w NETDASH_SCAN_CIDR.
+
+#
+
+# Limity RAM/CPU — NIE w YAML (ostrzeżenia IDE; Container Station może ignorować klucze).
+
+# Po deploy: Container Station → netdash → Resource → Memory 512 MB, CPU 50%.
 
 #
 
@@ -20,17 +26,11 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.112
+    image: ghcr.io/lobrzut/netdash:1.3.113
 
     container_name: netdash
 
     restart: always
-
-    mem_limit: 512m
-
-    memswap_limit: 512m
-
-    cpus: 0.5
 
     ports:
 

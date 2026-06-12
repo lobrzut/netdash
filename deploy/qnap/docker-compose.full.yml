@@ -6,7 +6,13 @@
 
 # !!! KRYTYCZNE: skan /24 bez /28 + ultra-safe mode może zabić CAŁY QNAP (nie tylko kontener).
 
-# mem_limit chroni kontener, NIE kernel sieciowy NAS. Domyślnie /28 + NETDASH_SCAN_SAFE_MODE=true.
+# Limit RAM kontenera NIE chroni kernel sieciowy NAS. Domyślnie /28 + NETDASH_SCAN_SAFE_MODE=true.
+
+#
+
+# Limity RAM/CPU — NIE w YAML (ostrzeżenia IDE; Container Station może ignorować klucze).
+
+# Po deploy: Container Station → netdash → Resource → Memory 512 MB, CPU 50%.
 
 
 
@@ -14,17 +20,11 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.112
+    image: ghcr.io/lobrzut/netdash:1.3.113
 
     container_name: netdash
 
     restart: always
-
-    mem_limit: 512m
-
-    memswap_limit: 512m
-
-    cpus: 0.5
 
     ports:
 

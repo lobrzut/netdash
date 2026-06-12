@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.113
+
+- **Compose QNAP**: usunięto `mem_limit`, `memswap_limit`, `cpus` ze wszystkich plików — limity RAM/CPU ustaw ręcznie w Container Station → Resource (512 MB, 50% CPU). Brak fałszywych ostrzeżeń IDE.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.113`.
+
 ## v1.3.112
 
 - **Remote discovery agent (NetAlertX SYNC pattern)**: `POST /api/discovery/import` — merge hostów z agenta (IP/MAC/hostname, opcjonalne porty, mark offline).
