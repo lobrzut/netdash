@@ -50,7 +50,8 @@ docker compose up -d
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '127.0.0.1')"
 echo ""
-echo "✓ NetDash działa → http://${IP}:8787"
+PORT="${NETDASH_PORT:-18787}"
+echo "✓ NetDash działa → http://${IP}:${PORT}"
 echo "  Login: admin + hasło z .env"
 echo "  Dane:  ${INSTALL_DIR}/data"
 echo ""

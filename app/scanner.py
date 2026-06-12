@@ -16,7 +16,7 @@ from app.url_utils import ensure_str, sanitize_service_url
 
 WEB_PORTS = [
     80, 81, 443, 3000, 4000, 4200, 4443, 5000, 5001, 8000, 8008,
-    8080, 8081, 8443, 8888, 9000, 9090, 9443, 6443, 8787,
+    8080, 8081, 8443, 8888, 9000, 9090, 9443, 6443, 8787, 18787,
 ]
 
 # Desktop / OS-revealing ports scanned in default mode (alongside WEB_PORTS).
@@ -32,7 +32,7 @@ OS_PORT_HINTS: dict[int, str] = {
 }
 
 HTTPS_PORTS = {443, 8443, 9443, 6443, 4443}
-HTTP_FIRST_PORTS = {80, 81, 8080, 8081, 8000, 8008, 3000, 5000, 5001, 8888, 9000, 9090, 8787, 4000, 4200}
+HTTP_FIRST_PORTS = {80, 81, 8080, 8081, 8000, 8008, 3000, 5000, 5001, 8888, 9000, 9090, 8787, 18787, 4000, 4200}
 
 TLS_MISMATCH_RE = re.compile(
     r"plain HTTP request was sent to HTTPS|"
@@ -62,7 +62,7 @@ COMMON_PORTS = [
     465, 587, 993, 995, 1433, 1521, 1883, 2049, 3000, 3306, 3389,
     4000, 4200, 4443, 5000, 5001, 5432, 5672, 5900, 6379, 6443,
     8000, 8008, 8080, 8081, 8443, 8888, 9000, 9090, 9200, 9443,
-    10000, 27017, 8787,
+    10000, 27017, 8787, 18787,
 ]
 
 NOISE_PORTS = {135, 139, 445, 110, 143, 993, 995, 587, 465, 25, 23}
@@ -92,7 +92,8 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     9090: ("Prometheus", "chart", "Monitoring"),
     9200: ("Elasticsearch", "search", "Baza danych"),
     27017: ("MongoDB", "database", "Baza danych"),
-    8787: ("NetDash", "dashboard", "Dashboard"),
+    8787: ("NetDash (legacy)", "dashboard", "Dashboard"),
+    18787: ("NetDash", "dashboard", "Dashboard"),
 }
 
 HTTP_TITLE_RE = re.compile(r"<title[^>]*>([^<]+)</title>", re.IGNORECASE)

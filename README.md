@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.72-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.73-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -15,7 +15,9 @@ Na dowolnym **Linuxie z Dockerem** — trzy kroki:
 curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh | bash
 ```
 
-Otwórz **http://&lt;IP-serwera&gt;:8787** → login `admin` + hasło podane przy instalacji.
+Otwórz **http://&lt;IP-serwera&gt;:18787** → login `admin` + hasło podane przy instalacji.
+
+> **Port:** domyślnie **18787** (unika kolizji z Readarr **8787**). Zmiana: `NETDASH_PORT` w `.env`. Stare instalacje na 8787: ustaw `NETDASH_PORT=8787` do migracji.
 
 | Gdzie | Instrukcja |
 |-------|------------|
@@ -37,7 +39,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 |----------|-------|
 | ![Settings — sidebar and general options](docs/screenshots/settings.png) | ![Login — JWT authentication](docs/screenshots/login.png) |
 
-> **Screenshots use demo data only** (`*.demo.local`, `10.0.0.x`, masked keys like `sk-demo-…`). Regenerate: `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py` (requires Playwright + running app on port 8787).
+> **Screenshots use demo data only** (`*.demo.local`, `10.0.0.x`, masked keys like `sk-demo-…`). Regenerate: `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py` (requires Playwright + running app on port 18787).
 
 ## Why NetDash?
 
@@ -94,7 +96,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open **http://localhost:8787** (or `http://<server-ip>:8787` on your LAN).
+Open **http://localhost:18787** (or `http://<server-ip>:18787` on your LAN).
 
 Default login: values from `.env` → `NETDASH_DEFAULT_ADMIN_USER` / `NETDASH_DEFAULT_ADMIN_PASSWORD`.  
 **Change the password** after first login (Settings → Password).
@@ -154,8 +156,8 @@ Windows shortcut: `.\start.ps1` · Linux: `./start.sh`
 
 | Profile | How to run | URL |
 |---------|------------|-----|
-| **Local / dev** | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
-| **Server / Docker** | `docker compose up -d` (Linux, `network_mode: host`) | http://&lt;server-ip&gt;:8787 |
+| **Local / dev** | `python run.py`, `start.ps1`, `start.sh` | http://localhost:18787 |
+| **Server / Docker** | `docker compose up -d` (Linux, `network_mode: host`) | http://&lt;server-ip&gt;:18787 |
 
 Details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · prosty Docker: **[deploy/docker-simple/](deploy/docker-simple/)** · QNAP: **[deploy/qnap/](deploy/qnap/)** · SSH deploy: **[deploy/README.md](deploy/README.md)**
 

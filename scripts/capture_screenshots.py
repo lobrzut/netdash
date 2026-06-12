@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-BASE = os.environ.get("NETDASH_SCREENSHOT_URL", "http://127.0.0.1:8787")
+BASE = os.environ.get("NETDASH_SCREENSHOT_URL", "http://127.0.0.1:18787")
 OUT_DIR = ROOT / "docs" / "screenshots"
 
 

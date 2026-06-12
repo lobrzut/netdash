@@ -2,7 +2,7 @@
 
 Przewodnik dla **QNAP NAS** z **Container Station** (Linux Docker). Repozytorium: [lobrzut/netdash](https://github.com/lobrzut/netdash)
 
-Domyślny przykład serwera: `http://192.168.1.201:8787`
+Domyślny przykład serwera: `http://192.168.1.201:18787` (port `NETDASH_PORT`; unika kolizji z Readarr **8787**)
 
 ---
 
@@ -38,7 +38,7 @@ flowchart LR
 - Dostęp do internetu (pobieranie obrazu z `ghcr.io`)
 - Sieć LAN — NetDash skanuje sieć w trybie **`network_mode: host`** (jak na Linuxie)
 
-> **Uwaga:** `network_mode: host` na QNAP działa inaczej niż na czystym Linuxie — w wielu modelach kontener nasłuchuje na porcie hosta (8787). Jeśli skan LAN nie działa, ustaw w `.env`: `NETDASH_SCAN_CIDR=192.168.1.0/24`.
+> **Uwaga:** `network_mode: host` na QNAP działa inaczej niż na czystym Linuxie — w wielu modelach kontener nasłuchuje na porcie hosta (`NETDASH_PORT`, domyślnie 18787). Jeśli skan LAN nie działa, ustaw w `.env`: `NETDASH_SCAN_CIDR=192.168.1.0/24`.
 
 ---
 
@@ -99,10 +99,10 @@ Obraz: `ghcr.io/lobrzut/netdash:latest`
 ### 5. Weryfikacja
 
 ```bash
-curl -s http://127.0.0.1:8787/api/health
+curl -s http://127.0.0.1:18787/api/health
 ```
 
-W przeglądarce: `http://192.168.1.201:8787` → zaloguj się → **Ustawienia** → **O projekcie** → **Sprawdź aktualizacje**.
+W przeglądarce: `http://192.168.1.201:18787` → zaloguj się → **Ustawienia** → **O projekcie** → **Sprawdź aktualizacje**.
 
 ---
 

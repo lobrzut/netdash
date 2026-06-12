@@ -2,7 +2,7 @@
 # Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml
 #
 # Folder danych: /share/Container/netdash/data
-# Portal: http://<IP-QNAP>:8787
+# Portal: http://<IP-QNAP>:18787  (NETDASH_PORT; 8787 = Readarr conflict)
 #
 # Auto-update: patrz README.md (profil auto-update lub docker-compose.autoupdate.yml)
 
@@ -17,6 +17,7 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-}
+      NETDASH_PORT: ${NETDASH_PORT:-18787}
     volumes:
       - /share/Container/netdash/data:/app/data
     cap_add:
@@ -24,7 +25,7 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8787/api/health"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:$${NETDASH_PORT:-18787}/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

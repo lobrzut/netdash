@@ -5,7 +5,8 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.72"
+VERSION = "1.3.73"
+DEFAULT_PORT = 18787
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
 GHCR_IMAGE = "ghcr.io/lobrzut/netdash"
 
@@ -67,6 +68,8 @@ class Settings(BaseSettings):
     docker_image_tag: str = "latest"
     container_name: str = "netdash"
     docker_socket: str = "/var/run/docker.sock"
+    # Listen port (avoid 8787 — conflicts with Readarr in *arr homelabs)
+    port: int = DEFAULT_PORT
 
     class Config:
         env_prefix = "NETDASH_"

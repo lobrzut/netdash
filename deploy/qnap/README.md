@@ -2,7 +2,9 @@
 
 Obraz: `ghcr.io/lobrzut/netdash:latest` — pobierany z GitHub Container Registry. **Nie klonujesz repozytorium na NAS.**
 
-Portal po starcie: `http://<IP-QNAP>:8787` (np. `http://192.168.1.201:8787`)
+Portal po starcie: `http://<IP-QNAP>:18787` (np. `http://192.168.1.150:18787` na QNAP)
+
+> **Port 8787 = Readarr** — na wielu NAS (w tym QNAP) Readarr już zajmuje **8787**. NetDash od v1.3.73 domyślnie używa **18787** (`NETDASH_PORT`). **Nie ustawiaj `NETDASH_PORT=8787` na QNAP z Readarr.** Upgrade ze starego portu: zmień zakładkę na `:18787` i zrestartuj kontener.
 
 ---
 
@@ -43,6 +45,9 @@ W edycji aplikacji → **Environment** (lub w YAML przed utworzeniem) ustaw:
 | `NETDASH_SECRET_KEY` | losowy ciąg ≥32 znaków |
 | `NETDASH_DEFAULT_ADMIN_PASSWORD` | twoje hasło logowania |
 | `NETDASH_DEFAULT_ADMIN_USER` | `admin` (opcjonalnie) |
+| `NETDASH_PORT` | `18787` (domyślnie — **nie** 8787 jeśli masz Readarr) |
+| `NETDASH_SCAN_CIDR` | `192.168.1.0/24` (opcjonalnie, gdy skan LAN nie działa) |
+| `NETDASH_PORT` | `18787` (domyślnie; unika Readarr **8787**) |
 
 Wygeneruj klucz na PC:
 
@@ -56,7 +61,7 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 1. **Start** / **Deploy**
 2. Poczekaj na pobranie obrazu z GHCR (pierwszy raz ~1–2 min)
-3. Otwórz w przeglądarce: `http://<IP-QNAP>:8787`
+3. Otwórz w przeglądarce: `http://<IP-QNAP>:18787`
 4. Zaloguj się → **Ustawienia** → zmień hasło
 
 ### Krok 5 — skan sieci LAN (jeśli nie działa)

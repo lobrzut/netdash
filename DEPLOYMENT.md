@@ -1,6 +1,6 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.72**
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.73**
 
 ## Najprostsze ścieżki (bez git na serwerze)
 
@@ -18,8 +18,18 @@ Obraz: `ghcr.io/lobrzut/netdash:latest` (GHCR, bez budowania lokalnie).
 
 | Profile | Target | Start command | URL |
 |---------|--------|---------------|-----|
-| **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
-| **Server / Docker** | Linux homelab server | `deploy/docker-simple/install.sh` lub `docker compose up -d` | http://&lt;server-ip&gt;:8787 |
+| **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:18787 |
+| **Server / Docker** | Linux homelab server | `deploy/docker-simple/install.sh` lub `docker compose up -d` | http://&lt;server-ip&gt;:18787 |
+
+### Port (`NETDASH_PORT`)
+
+Domyślnie **18787** — poza typowymi portami homelab i **bez kolizji z Readarr (8787)**.
+
+| Sytuacja | Co zrobić |
+|----------|-----------|
+| Nowa instalacja | Nic — użyj `http://<host>:18787` |
+| Upgrade z wersji ≤1.3.72 (było 8787) | Dodaj `NETDASH_PORT=8787` w `.env` tymczasowo **lub** zmień zakładkę na `:18787` i zrestartuj kontener |
+| Własny port | `NETDASH_PORT=<port>` w `.env` + healthcheck w compose używa tej samej wartości |
 
 ---
 
@@ -47,10 +57,10 @@ nano .env
 # 4. Start
 docker compose up -d --build
 docker compose ps          # Status should be "healthy"
-curl -s http://127.0.0.1:8787/api/health
+curl -s http://127.0.0.1:18787/api/health
 
 # 5. Open in browser
-# http://<server-ip>:8787
+# http://<server-ip>:18787
 # Login: NETDASH_DEFAULT_ADMIN_USER / NETDASH_DEFAULT_ADMIN_PASSWORD
 # Then change password in Settings → Password
 ```
@@ -86,7 +96,7 @@ Auto-update (opcjonalnie): `docker compose --profile auto-update up -d` lub plik
    nano .env   # NETDASH_SECRET_KEY, NETDASH_DEFAULT_ADMIN_PASSWORD
    ```
 3. **Dockge UI** → ⋮ → **Scan Stacks Folder** → open stack **netdash** → **Deploy**
-4. Open **http://&lt;server-ip&gt;:8787** and change the default password after login.
+4. Open **http://&lt;server-ip&gt;:18787** and change the default password after login.
 
 Dockge auto-detects `docker-compose.yml` at the repo root. Optional Dockge filename: `cp dockge/compose.yaml compose.yaml`.
 
@@ -122,7 +132,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:8787/api/health          # {"ok":true,"version":"1.3.18",...}
+curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.73",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```
@@ -130,7 +140,7 @@ docker compose ps                                  # healthy
 Simulate auto-restart:
 
 ```bash
-docker stop netdash && sleep 35 && curl -s http://127.0.0.1:8787/api/health
+docker stop netdash && sleep 35 && curl -s http://127.0.0.1:18787/api/health
 # Container should return within ~30s (restart: always)
 ```
 
@@ -156,7 +166,7 @@ copy .env.example .env
 .\start.ps1
 ```
 
-→ http://localhost:8787 (LAN: http://&lt;your-pc-ip&gt;:8787)
+→ http://localhost:18787 (LAN: http://&lt;your-pc-ip&gt;:18787)
 
 ### Linux bare metal
 
@@ -184,7 +194,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-→ http://&lt;server-ip&gt;:8787
+→ http://&lt;server-ip&gt;:18787
 
 ### Network scan — Docker
 

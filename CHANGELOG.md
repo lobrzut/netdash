@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.73
+
+- **Domyślny port 18787** (`NETDASH_PORT`): unika kolizji z **Readarr (8787)** i typowymi portami homelab (80, 443, 3000, 5000, 8080, 8096, 8989…). Wszystkie compose, healthchecki i `run.py` respektują zmienną środowiskową.
+- **Migracja z 8787**: istniejące instalacje — dodaj `NETDASH_PORT=8787` w `.env` do czasu zmiany zakładki, albo usuń i przejdź na `http://<host>:18787`.
+- **Skaner LAN**: rozpoznaje NetDash na porcie 18787 (8787 oznaczony jako legacy).
+
 ## v1.3.72
 
 - **Auto-aktualizacja (QNAP / Docker)**: GitHub Actions publikuje obraz na `ghcr.io/lobrzut/netdash` przy tagu `v*`. Compose: `image` + opcjonalny profil **Watchtower** (`docker compose --profile auto-update up -d`). Etykieta `watchtower.enable` tylko na NetDash — brak auto-update bez świadomego włączenia.

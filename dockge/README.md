@@ -54,11 +54,11 @@ Both root `docker-compose.yml` and `dockge/compose.yaml` are equivalent; paths a
 ### 4. Verify
 
 ```bash
-curl -s http://127.0.0.1:8787/api/health
+curl -s http://127.0.0.1:18787/api/health
 docker compose -f /opt/stacks/netdash/docker-compose.yml ps
 ```
 
-Open **http://&lt;server-ip&gt;:8787** — login with `NETDASH_DEFAULT_ADMIN_USER` / `NETDASH_DEFAULT_ADMIN_PASSWORD`, then change the password in Settings.
+Open **http://&lt;server-ip&gt;:18787** — login with `NETDASH_DEFAULT_ADMIN_USER` / `NETDASH_DEFAULT_ADMIN_PASSWORD`, then change the password in Settings.
 
 ## Create stack from Dockge UI (paste compose)
 
@@ -84,7 +84,7 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 
 | Topic | Detail |
 |-------|--------|
-| **Host network** | Required for LAN scan. Container listens on host port **8787** directly — no `ports:` mapping. |
+| **Host network** | Required for LAN scan. Container listens on host port **18787** (`NETDASH_PORT`) directly — no `ports:` mapping. |
 | **ports + host** | Never combine `network_mode: host` with `ports:` — Docker will refuse to start. |
 | **Linux only** | `network_mode: host` on Docker Desktop (Windows/Mac) does not expose your LAN; use native `python run.py` or `docker-compose.dev.yml` with `NETDASH_SCAN_CIDR`. |
 | **Data** | Bind mount `./data:/app/data` — SQLite `./data/netdash.db`, uploaded icons/logos `./data/uploads/`. Back up `/opt/stacks/netdash/data/`. |

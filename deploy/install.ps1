@@ -57,8 +57,9 @@ docker compose up -d --remove-orphans
 echo "Waiting for health..."
 ok=0
 for i in $(seq 1 45); do
-  if curl -sf --max-time 5 http://127.0.0.1:8787/api/health >/dev/null 2>&1 || \
-     docker exec netdash curl -sf --max-time 5 http://127.0.0.1:8787/api/health >/dev/null 2>&1; then
+  PORT="\${NETDASH_PORT:-18787}"
+  if curl -sf --max-time 5 "http://127.0.0.1:\${PORT}/api/health" >/dev/null 2>&1 || \
+     docker exec netdash curl -sf --max-time 5 "http://127.0.0.1:\${PORT}/api/health" >/dev/null 2>&1; then
     ok=1
     break
   fi
@@ -70,7 +71,7 @@ if [ "$ok" != "1" ]; then
   exit 1
 fi
 docker compose ps
-curl -sf http://127.0.0.1:8787/api/health
+curl -sf "http://127.0.0.1:\${NETDASH_PORT:-18787}/api/health"
 if command -v systemctl >/dev/null 2>&1; then
   sudo cp deploy/netdash-watchdog.service deploy/netdash-watchdog.timer /etc/systemd/system/ 2>/dev/null || true
   sudo systemctl daemon-reload 2>/dev/null || true
@@ -88,4 +89,4 @@ fi
 }
 
 Write-Host "Deployed to ${Remote}:${RemoteDir}" -ForegroundColor Green
-Write-Host "Open: http://<server-ip>:8787 (or check remote health: curl http://127.0.0.1:8787/api/health)"
+Write-Host "Open: http://<server-ip>:18787 (or check remote health: curl http://127.0.0.1:18787/api/health)"

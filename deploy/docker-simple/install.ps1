@@ -42,5 +42,6 @@ Write-Host "-> Uruchamiam NetDash..." -ForegroundColor Cyan
 docker compose up -d
 
 Write-Host ""
-Write-Host "NetDash -> http://localhost:8787" -ForegroundColor Green
+$port = if ($env:NETDASH_PORT) { $env:NETDASH_PORT } else { "18787" }
+Write-Host "NetDash -> http://localhost:$port" -ForegroundColor Green
 Write-Host "Dane: $InstallDir\data"
