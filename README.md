@@ -1,11 +1,29 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.62-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.72-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
 
 **Homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer) — with automatic LAN service discovery.**
+
+## Szybki start (Docker, bez git)
+
+Na dowolnym **Linuxie z Dockerem** — trzy kroki:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh | bash
+```
+
+Otwórz **http://&lt;IP-serwera&gt;:8787** → login `admin` + hasło podane przy instalacji.
+
+| Gdzie | Instrukcja |
+|-------|------------|
+| **Linux (Docker)** | [`deploy/docker-simple/`](deploy/docker-simple/) — `install.sh`, compose z GHCR |
+| **QNAP NAS** | [`deploy/qnap/README.md`](deploy/qnap/README.md) — Container Station, import z URL |
+| **Pełny przewodnik** | [DEPLOYMENT.md](DEPLOYMENT.md) |
+
+Windows (Docker Desktop): `irm …/deploy/docker-simple/install.ps1 | iex` — patrz [deploy/docker-simple/](deploy/docker-simple/).
 
 ## Screenshots
 
@@ -100,14 +118,13 @@ Requires `network_mode: host` (Linux only) for LAN scan — see **[dockge/README
 
 ## Quick start
 
-### Docker (recommended)
+### Docker (recommended — no git)
 
 ```bash
-git clone https://github.com/lobrzut/netdash.git
-cd netdash
-cp .env.example .env
-docker compose up -d
+curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh | bash
 ```
+
+Lub ręcznie: [`deploy/docker-simple/docker-compose.yml`](deploy/docker-simple/docker-compose.yml) + [`.env.example`](deploy/docker-simple/.env.example) → `docker compose up -d`.
 
 ### Local Python dev (3.12+)
 
@@ -140,7 +157,7 @@ Windows shortcut: `.\start.ps1` · Linux: `./start.sh`
 | **Local / dev** | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
 | **Server / Docker** | `docker compose up -d` (Linux, `network_mode: host`) | http://&lt;server-ip&gt;:8787 |
 
-Details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · deploy scripts: **[deploy/README.md](deploy/README.md)**
+Details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · prosty Docker: **[deploy/docker-simple/](deploy/docker-simple/)** · QNAP: **[deploy/qnap/](deploy/qnap/)** · SSH deploy: **[deploy/README.md](deploy/README.md)**
 
 ## Production on Linux
 
@@ -208,7 +225,9 @@ netdash/
 │   ├── icons.py      # Brand icons
 │   ├── vault.py      # Key encryption
 │   └── static/       # Frontend
-├── deploy/           # install scripts, systemd, watchdog
+├── deploy/
+│   ├── docker-simple/  # GHCR-only compose + install.sh (bez git)
+│   └── qnap/           # QNAP Container Station
 ├── dockge/           # Dockge stack compose + deploy guide
 ├── docker-compose.yml
 ├── Dockerfile

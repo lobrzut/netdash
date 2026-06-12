@@ -1,0 +1,4 @@
+# Watchtower bez profilu — dla Container Station (Import drugiego pliku lub merge w UI)
+services:
+  watchtower:
+    profiles: []

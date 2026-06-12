@@ -1,17 +1,29 @@
 # NetDash — deployment guide
 
-One codebase, two runtime profiles. Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash)
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.72**
+
+## Najprostsze ścieżki (bez git na serwerze)
+
+| Cel | Co zrobić |
+|-----|-----------|
+| **Linux + Docker** | `curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh \| bash` |
+| **QNAP Container Station** | Import URL → [`deploy/qnap/compose.url`](deploy/qnap/compose.url) — szczegóły: **[deploy/qnap/README.md](deploy/qnap/README.md)** |
+| **Windows Docker Desktop** | `irm …/deploy/docker-simple/install.ps1 \| iex` — patrz **[deploy/docker-simple/](deploy/docker-simple/)** |
+
+Obraz: `ghcr.io/lobrzut/netdash:latest` (GHCR, bez budowania lokalnie).
+
+---
+
+## Profile uruchomienia
 
 | Profile | Target | Start command | URL |
 |---------|--------|---------------|-----|
 | **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:8787 |
-| **Server / Docker** | Linux homelab server | `docker compose up -d` | http://&lt;server-ip&gt;:8787 |
-
-Application version: **1.3.72** (`app/config.py` → `VERSION`).
+| **Server / Docker** | Linux homelab server | `deploy/docker-simple/install.sh` lub `docker compose up -d` | http://&lt;server-ip&gt;:8787 |
 
 ---
 
-## Deploy from GitHub (fresh server)
+## Deploy from GitHub (clone — opcjonalnie)
 
 Use this workflow to clone and run NetDash on a new Linux machine — same pattern as other homelab projects.
 
@@ -45,22 +57,13 @@ curl -s http://127.0.0.1:8787/api/health
 
 Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 
-### Pre-built image (GHCR) — no git on host
+### Pre-built image (GHCR) — zalecane
 
-GitHub Actions publishes `ghcr.io/lobrzut/netdash:latest` on each release tag `v*`.
+Użyj **[deploy/docker-simple/](deploy/docker-simple/)** — compose bez `build:`, tylko pull z GHCR.
 
-```bash
-docker compose pull
-docker compose up -d
-```
+Auto-update (opcjonalnie): `docker compose --profile auto-update up -d` lub plik `docker-compose.autoupdate.yml`.
 
-Optional auto-update via Watchtower (opt-in profile):
-
-```bash
-docker compose --profile auto-update up -d
-```
-
-**QNAP Container Station:** see **[docs/QNAP.md](docs/QNAP.md)** (Polish, step-by-step).
+**QNAP:** **[deploy/qnap/README.md](deploy/qnap/README.md)** (krótko) · **[docs/QNAP.md](docs/QNAP.md)** (pełny przewodnik).
 
 ---
 
@@ -234,7 +237,8 @@ Environment variables (also supported as `BRAIN_SSH_*` for backward compatibilit
 |------|-------|---------------|
 | `run.py` | ✓ | (in image) |
 | `start.ps1` / `start.sh` | ✓ | — |
-| `docker-compose.yml` | — | ✓ production (`network_mode: host`) |
+| `deploy/docker-simple/docker-compose.yml` | — | ✓ GHCR-only (bez git) |
+| `docker-compose.yml` | — | ✓ repo root (build + GHCR) |
 | `dockge/compose.yaml` | — | ✓ Dockge stack (same as production) |
 | `docker-compose.dev.yml` | optional (bridge test) | — |
 | `.env` | local secrets (gitignored) | separate secrets on server |

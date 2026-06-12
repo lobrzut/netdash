@@ -1,14 +1,16 @@
 # Deploy NetDash
 
-Pełna dokumentacja dwóch trybów (lokalny vs Docker): **[../DEPLOYMENT.md](../DEPLOYMENT.md)**.
+Pełna dokumentacja: **[../DEPLOYMENT.md](../DEPLOYMENT.md)**.
 
 ## Szybki wybór
 
-| Cel | Komenda |
-|-----|---------|
+| Cel | Komenda / link |
+|-----|----------------|
+| **Linux Docker (bez git)** | [`docker-simple/install.sh`](docker-simple/install.sh) lub `curl …/install.sh \| bash` |
+| **QNAP NAS** | **[qnap/README.md](qnap/README.md)** |
 | Windows dev | `..\start.ps1` |
 | Linux bare metal | `../start.sh` |
-| Produkcja Linux (VM) | `docker compose up -d` w `/opt/netdash` |
+| Produkcja (clone repo) | `docker compose up -d` w `/opt/netdash` |
 | Test Docker bridge | `docker compose -f docker-compose.dev.yml up` |
 
 ## Skrypty w tym katalogu

@@ -44,6 +44,8 @@ flowchart LR
 
 ## Wdrożenie początkowe (bez git na NAS)
 
+> **Najprostsza ścieżka:** **[deploy/qnap/README.md](../deploy/qnap/README.md)** — import compose z URL w Container Station. Poniżej wersja rozszerzona.
+
 ### 1. Przygotuj folder na QNAP
 
 Przez SSH lub File Station utwórz katalog, np.:
@@ -218,6 +220,8 @@ Pierwszy raz obraz musi powstać z release na GitHub — dopiero wtedy `docker c
 
 ## Powiązane pliki
 
+- [`deploy/qnap/docker-compose.yml`](../deploy/qnap/docker-compose.yml) — compose pod QNAP (import URL)
+- [`deploy/qnap/README.md`](../deploy/qnap/README.md) — krótki przewodnik PL
 - [`docker-compose.yml`](../docker-compose.yml) — NetDash + Watchtower (profil)
 - [`dockge/compose.yaml`](../dockge/compose.yaml) — ten sam stack dla Dockge
 - [`DEPLOYMENT.md`](../DEPLOYMENT.md) — ogólny przewodnik wdrożenia

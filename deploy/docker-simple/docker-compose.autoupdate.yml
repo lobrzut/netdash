@@ -1,0 +1,6 @@
+# Opcjonalny override — Watchtower bez profilu (np. gdy UI nie obsługuje profiles)
+# Użycie: docker compose -f docker-compose.yml -f docker-compose.autoupdate.yml up -d
+
+services:
+  watchtower:
+    profiles: []
