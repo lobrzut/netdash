@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.119
+
+- **Fix: serwisy OFFLINE mimo HTTP 200**: status online/offline usług HTTP/TCP pochodzi wyłącznie z health checkera (`NETDASH_HEALTH_INTERVAL`, domyślnie 120 s na QNAP). ARP discovery i `mark_missing_offline` aktualizują tylko wpisy host-only (`protocol=host`, port 0) — nie nadpisują `is_online` na portach 3000/8000 itd.
+- **Skan TCP**: `_finalize_scan` nie oznacza już portowych usług jako offline, gdy nie wykryto portu w skanie — health check decyduje.
+- **UI**: zielona kropka i badge offline na karcie serwisu = ostatni health check; karta hosta może być offline przy działających usługach.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.119`.
+
 ## v1.3.118
 
 - **Fix ARP discovery returning 0 hosts on QNAP**: when `arp-scan` finds nothing, auto-fallback to `ip neigh`, rate-limited ping/TCP sweep, and quick-scan style discovery; log full `arp-scan` command and stderr.

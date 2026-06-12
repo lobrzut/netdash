@@ -54,6 +54,11 @@ def _pick_host_only(services: list[Service]) -> Service | None:
     return services[0] if services else None
 
 
+def _is_host_only_service(svc: Service) -> bool:
+    """Host discovery status applies only to host-only rows, not HTTP/TCP services."""
+    return svc.port == HOST_ONLY_PORT or svc.protocol == "host"
+
+
 async def _upsert_host_entry(
     db: AsyncSession,
     entry: DiscoveryHostEntry,
@@ -120,9 +125,8 @@ async def _upsert_host_entry(
                 if svc.host != ip:
                     svc.host = ip
                     updated = True
-                svc.is_online = online
                 svc.last_seen = now
-                svc.last_checked = now
+                # Port services: is_online comes from health checks only.
                 continue
             base = PORT_SIGNATURES.get(port, (port_entry.service or f"Port {port}", "plug", "Inne"))
             name = port_entry.service or base[0]
@@ -143,9 +147,8 @@ async def _upsert_host_entry(
                     icon=base[1],
                     description=f"Wykryto przez agenta zdalnego (port {port})",
                     auto_discovered=True,
-                    is_online=online,
+                    is_online=True,
                     last_seen=now,
-                    last_checked=now,
                     mac_address=mac,
                 )
             )
@@ -186,9 +189,12 @@ async def import_discovery_hosts(
             select(Service).where(
                 Service.auto_discovered.is_(True),
                 Service.protocol == "host",
+                Service.port == HOST_ONLY_PORT,
             )
         )
         for svc in result.scalars().all():
+            if not _is_host_only_service(svc):
+                continue
             if svc.host in seen_ips:
                 continue
             if svc.is_online:

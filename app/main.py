@@ -61,6 +61,12 @@ from app.arp_discovery import (
     start_arp_discovery_scheduler,
     stop_arp_discovery_scheduler,
 )
+from app.discovery_pipeline import (
+    get_discovery_pipeline_status,
+    run_discovery_cycle,
+    start_discovery_scheduler,
+    stop_discovery_scheduler,
+)
 from app.wol import normalize_mac, send_magic_packet
 from app.discovery_import import import_discovery_hosts
 from app.schemas import (
@@ -493,9 +499,12 @@ async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(_deferred_startup_health_check())
     health_task = asyncio.create_task(_health_check_loop())
-    if settings.arp_discovery_enabled:
+    if settings.adaptive_discovery_enabled:
+        start_discovery_scheduler()
+    elif settings.arp_discovery_enabled:
         start_arp_discovery_scheduler()
     yield
+    await stop_discovery_scheduler()
     await stop_arp_discovery_scheduler()
     if health_task:
         health_task.cancel()
@@ -556,6 +565,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "discovery_last_import_at": app_settings.discovery_last_import_at,
         "discovery_last_import_source": app_settings.discovery_last_import_source,
         "discovery_last_import_hosts": app_settings.discovery_last_import_hosts,
+        "adaptive_discovery": get_discovery_pipeline_status() if settings.adaptive_discovery_enabled else None,
         "arp_discovery": get_arp_discovery_status() if settings.arp_discovery_enabled else None,
     }
 
@@ -682,6 +692,9 @@ async def network_info(
     app_settings = await _get_or_create_settings(db)
     ping_ok = await icmp_ping_available()
     env_cidr = settings.scan_cidr.strip() if settings.scan_cidr else None
+    adaptive = get_discovery_pipeline_status() if settings.adaptive_discovery_enabled else None
+    arp = get_arp_discovery_status() if settings.arp_discovery_enabled else None
+    auto_status = adaptive or arp
     return NetworkInfo(
         local_network=get_local_network(),
         local_ip=get_local_ip(),
@@ -700,17 +713,13 @@ async def network_info(
         discovery_last_import_at=app_settings.discovery_last_import_at,
         discovery_last_import_source=app_settings.discovery_last_import_source,
         discovery_last_import_hosts=app_settings.discovery_last_import_hosts,
+        discovery_profile=(adaptive or {}).get("profile") if adaptive else None,
+        discovery_status_line=(auto_status or {}).get("last_status_line"),
+        discovery_current_tier=(auto_status or {}).get("current_tier"),
+        discovery_interval_sec=(auto_status or {}).get("interval_sec"),
         arp_interval_sec=settings.arp_interval if settings.arp_discovery_enabled else None,
-        arp_last_cycle_at=(
-            get_arp_discovery_status().get("last_cycle_at")
-            if settings.arp_discovery_enabled
-            else None
-        ),
-        arp_last_cycle_hosts=(
-            get_arp_discovery_status().get("last_cycle_hosts")
-            if settings.arp_discovery_enabled
-            else None
-        ),
+        arp_last_cycle_at=(auto_status or {}).get("last_cycle_at"),
+        arp_last_cycle_hosts=(auto_status or {}).get("last_cycle_hosts"),
     )
 
 
@@ -1333,6 +1342,9 @@ async def _finalize_scan(seen: set[tuple[str, int]]) -> None:
         for service in result.scalars().all():
             key = (service.host, service.port)
             if key in seen:
+                continue
+            # Port services keep is_online from scheduled health checks, not TCP scan presence.
+            if service.protocol != "host" and service.port != 0:
                 continue
             service.is_online = False
             service.last_checked = now

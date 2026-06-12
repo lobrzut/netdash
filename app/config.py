@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.118"
+VERSION = "1.3.120"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -125,8 +125,16 @@ class Settings(BaseSettings):
     scan_cidr: str | None = None
     # Disable built-in LAN scan (QNAP dashboard) — use remote discovery agent instead
     scan_disabled: bool = False
-    # local = manual TCP scan; arp = background arp-scan (WatchYourLAN-style); remote = deploy/agent
+    # local = manual TCP scan; adaptive = tiered ping→ARP→ports (default QNAP);
+    # arp = legacy background arp-scan; remote = deploy/agent
     discovery_mode: str = "local"
+    # Hardware profile for adaptive discovery: auto|weak|normal|strong
+    discovery_profile: str = "auto"
+    # Override adaptive cycle interval (seconds); profile default if unset
+    discovery_interval: int | None = None
+    # Light port probe on new/stale hosts in adaptive mode
+    discovery_port_probe: bool = True
+    discovery_port_max_hosts: int = 5
     # Background ARP cycle interval (seconds) when discovery_mode=arp
     arp_interval: int = 300
     # Light port probe for newly seen ARP hosts only (one host at a time)
@@ -202,7 +210,38 @@ class Settings(BaseSettings):
         if v is None or (isinstance(v, str) and not v.strip()):
             return "local"
         mode = str(v).strip().lower()
-        return mode if mode in ("local", "remote", "arp") else "local"
+        return mode if mode in ("local", "remote", "arp", "adaptive") else "local"
+
+    @field_validator("discovery_profile", mode="before")
+    @classmethod
+    def _discovery_profile(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "auto"
+        profile = str(v).strip().lower()
+        return profile if profile in ("auto", "weak", "normal", "strong") else "auto"
+
+    @field_validator("discovery_interval", mode="before")
+    @classmethod
+    def _discovery_interval(cls, v: object) -> int | None:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return max(60, int(v))
+
+    @field_validator("discovery_port_probe", mode="before")
+    @classmethod
+    def _discovery_port_probe(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("discovery_port_max_hosts", mode="before")
+    @classmethod
+    def _discovery_port_max_hosts(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 5
+        return max(1, int(v))
 
     @field_validator("arp_interval", mode="before")
     @classmethod
@@ -327,8 +366,16 @@ class Settings(BaseSettings):
         return self.discovery_mode
 
     @property
+    def adaptive_discovery_enabled(self) -> bool:
+        return not self.scan_disabled and self.discovery_mode == "adaptive"
+
+    @property
     def arp_discovery_enabled(self) -> bool:
         return not self.scan_disabled and self.discovery_mode == "arp"
+
+    @property
+    def auto_discovery_enabled(self) -> bool:
+        return self.adaptive_discovery_enabled or self.arp_discovery_enabled
 
     @property
     def health_check_concurrency(self) -> int:
