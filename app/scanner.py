@@ -19,13 +19,13 @@ WEB_PORTS = [
     8080, 8081, 8443, 8888, 9000, 9090, 9443, 6443, 8787, 18787,
 ]
 
-# Safe mode (QNAP): common homelab ports only — avoids 254×50 TCP flood on weak NAS kernels.
+# Safe mode: common homelab ports only — avoids 254×50 TCP flood on weak hosts.
 SAFE_WEB_PORTS = [80, 443, 8080, 8443, 5000, 5001, 8000, 9000, 18787]
 
 # Desktop / OS-revealing ports scanned in default mode (alongside WEB_PORTS).
 HOST_DISCOVERY_PORTS = [22, 445, 3389, 5900]
 DEFAULT_HOST_SCAN_PORTS = "22,445,3389,5900"
-# Ports probed when ICMP ping is blocked (common on QNAP Docker without usable NET_RAW).
+# Ports probed when ICMP ping is blocked (common in Docker without usable NET_RAW).
 TCP_DISCOVERY_PORTS = [80, 443, 22, 445, 8080, 5000, 8000, 8443]
 SAFE_TCP_DISCOVERY_PORTS = [80, 443, 22]
 SAFE_HOST_DISCOVERY_PORTS = [22, 445]
@@ -338,7 +338,7 @@ def resolve_scan_cidrs(
         return parse_scan_cidrs(cidr)
     if scan_cidr_default and scan_cidr_default.strip():
         return parse_scan_cidrs(scan_cidr_default)
-    # QNAP host/bridge: prefer NETDASH_SCAN_CIDR over auto-detected Docker /24.
+    # Docker bridge: prefer NETDASH_SCAN_CIDR over auto-detected container /24.
     if settings.scan_cidr and settings.scan_cidr.strip():
         return parse_scan_cidrs(settings.scan_cidr)
     return [get_local_network()]
@@ -474,7 +474,7 @@ async def _ping_host(host: str) -> bool:
 
 
 async def icmp_ping_available() -> bool:
-    """False when container cannot use ICMP (QNAP without NET_RAW or ping blocked)."""
+    """False when container cannot use ICMP (missing NET_RAW or ping blocked)."""
     if platform.system().lower() == "windows":
         probes = ["127.0.0.1"]
     else:
@@ -585,7 +585,7 @@ async def discover_live_hosts(
     elif progress_callback:
         await progress_callback("ping", 0, total)
 
-    # QNAP / Docker: ping often fails even with correct CIDR — TCP sweep entire subnet.
+    # Docker: ping often fails even with correct CIDR — TCP sweep entire subnet.
     ping_only_hosts = len(live - extra)
     use_tcp = tcp_fallback and (not icmp_ok or ping_only_hosts <= 1)
     if use_tcp:

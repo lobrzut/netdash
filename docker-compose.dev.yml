@@ -1,4 +1,5 @@
 # Opcjonalny profil: test Dockera lokalnie (bridge, bez network_mode: host).
+# Słaby sprzęt: mem_limit 512m, cpus 1.0, safe mode domyślnie true, CIDR /28.
 # Skan LAN wymaga NETDASH_SCAN_CIDR — ustaw w .env lub w panelu Ustawienia.
 # Użycie: docker compose -f docker-compose.dev.yml up -d --build
 

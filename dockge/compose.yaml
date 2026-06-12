@@ -54,7 +54,7 @@ services:
 
     restart: always
 
-    # Weak hardware: cap resources; safe scan is default (NETDASH_SCAN_SAFE_MODE).
+    # Słaby sprzęt homelab: limit RAM/CPU; safe scan domyślnie (NETDASH_SCAN_SAFE_MODE).
 
     mem_limit: 512m
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.95
+
+- **Filozofia projektu**: słaby sprzęt homelab (RPi, stary PC, N100, NAS, QNAP) — nie tylko QNAP. Safe mode i limity zasobów są domyślne **w całym projekcie**.
+- **Kod**: komunikaty skanu/health bez hardcoded „QNAP” w logice safe mode; ogólne „słaby sprzęt” / „Docker bridge”.
+- **UI (i18n)**: ostrzeżenia profilu skanu — „słaby serwer” zamiast QNAP-first; docker scan hint uniwersalny.
+- **Dokumentacja**: README i DEPLOYMENT — homelab weak hardware jako domyślne założenie projektu.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.95`.
+
 ## v1.3.94
 
 - **Słaby sprzęt (domyślnie)**: `NETDASH_SCAN_SAFE_MODE=true` w kodzie i we wszystkich compose — nie tylko QNAP. `mem_limit: 512m`, `cpus: 1.0` w docker-simple, root compose, Dockge, dev.

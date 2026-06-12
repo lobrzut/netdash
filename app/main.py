@@ -556,7 +556,7 @@ async def apply_update(_: User = Depends(get_current_user)):
     if not update_apply_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Aktualizacja z portalu wymaga docker.sock — na QNAP użyj Watchtower lub Pull w Container Station",
+            detail="Aktualizacja z portalu wymaga docker.sock — bez niego użyj Watchtower lub ręcznego pull obrazu",
         )
     image = f"{settings.docker_image}:{settings.docker_image_tag}"
     try:
@@ -667,7 +667,7 @@ async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
             "Kontener w sieci Docker (bridge) — wymagany NETDASH_SCAN_CIDR lub CIDR w Ustawienia → Skanowanie."
         )
     if not ping_ok:
-        hints.append("Ping ICMP niedostępny (typowe na QNAP) — skan użyje TCP discovery.")
+        hints.append("Ping ICMP niedostępny (typowe w Dockerze) — skan użyje TCP discovery.")
     if not resolved:
         hints.append("Brak CIDR — ustaw NETDASH_SCAN_CIDR w compose lub Domyślne sieci w ustawieniach.")
     elif scan_ready:
@@ -1331,7 +1331,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
                 if is_likely_docker_bridge():
                     hints.append(
                         "Kontener widzi sieć Docker, nie LAN — ustaw NETDASH_SCAN_CIDR "
-                        "(np. 192.168.1.0/24) lub użyj docker-compose.bridge.yml na QNAP."
+                        "(np. 192.168.1.0/24) lub mapowanie portów (bridge) z NETDASH_SCAN_CIDR."
                     )
                 if not await icmp_ping_available():
                     hints.append(
@@ -1353,7 +1353,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
     except asyncio.TimeoutError:
         msg = (
             f"Skanowanie przekroczyło limit czasu ({int(settings.effective_scan_max_duration)} s). "
-            "Na QNAP użyj NETDASH_SCAN_SAFE_MODE=true, mniejszego CIDR (/28) lub wyłącz pełny skan."
+            "Na słabym sprzęcie zostaw NETDASH_SCAN_SAFE_MODE=true, użyj mniejszego CIDR (/28) lub wyłącz pełny skan."
         )
         logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
@@ -1375,7 +1375,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
     except PermissionError as exc:
         msg = (
             "Brak uprawnień do ping/skanu sieci (NET_RAW). "
-            "Dodaj cap_add: NET_RAW w compose lub użyj docker-compose.bridge.yml na QNAP."
+            "Dodaj cap_add: NET_RAW w compose lub mapuj porty (bridge) z NETDASH_SCAN_CIDR."
         )
         logger.exception("Scan %s permission error for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
@@ -1426,8 +1426,8 @@ async def start_scan(
                 status_code=400,
                 detail=(
                     "Brak CIDR do skanu LAN — kontener jest w sieci Docker (172.x), nie w Twojej LAN. "
-                    "Ustaw NETDASH_SCAN_CIDR=192.168.1.0/24 w Container Station, "
-                    "lub Ustawienia → Skanowanie, lub użyj docker-compose.bridge.yml na QNAP."
+                    "Ustaw NETDASH_SCAN_CIDR=192.168.1.0/24 w compose, "
+                    "lub Ustawienia → Skanowanie, lub mapowanie portów (bridge)."
                 ),
             )
 
@@ -1451,7 +1451,7 @@ async def start_scan(
         )
     else:
         logger.warning(
-            "Network scan started CIDR=%s full_scan=%s safe_mode=%s — ICMP ping unavailable (QNAP/Docker), using TCP discovery",
+            "Network scan started CIDR=%s full_scan=%s safe_mode=%s — ICMP ping unavailable (Docker), using TCP discovery",
             cidr_label,
             full_scan,
             settings.scan_safe_mode,
@@ -1460,7 +1460,7 @@ async def start_scan(
     job = ScanJob(cidr=cidr_label, status="pending")
     if not ping_ok:
         job.error_message = (
-            "Ping ICMP niedostępny na tym hoście (typowe na QNAP Docker) — skan użyje TCP. "
+            "Ping ICMP niedostępny na tym hoście (typowe w Dockerze) — skan użyje TCP. "
             "Upewnij się, że NETDASH_SCAN_CIDR jest poprawny i compose ma cap_add: NET_RAW."
         )
     db.add(job)

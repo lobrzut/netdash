@@ -14,7 +14,7 @@ services:
         NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
     container_name: netdash
     restart: always
-    # Weak hardware (QNAP, RPi, old NAS, N100): cap resources so LAN scan cannot starve the host.
+    # Słaby sprzęt homelab: limit RAM/CPU — skan LAN nie może zagłodzić hosta.
     mem_limit: 512m
     cpus: 1.0
     network_mode: host

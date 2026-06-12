@@ -67,9 +67,9 @@ curl -s http://127.0.0.1:18787/api/health
 
 Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 
-### Słaby sprzęt (QNAP, Raspberry Pi, stary NAS, N100)
+### Słaby sprzęt (homelab — RPi, stary PC, N100, NAS, QNAP)
 
-Od **v1.3.94** wszystkie oficjalne pliki compose ustawiają:
+Filozofia projektu: **działa na słabym sprzęcie**. Wszystkie oficjalne pliki compose ustawiają:
 
 - `NETDASH_SCAN_SAFE_MODE=true` (domyślnie też w kodzie aplikacji)
 - `mem_limit: 512m`, `cpus: 1.0`

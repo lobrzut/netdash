@@ -39,6 +39,7 @@ const API_ERROR_MAP = {
   'Sleep-on-LAN nie jest skonfigurowane dla tego serwisu': 'error.solNotConfigured',
   'Skan ARP jest wyłączony w ustawieniach': 'error.arpDisabled',
   'Aktualizacja z portalu wymaga docker.sock — na QNAP użyj Watchtower lub Pull w Container Station': 'error.updateApplyUnavailable',
+  'Aktualizacja z portalu wymaga docker.sock — bez niego użyj Watchtower lub ręcznego pull obrazu': 'error.updateApplyUnavailable',
   'Aktualizacja z poziomu aplikacji jest wyłączona (brak docker.sock lub NETDASH_UPDATE_APPLY_ENABLED)': 'error.updateApplyUnavailable',
 };
 

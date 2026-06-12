@@ -24,6 +24,8 @@ services:
 
     restart: always
 
+    # Słaby sprzęt homelab: limit RAM/CPU; safe scan domyślnie.
+
     mem_limit: 512m
 
     cpus: 1.0

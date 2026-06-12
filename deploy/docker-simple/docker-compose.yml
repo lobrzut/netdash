@@ -13,7 +13,7 @@ services:
     image: ghcr.io/lobrzut/netdash:latest
     container_name: netdash
     restart: always
-    # Weak hardware (QNAP, RPi, old NAS, N100): cap CPU/RAM — use smaller CIDR (/28) if needed.
+    # Słaby sprzęt homelab: limit CPU/RAM — przy potrzebie węższy CIDR (/28).
     mem_limit: 512m
     cpus: 1.0
     network_mode: host

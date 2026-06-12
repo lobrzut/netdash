@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.94"
+VERSION = "1.3.95"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     scan_timeout: float = 0.8
     http_timeout: float = 3.0
     scan_concurrency: int = 80
-    # Weak hardware (QNAP, RPi, old NAS): gentler scan — ON by default everywhere
+    # Weak homelab hardware (RPi, old PC, NAS, N100): gentler scan — ON by default everywhere
     scan_safe_mode: bool = True
     scan_safe_concurrency: int = 8
     scan_safe_max_hosts: int = 64
@@ -115,7 +115,7 @@ class Settings(BaseSettings):
     reset_admin_password: str | None = None
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
     scan_cidr: str | None = None
-    # HttpOnly session cookie Secure flag — false for QNAP HTTP (default).
+    # HttpOnly session cookie Secure flag — false for plain HTTP homelab (default).
     cookie_secure: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
     demo_mode: bool = False

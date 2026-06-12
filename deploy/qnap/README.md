@@ -144,7 +144,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesiątki portów × wysoka równoległość TCP, szczególnie gdy ping ICMP jest zablokowany).
 
-**Od v1.3.94** safe mode jest domyślny **w całej aplikacji** (nie tylko compose QNAP): `NETDASH_SCAN_SAFE_MODE=true`, `mem_limit: 512m`, `cpus: 1.0`. Na słabym sprzęcie użyj węższego CIDR (`/28`).
+**Od v1.3.94+** safe mode i limity zasobów są domyślne **w całym projekcie NetDash** (każdy deploy, nie tylko QNAP): `NETDASH_SCAN_SAFE_MODE=true`, `mem_limit: 512m`, `cpus: 1.0`. Na słabym sprzęcie użyj węższego CIDR (`/28`).
 
 | Parametr (safe mode) | Wartość |
 |----------------------|---------|
@@ -154,7 +154,7 @@ Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesi
 | Timeout skanu | 300 s |
 | Pełny skan | wyłączony |
 
-**Odzyskiwanie po crashu:** wyłącz zasilanie QNAP na 30 s → włącz → Container Station → upewnij się, że NetDash ma obraz **1.3.94+** → Pull → Restart → skanuj tylko z **Serwisy** (nie Pulpit).
+**Odzyskiwanie po crashu:** wyłącz zasilanie QNAP na 30 s → włącz → Container Station → upewnij się, że NetDash ma obraz **1.3.95+** → Pull → Restart → skanuj tylko z **Serwisy** (nie Pulpit).
 
 ---
 
