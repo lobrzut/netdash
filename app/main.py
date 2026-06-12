@@ -8,13 +8,20 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import create_access_token, get_current_user, hash_password, verify_password
+from app.auth import (
+    clear_auth_cookie,
+    create_access_token,
+    get_current_user,
+    hash_password,
+    set_auth_cookie,
+    verify_password,
+)
 from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, settings
 from app.docker_update import pull_and_restart, update_apply_available
 from app.updates import fetch_latest_release, is_newer_version, normalize_version
@@ -464,6 +471,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "admin_user": settings.default_admin_user,
         "sync_admin_password": settings.sync_admin_password,
         "secret_key_configured": settings.secret_key_configured,
+        "secret_key_stable": settings.secret_key_stable,
     }
 
 
@@ -512,7 +520,12 @@ async def apply_update(_: User = Depends(get_current_user)):
 
 
 @app.post("/api/auth/login", response_model=Token)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    data: LoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     username = (data.username or "").strip()
     if not username:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
@@ -520,7 +533,15 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
-    return Token(access_token=create_access_token(user.username))
+    access_token = create_access_token(user.username)
+    set_auth_cookie(response, request, access_token)
+    return Token(access_token=access_token)
+
+
+@app.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(request: Request, response: Response):
+    clear_auth_cookie(response, request)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.patch("/api/auth/password", status_code=status.HTTP_204_NO_CONTENT)

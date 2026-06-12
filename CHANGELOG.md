@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.81
+
+- **Fix sesji QNAP (odświeżanie strony)**: stabilny `NETDASH_SECRET_KEY` z `/app/data/.secret` (entrypoint zawsze preferuje plik na wolumenie; Python też ładuje `.secret`). Ciasteczko sesji `HttpOnly` z `Secure=false` na HTTP, `SameSite=Lax`, ważność 7 dni; `/api/auth/logout` czyści cookie.
+- **Health**: `/api/health` zwraca `secret_key_stable: true` gdy klucz wczytany z pliku `.secret`.
+- **QNAP skan sieci**: compose ma twardy `NETDASH_SCAN_CIDR: "192.168.1.0/24"` (CS ignoruje `${VAR:-default}`); obraz `1.3.81`.
+- **QNAP bridge compose**: `deploy/qnap/docker-compose.bridge.yml` — tryb bridge + port `18787:18787` gdy `network_mode: host` nie skanuje LAN.
+- **UI**: baner ostrzeżenia na zakładce Serwisy gdy kontener w sieci Docker bez skonfigurowanego CIDR.
+- **Dokumentacja QNAP**: rozszerzona sekcja troubleshooting skanu sieci i sesji (PL).
+
 ## v1.3.80
 
 - **Fix QNAP login (definitive)**: `_sync_admin_password_from_env` nie wymaga już obecności `NETDASH_DEFAULT_ADMIN_PASSWORD` w `os.environ` — używa wartości z Settings (domyślnie `changeme`). Puste stringi z Container Station są normalizowane do domyślnych.

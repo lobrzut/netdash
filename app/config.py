@@ -2,11 +2,11 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.80"
+VERSION = "1.3.81"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -48,6 +48,36 @@ def _get_build_date() -> str:
 BUILD_DATE = _get_build_date()
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
+SECRET_FILE = DATA_DIR / ".secret"
+SECRET_KEY_PLACEHOLDER = "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env"
+
+
+def _read_secret_file() -> str | None:
+    try:
+        if SECRET_FILE.is_file():
+            key = SECRET_FILE.read_text(encoding="utf-8").strip()
+            if len(key) >= 16:
+                return key
+    except OSError:
+        pass
+    return None
+
+
+def _is_placeholder_secret(key: str | None) -> bool:
+    normalized = (key or "").strip()
+    return not normalized or normalized == SECRET_KEY_PLACEHOLDER
+
+
+def _persist_secret_file(key: str) -> None:
+    if _is_placeholder_secret(key) or len(key.strip()) < 16:
+        return
+    try:
+        SECRET_FILE.parent.mkdir(parents=True, exist_ok=True)
+        SECRET_FILE.write_text(key.strip(), encoding="utf-8")
+        if hasattr(os, "chmod"):
+            os.chmod(SECRET_FILE, 0o600)
+    except OSError:
+        pass
 
 
 def resolve_listen_port() -> int:
@@ -67,7 +97,8 @@ def resolve_listen_port() -> int:
 
 
 class Settings(BaseSettings):
-    secret_key: str = "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env"
+    secret_key: str = SECRET_KEY_PLACEHOLDER
+    secret_key_from_file: bool = False
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
     database_url: str = f"sqlite+aiosqlite:///{DATA_DIR / 'netdash.db'}"
@@ -120,9 +151,22 @@ class Settings(BaseSettings):
     @field_validator("secret_key", mode="before")
     @classmethod
     def _secret_key(cls, v: object) -> str:
+        file_key = _read_secret_file()
+        if file_key:
+            return file_key
         if v is None or (isinstance(v, str) and not v.strip()):
-            return "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env"
+            return SECRET_KEY_PLACEHOLDER
         return str(v).strip()
+
+    @model_validator(mode="after")
+    def _finalize_secret_key(self) -> "Settings":
+        file_key = _read_secret_file()
+        if file_key:
+            self.secret_key = file_key
+            self.secret_key_from_file = True
+        elif not _is_placeholder_secret(self.secret_key):
+            _persist_secret_file(self.secret_key)
+        return self
 
     @property
     def port(self) -> int:
@@ -130,8 +174,11 @@ class Settings(BaseSettings):
 
     @property
     def secret_key_configured(self) -> bool:
-        key = (self.secret_key or "").strip()
-        return key not in ("", "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env") and len(key) >= 16
+        return not _is_placeholder_secret(self.secret_key) and len((self.secret_key or "").strip()) >= 16
+
+    @property
+    def secret_key_stable(self) -> bool:
+        return self.secret_key_from_file and SECRET_FILE.is_file()
 
 
 settings = Settings()

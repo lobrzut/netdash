@@ -1975,6 +1975,19 @@ body.modal-open {
   animation: pulse 1.5s ease infinite;
 }
 
+.scan-config-warning {
+  padding: 0.625rem 2rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: rgba(234, 179, 8, 0.08);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.22);
+}
+
+.scan-config-warning:not(.hidden) {
+  display: block;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(1.4); }

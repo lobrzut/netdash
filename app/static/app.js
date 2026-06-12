@@ -104,7 +104,7 @@ const $$ = (sel) => document.querySelectorAll(sel);
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API}${path}`, { ...options, headers });
+  const res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers });
   if (res.status === 401) {
     logout();
     throw new Error('Unauthorized');
@@ -126,9 +126,14 @@ function showView(id) {
   $(`#${id}`).classList.remove('hidden');
 }
 
-function logout() {
+async function logout() {
   token = null;
   localStorage.removeItem('netdash_token');
+  try {
+    await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+  } catch {
+    /* ignore */
+  }
   showView('login-view');
   if (scanPollInterval) clearInterval(scanPollInterval);
   if (healthPollInterval) clearInterval(healthPollInterval);
@@ -327,7 +332,7 @@ function updateFooterNetwork(netLabel) {
 
 async function checkServerHealth() {
   try {
-    const res = await fetch('/api/health');
+    const res = await fetch('/api/health', { credentials: 'include' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (!data.ok) throw new Error(t('error.serverHealth'));
@@ -482,6 +487,7 @@ function applyLayout() {
     el.tabIndex = onServices ? 0 : -1;
   });
   updateFooterNetwork();
+  updateScanConfigWarning(window.__netdashNetwork || null, appSettings);
 }
 
 function navigateTo(page) {
@@ -594,18 +600,37 @@ async function fetchSettings() {
   }
 }
 
+function scanNeedsCidrConfig(netRes, settings) {
+  return !!(netRes?.docker_bridge
+    && !netRes?.scan_cidr_configured
+    && !settings?.scan_cidr_default);
+}
+
 function updateDockerScanWarning(netRes, settings) {
   const el = $('#docker-scan-warning');
   if (!el) return;
-  const show = netRes?.docker_bridge
-    && !netRes?.scan_cidr_configured
-    && !settings?.scan_cidr_default;
-  if (!show) {
+  if (!scanNeedsCidrConfig(netRes, settings)) {
     el.classList.add('hidden');
     el.textContent = '';
     return;
   }
   el.textContent = t('settings.dockerScanWarning', {
+    ip: netRes.local_ip,
+    network: netRes.local_network,
+  });
+  el.classList.remove('hidden');
+}
+
+function updateScanConfigWarning(netRes, settings) {
+  const el = $('#scan-config-warning');
+  if (!el) return;
+  const show = scanNeedsCidrConfig(netRes, settings) && currentPage === 'services';
+  if (!show) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  el.textContent = t('scan.configWarning', {
     ip: netRes.local_ip,
     network: netRes.local_network,
   });
@@ -673,6 +698,7 @@ async function loadDashboard() {
     $('#local-network-hint').textContent = t('hint.localNetwork', { network: netRes.local_network });
     $('#cidr-input').placeholder = netRes.local_network;
     updateDockerScanWarning(netRes, settings);
+    updateScanConfigWarning(netRes, settings);
   }
 
   $('#full-scan').checked = !!settings.full_scan_default;
@@ -2075,6 +2101,7 @@ async function uploadServiceIcon(prefix, file) {
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`${API}/api/services/upload-icon`, {
       method: 'POST',
+      credentials: 'include',
       headers,
       body: form,
     });
@@ -2162,6 +2189,7 @@ async function uploadSettingsFavicon(file) {
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`${API}/api/services/upload-icon`, {
       method: 'POST',
+      credentials: 'include',
       headers,
       body: form,
     });
@@ -3078,6 +3106,7 @@ function fillSettingsForm() {
   $('#settings-about-project').value = appSettings.about_project || '';
   $('#settings-scan-cidr').value = appSettings.scan_cidr_default || '';
   updateDockerScanWarning(window.__netdashNetwork || null, appSettings);
+  updateScanConfigWarning(window.__netdashNetwork || null, appSettings);
   $('#settings-full-scan').checked = !!appSettings.full_scan_default;
   $('#settings-host-ports').value = appSettings.host_scan_ports || '22,445,3389,5900';
   $('#settings-host-only').checked = appSettings.host_only_entries !== false;
@@ -3233,6 +3262,7 @@ async function importHomerConfig(file) {
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`${API}/api/services/import/homer`, {
       method: 'POST',
+      credentials: 'include',
       headers,
       body: form,
     });
@@ -3260,6 +3290,7 @@ async function changePassword(currentPassword, newPassword) {
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(`${API}/api/auth/password`, {
     method: 'PATCH',
+    credentials: 'include',
     headers,
     body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
@@ -4074,6 +4105,16 @@ setupSettingsFaviconUpload();
 document.addEventListener('visibilitychange', reconcilePageScrollLock);
 window.addEventListener('pageshow', reconcilePageScrollLock);
 
+async function hasActiveSession() {
+  if (token) return true;
+  try {
+    const res = await fetch(`${API}/api/network`, { credentials: 'include' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Init
 (async () => {
   await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
@@ -4085,7 +4126,7 @@ window.addEventListener('pageshow', reconcilePageScrollLock);
   });
   await checkServerHealth();
   reconcilePageScrollLock();
-  if (token) {
+  if (await hasActiveSession()) {
     showView('dashboard-view');
     loadDashboard().catch(handleDashboardLoadError);
   } else {

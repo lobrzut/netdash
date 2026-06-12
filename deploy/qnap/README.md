@@ -44,10 +44,10 @@ Od **v1.3.80** compose ma **twarde domyślne** (`admin` / `changeme` / sync) —
 |---------|-----------|---------|
 | *(brak)* | nie | login `admin` / `changeme` działa z compose |
 | `NETDASH_SECRET_KEY` | opcjonalna | losowy ≥32 znaki; jeśli brak — entrypoint zapisze klucz w `/app/data/.secret` |
-| `NETDASH_SCAN_CIDR` | opcjonalna | `192.168.1.0/24` gdy skan LAN nie działa |
+| `NETDASH_SCAN_CIDR` | **w compose od v1.3.81** | `192.168.1.0/24` (dostosuj do swojej podsieci) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | opcjonalna | ustaw `false` **po** zmianie hasła w portalu (żeby restart nie przywracał `changeme`) |
 
-> Compose ≥ v1.3.80: obraz `ghcr.io/lobrzut/netdash:1.3.80`, port **`NETDASH_LISTEN_PORT=18787`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
+> Compose ≥ v1.3.81: obraz `ghcr.io/lobrzut/netdash:1.3.81`, port **`NETDASH_LISTEN_PORT=18787`**, skan LAN z **`NETDASH_SCAN_CIDR=192.168.1.0/24`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
 
 Opcjonalnie wygeneruj `NETDASH_SECRET_KEY` na PC:
 
@@ -64,17 +64,72 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 3. Otwórz w przeglądarce: `http://<IP-QNAP>:18787`
 4. Zaloguj się (`admin` / `changeme`) → **Ustawienia** → **Hasło** → ustaw własne hasło
 
-### Krok 5 — skan sieci LAN (jeśli nie działa)
+### Krok 5 — skan sieci LAN
 
-Na QNAP `network_mode: host` czasem nie skanuje całej sieci. Dodaj zmienną:
+Od **v1.3.81** compose ma już `NETDASH_SCAN_CIDR=192.168.1.0/24`. Jeśli Twoja sieć to np. `192.168.0.0/24`, zmień wartość w **Environment** Container Station.
+
+**Gdzie jest przycisk skanu w portalu?**
+
+1. Zaloguj się do `http://<IP-QNAP>:18787`
+2. Kliknij zakładkę **Serwisy** (nie **Pulpit** — przycisk skanu jest ukryty na pulpicie)
+3. W prawym górnym rogu: **Skanuj sieć** → modal z CIDR → **Rozpocznij skan**
+
+Dodatkowo: **Ustawienia** → **Skanowanie** (domyślne CIDR, pełny skan) oraz **Zasilanie** → **Skan ARP** (MAC urządzeń).
+
+---
+
+## Skan sieci — nie działa / nie widać przycisku
+
+### Nie widzę przycisku „Skanuj sieć”
+
+| Przyczyna | Rozwiązanie |
+|-----------|-------------|
+| Jesteś na zakładce **Pulpit** | Przełącz na **Serwisy** — przycisk jest tylko tam |
+| Nie jesteś zalogowany | Zaloguj się (`admin` / `changeme` na v1.3.81+) |
+
+Skan **nie wymaga** dodatkowych uprawnień — wystarczy konto użytkownika.
+
+### Skan się uruchamia, ale nie znajduje urządzeń
+
+**Przyczyna:** Na QNAP `network_mode: host` często **nie daje** kontenerowi pełnego dostępu do LAN. Kontener widzi sieć Docker (`172.17.x.x`) zamiast Twojej sieci (`192.168.1.x`) i skanuje złą podsieć.
+
+**Rozwiązanie 1 — CIDR (zalecane, od v1.3.81 w compose):**
 
 ```
 NETDASH_SCAN_CIDR=192.168.1.0/24
 ```
 
-(dostosuj do swojej podsieci)
+(dostosuj do swojej podsieci — sprawdź IP QNAP w Panelu QTS)
 
-**Opis ekranu:** po dodaniu CIDR zrestartuj aplikację w Container Station — przycisk **Scan network** w portalu powinien znaleźć urządzenia w LAN.
+W portalu: **Ustawienia** → **Skanowanie** → **Domyślne sieci (CIDR)** — to samo, ale zapisane w bazie.
+
+**Rozwiązanie 2 — uprawnienia ping/ARP:**
+
+Compose QNAP ma `cap_add: NET_RAW` (wymagane do ping i skanu ARP). Po imporcie compose sprawdź w logach kontenera, czy ping działa:
+
+```bash
+docker exec netdash ping -c 1 192.168.1.1
+```
+
+**Rozwiązanie 3 — tryb bridge (gdy host nie pomaga):**
+
+Zaimportuj alternatywny compose:
+
+```
+https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.bridge.yml
+```
+
+- Mapowanie portu `18787:18787` (zamiast `network_mode: host`)
+- **`NETDASH_SCAN_CIDR` jest obowiązkowy** — bez niego skan nie ma sensu
+- Portal nadal: `http://<IP-QNAP>:18787`
+
+**Weryfikacja po naprawie:**
+
+1. `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.81"`
+2. Zaloguj → **Serwisy** → **Skanuj sieć** → zostaw CIDR puste (użyje `NETDASH_SCAN_CIDR`) lub wpisz `192.168.1.0/24`
+3. Po skanie pojawią się karty urządzeń / serwisów
+
+**Baner ostrzeżenia:** Na zakładce Serwisy, gdy kontener jest w sieci Docker bez CIDR, NetDash pokazuje żółty komunikat z instrukcją — ustaw CIDR i zrestartuj.
 
 ---
 
@@ -173,8 +228,8 @@ Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i C
    ```
    https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
    ```
-4. **Environment** — **nic nie musisz dodawać** (v1.3.80+). Opcjonalnie: `NETDASH_SCAN_CIDR=192.168.1.0/24`. **Nie dodawaj** `NETDASH_PORT`.
-5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:1.3.80`.
+4. **Environment** — **nic nie musisz dodawać** (v1.3.81+ ma CIDR w compose). Dostosuj `NETDASH_SCAN_CIDR` jeśli Twoja sieć ≠ `192.168.1.0/24`. **Nie dodawaj** `NETDASH_PORT`.
+5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:1.3.81`.
 6. Otwórz: `http://192.168.1.150:18787` (nie `:8787`).
 7. W logach: `NetDash listening on port 18787` i `Uvicorn running on http://0.0.0.0:18787`.
 
@@ -182,9 +237,9 @@ Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i C
 
 1. **Applications** — zostaw **jedną** aplikację `netdash`; usuń duplikaty.
 2. **Delete Application** (Remove containers) i zaimportuj compose od nowa — CS trzyma stare env w szablonie aplikacji.
-3. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.80` (nie `:latest`).
+3. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.81` (nie `:latest`).
 4. **Start**.
-5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.80","admin_ready":true,...}`.
+5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.81","admin_ready":true,...}`.
 
 Jeśli nadal błąd — przez SSH na QNAP:
 
@@ -207,7 +262,7 @@ Import compose **dwa razy** tworzy dwie aplikacje z tym samym `container_name: n
 
 | Sprawdź | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.80` po **Pull** |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.81` po **Pull** |
 | Compose URL | `docker-compose.full.yml` z GitHub **main** (`NETDASH_LISTEN_PORT: "18787"`) |
 | CS Environment | tylko SECRET_KEY / hasło; **brak** `NETDASH_PORT` |
 | Log kontenera | `Uvicorn running on http://0.0.0.0:18787` |
@@ -228,7 +283,7 @@ Jeśli log nadal pokazuje `:8787` — usuń aplikację CS i zaimportuj compose o
 
 Portal działa (`http://<IP-QNAP>:18787`), ale formularz logowania odrzuca hasło.
 
-**Od v1.3.80 (zalecane):** compose ma twarde `admin` / `changeme` / `sync=true` (QNAP CS ignoruje `${VAR:-default}`). Przy **każdym starcie** hasło admina jest synchronizowane ze **starym wolumenem** `/share/Container/netdash/data`. Zrestartuj kontener po **Pull** obrazu `1.3.80`.
+**Od v1.3.80 (zalecane):** compose ma twarde `admin` / `changeme` / `sync=true` (QNAP CS ignoruje `${VAR:-default}`). Od **v1.3.81** także `NETDASH_SCAN_CIDR=192.168.1.0/24`. Zrestartuj kontener po **Pull** obrazu `1.3.81`.
 
 **Bezpieczeństwo (homelab):** po ustawieniu własnego hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false` w Container Station — inaczej każdy restart przywróci `changeme`.
 
@@ -236,7 +291,7 @@ Portal działa (`http://<IP-QNAP>:18787`), ale formularz logowania odrzuca hasł
 
 | Element | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.80` (Pull w CS) |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.81` (Pull w CS) |
 | Health | `http://<IP>:18787/api/health` → `"admin_ready": true` |
 | Login | `admin` / `changeme` (wielkość liter w loginie bez znaczenia) |
 
@@ -280,6 +335,36 @@ python scripts/reset-admin-password.py --db /share/Container/netdash/data/netdas
 ```
 
 **Nie pomaga zmiana `NETDASH_SECRET_KEY`** — dotyczy tokenów JWT po zalogowaniu, nie hasła w bazie. Po resecie wyczyść ciasteczka przeglądarki dla tego hosta, jeśli nadal widzisz dziwne błędy sesji.
+
+### Po odświeżeniu strony (F5) trzeba logować się od nowa
+
+**Przyczyna (v1.3.80 i starsze):** przy każdym restarcie kontenera generował się **nowy** `NETDASH_SECRET_KEY`, jeśli plik `/app/data/.secret` nie był zapisany na wolumenie NAS. Token JWT (localStorage lub cookie) przestawał być ważny → 401 → powrót do ekranu logowania.
+
+**Naprawa od v1.3.81:**
+
+- Entrypoint **zawsze** wczytuje klucz z `/app/data/.secret` na wolumenie (jeśli plik istnieje).
+- Python też ładuje `.secret` — podwójne zabezpieczenie.
+- Sesja w ciasteczku `HttpOnly` (`Secure=false` na HTTP homelab, `SameSite=Lax`, 7 dni).
+
+**Kroki dla użytkownika:**
+
+1. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.81` w Container Station (lub ponowny import compose).
+2. Sprawdź, że wolumen jest zamontowany: `/share/Container/netdash/data:/app/data`.
+3. Po starcie kontenera w logach: `loaded NETDASH_SECRET_KEY from /app/data/.secret`.
+4. Weryfikacja: `http://<IP-QNAP>:18787/api/health` → `"secret_key_stable": true` i `"secret_key_configured": true`.
+5. **Zaloguj się raz** po aktualizacji (stary token był podpisany innym kluczem).
+6. Odśwież stronę (F5) — powinieneś zostać zalogowany.
+
+**Jeśli `secret_key_stable` jest `false`:**
+
+| Przyczyna | Rozwiązanie |
+|-----------|-------------|
+| Brak wolumenu `/app/data` | Dodaj mount w compose: `/share/Container/netdash/data:/app/data` |
+| Folder `data` tylko do odczytu | W File Station nadaj uprawnienia zapisu dla użytkownika Dockera |
+| Pierwszy start po upgrade | Zrestartuj kontener — plik `.secret` zostanie utworzony; potem `secret_key_stable: true` |
+| Różne adresy URL (IP vs nazwa hosta) | Używaj **jednego** adresu (np. zawsze `http://192.168.1.150:18787`) — localStorage i cookie są per-origin |
+
+**Nie ustawiaj** losowego `NETDASH_SECRET_KEY` w CS przy każdym deployu — entrypoint i tak preferuje plik `.secret` na wolumenie.
 
 ---
 

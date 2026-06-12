@@ -42,7 +42,7 @@ flowchart LR
 - Dostęp do internetu (pobieranie obrazu z `ghcr.io`)
 - Sieć LAN — NetDash skanuje sieć w trybie **`network_mode: host`** (jak na Linuxie)
 
-> **Uwaga:** `network_mode: host` na QNAP działa inaczej niż na czystym Linuxie — w wielu modelach kontener nasłuchuje na porcie hosta (`NETDASH_PORT`, domyślnie 18787). Jeśli skan LAN nie działa, ustaw w `.env`: `NETDASH_SCAN_CIDR=192.168.1.0/24`.
+> **Uwaga:** `network_mode: host` na QNAP działa inaczej niż na czystym Linuxie — skan LAN często wymaga jawnego CIDR. Compose **v1.3.81+** ma `NETDASH_SCAN_CIDR=192.168.1.0/24`. Gdy host mode nie skanuje LAN, użyj [`docker-compose.bridge.yml`](../deploy/qnap/docker-compose.bridge.yml). Szczegóły: [deploy/qnap/README.md — Skan sieci](../deploy/qnap/README.md#skan-sieci--nie-działa--nie-widzę-przycisku).
 
 ---
 
@@ -71,7 +71,7 @@ Na QNAP w `.env` (opcjonalnie — compose v1.3.80+ ma twarde domyślne):
 ```env
 # NETDASH_SECRET_KEY opcjonalny — entrypoint zapisze klucz w data/.secret
 NETDASH_SCAN_CIDR=192.168.1.0/24
-NETDASH_IMAGE_TAG=1.3.80
+NETDASH_IMAGE_TAG=1.3.81
 ```
 
 > **Homelab (v1.3.80+):** login `admin`/`changeme` działa bez env w CS; sync hasła przy starcie także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`.
