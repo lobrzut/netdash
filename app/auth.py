@@ -11,7 +11,8 @@ from app.database import get_db
 from app.models import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-AUTH_COOKIE_NAME = "netdash_token"
+AUTH_COOKIE_NAME = "netdash_session"
+AUTH_COOKIE_LEGACY = "netdash_token"
 
 
 def hash_password(password: str) -> str:
@@ -38,26 +39,43 @@ def auth_cookie_secure(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
+def _cookie_secure(request: Request) -> bool:
+    if not settings.cookie_secure:
+        return False
+    return auth_cookie_secure(request)
+
+
 def set_auth_cookie(response, request: Request, token: str) -> None:
+    secure = _cookie_secure(request)
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
         value=token,
         max_age=auth_cookie_max_age(),
         httponly=True,
-        secure=auth_cookie_secure(request),
+        secure=secure,
         samesite="lax",
         path="/",
+    )
+    # Drop legacy cookie name after login (migration from <= v1.3.85).
+    response.delete_cookie(
+        key=AUTH_COOKIE_LEGACY,
+        path="/",
+        httponly=True,
+        secure=secure,
+        samesite="lax",
     )
 
 
 def clear_auth_cookie(response, request: Request) -> None:
-    response.delete_cookie(
-        key=AUTH_COOKIE_NAME,
-        path="/",
-        httponly=True,
-        secure=auth_cookie_secure(request),
-        samesite="lax",
-    )
+    secure = _cookie_secure(request)
+    for name in (AUTH_COOKIE_NAME, AUTH_COOKIE_LEGACY):
+        response.delete_cookie(
+            key=name,
+            path="/",
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+        )
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -70,14 +88,15 @@ def _extract_bearer_token(request: Request) -> str | None:
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    cookie_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_NAME),
+    session_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_NAME),
+    legacy_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_LEGACY),
 ) -> User:
     credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Nieprawidłowe dane logowania",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    token = cookie_token or _extract_bearer_token(request)
+    token = session_token or legacy_token or _extract_bearer_token(request)
     if not token:
         raise credentials_error
     try:

@@ -5,12 +5,12 @@
 # Portal: http://<IP-QNAP>:18787  (NETDASH_LISTEN_PORT; never 8787 — Readarr)
 #
 # Watchtower co 24 h pobiera nowe obrazy z GHCR (etykieta watchtower.enable).
-# Obraz 1.3.85 — skan LAN: NETDASH_SCAN_CIDR + TCP fallback gdy ping zablokowany.
+# Obraz 1.3.86 — sesja cookie netdash_session + skan LAN (NETDASH_SCAN_CIDR).
 # Gdy host mode nie skanuje LAN na QNAP → docker-compose.bridge.yml (patrz README.md).
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.85
+    image: ghcr.io/lobrzut/netdash:1.3.86
     container_name: netdash
     restart: always
     network_mode: host

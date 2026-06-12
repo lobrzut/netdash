@@ -20,6 +20,10 @@ class PasswordChangeRequest(BaseModel):
     new_password: str = Field(min_length=4)
 
 
+class UserMe(BaseModel):
+    username: str
+
+
 class ServiceCreate(BaseModel):
     name: str
     url: str

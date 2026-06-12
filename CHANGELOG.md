@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.86
+
+- **Fix sesji QNAP (odświeżanie)**: cookie `netdash_session` (`HttpOnly`, `Path=/`, `SameSite=Lax`, `Secure=false` na HTTP); nowy endpoint `GET /api/auth/me` — frontend sprawdza sesję przed ekranem logowania (bez ponownego `POST /api/auth/login` po F5).
+- **Migracja cookie**: odczyt starego `netdash_token` do czasu ponownego logowania; `NETDASH_COOKIE_SECURE=false` domyślnie (QNAP HTTP).
+- **Skan sieci**: log serwera `Network scan started CIDR=...`; komunikat w `error_message` gdy ping ICMP niedostępny (QNAP).
+
 ## v1.3.85
 
 - **QNAP skan sieci (fix)**: gdy ICMP ping jest zablokowany (typowe na QNAP Docker), skan automatycznie przechodzi na **TCP discovery** całej podsieci CIDR (porty 80, 443, 22, 445, 8080, …) zamiast zwracać pusty wynik.

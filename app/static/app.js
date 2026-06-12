@@ -577,10 +577,21 @@ async function checkServerHealth() {
 }
 
 async function login(username, password) {
-  const data = await api('/api/auth/login', {
+  const res = await fetch(`${API}/api/auth/login`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    let detail = err.detail;
+    if (Array.isArray(detail)) {
+      detail = detail.map((d) => d.msg || d).join(', ');
+    }
+    throw new Error(translateApiDetail(detail) || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
   token = data.access_token;
   localStorage.setItem('netdash_token', token);
   showView('dashboard-view');
@@ -4373,12 +4384,18 @@ setupSettingsFaviconUpload();
 document.addEventListener('visibilitychange', reconcilePageScrollLock);
 window.addEventListener('pageshow', reconcilePageScrollLock);
 
-async function hasActiveSession() {
-  if (token) return true;
+async function restoreSession() {
   try {
-    const res = await fetch(`${API}/api/network`, { credentials: 'include' });
-    return res.ok;
+    const res = await fetch(`${API}/api/auth/me`, { credentials: 'include' });
+    if (!res.ok) {
+      token = null;
+      localStorage.removeItem('netdash_token');
+      return false;
+    }
+    return true;
   } catch {
+    token = null;
+    localStorage.removeItem('netdash_token');
     return false;
   }
 }
@@ -4394,7 +4411,7 @@ async function hasActiveSession() {
   });
   await checkServerHealth();
   reconcilePageScrollLock();
-  if (await hasActiveSession()) {
+  if (await restoreSession()) {
     showView('dashboard-view');
     loadDashboard().catch(handleDashboardLoadError);
   } else {

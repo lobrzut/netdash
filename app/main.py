@@ -88,6 +88,7 @@ from app.schemas import (
     Token,
     UpdateApplyOut,
     UpdateCheckOut,
+    UserMe,
 )
 
 scan_tasks: dict[int, asyncio.Task] = {}
@@ -553,6 +554,11 @@ async def login(
 async def logout(request: Request, response: Response):
     clear_auth_cookie(response, request)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/api/auth/me", response_model=UserMe)
+async def auth_me(user: User = Depends(get_current_user)):
+    return UserMe(username=user.username)
 
 
 @app.patch("/api/auth/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -1310,7 +1316,22 @@ async def start_scan(
         )
 
     cidr_label = format_cidr_list(cidrs)
+    ping_ok = await icmp_ping_available()
+    if ping_ok:
+        logger.info("Network scan started CIDR=%s full_scan=%s", cidr_label, data.full_scan)
+    else:
+        logger.warning(
+            "Network scan started CIDR=%s full_scan=%s — ICMP ping unavailable (QNAP/Docker), using TCP discovery",
+            cidr_label,
+            data.full_scan,
+        )
+
     job = ScanJob(cidr=cidr_label, status="pending")
+    if not ping_ok:
+        job.error_message = (
+            "Ping ICMP niedostępny na tym hoście (typowe na QNAP Docker) — skan użyje TCP. "
+            "Upewnij się, że NETDASH_SCAN_CIDR jest poprawny i compose ma cap_add: NET_RAW."
+        )
     db.add(job)
     await db.commit()
     await db.refresh(job)

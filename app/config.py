@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.85"
+VERSION = "1.3.86"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -106,6 +106,8 @@ class Settings(BaseSettings):
     reset_admin_password: str | None = None
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
     scan_cidr: str | None = None
+    # HttpOnly session cookie Secure flag — false for QNAP HTTP (default).
+    cookie_secure: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
     demo_mode: bool = False
     # Optional in-container update apply (requires docker.sock mount — see docs/QNAP.md)
@@ -131,6 +133,15 @@ class Settings(BaseSettings):
         if v is None or (isinstance(v, str) and not v.strip()):
             return "admin"
         return str(v).strip()
+
+    @field_validator("cookie_secure", mode="before")
+    @classmethod
+    def _cookie_secure(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
 
     @field_validator("sync_admin_password", mode="before")
     @classmethod
