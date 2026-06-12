@@ -36,27 +36,26 @@ mkdir -p /share/Container/netdash/data
 
 **Opis ekranu:** po imporcie zobaczysz jeden serwis `netdash` z obrazem `ghcr.io/lobrzut/netdash:latest`, trybem sieci **host** i wolumenem `/share/Container/netdash/data`.
 
-### Krok 3 — zmienne środowiskowe
+### Krok 3 — zmienne środowiskowe (minimalne)
 
-W edycji aplikacji → **Environment** (lub w YAML przed utworzeniem) ustaw:
+Od **v1.3.80** compose ma **twarde domyślne** (`admin` / `changeme` / sync) — Container Station **nie musi** mieć żadnych zmiennych, żeby zalogować się po deployu.
 
-| Zmienna | Wartość |
-|---------|---------|
-| `NETDASH_SECRET_KEY` | losowy ciąg ≥32 znaków |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | `changeme` (domyślnie w compose — **zmień po pierwszym logowaniu**) |
-| `NETDASH_DEFAULT_ADMIN_USER` | `admin` (domyślnie) |
-| `NETDASH_SYNC_ADMIN_PASSWORD` | `true` (domyślnie — sync hasła z env przy starcie; patrz sekcja logowania) |
-| `NETDASH_SCAN_CIDR` | `192.168.1.0/24` (opcjonalnie, gdy skan LAN nie działa) |
+| Zmienna | Wymagana? | Wartość |
+|---------|-----------|---------|
+| *(brak)* | nie | login `admin` / `changeme` działa z compose |
+| `NETDASH_SECRET_KEY` | opcjonalna | losowy ≥32 znaki; jeśli brak — entrypoint zapisze klucz w `/app/data/.secret` |
+| `NETDASH_SCAN_CIDR` | opcjonalna | `192.168.1.0/24` gdy skan LAN nie działa |
+| `NETDASH_SYNC_ADMIN_PASSWORD` | opcjonalna | ustaw `false` **po** zmianie hasła w portalu (żeby restart nie przywracał `changeme`) |
 
-> Compose ≥ v1.3.79: obraz `ghcr.io/lobrzut/netdash:1.3.79`, port **`NETDASH_LISTEN_PORT=18787`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
+> Compose ≥ v1.3.80: obraz `ghcr.io/lobrzut/netdash:1.3.80`, port **`NETDASH_LISTEN_PORT=18787`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
 
-Wygeneruj klucz na PC:
+Opcjonalnie wygeneruj `NETDASH_SECRET_KEY` na PC:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-**Opis ekranu:** `NETDASH_SECRET_KEY` musi być losowy (≥32 znaki). Login **`admin` / `changeme`** działa po każdym deployu (sync z env). **Zmień hasło** w Ustawienia → Hasło, potem ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`, żeby restart kontenera nie przywracał `changeme`.
+**Opis ekranu:** login **`admin` / `changeme`** działa po każdym deployu (sync przy starcie, także ze starym wolumenem). **Zmień hasło** w Ustawienia → Hasło, potem ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`.
 
 ### Krok 4 — start
 
@@ -174,16 +173,8 @@ Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i C
    ```
    https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
    ```
-4. **Environment** — ustaw tylko:
-   | Zmienna | Wartość |
-   |---------|---------|
-   | `NETDASH_SECRET_KEY` | *(twój losowy klucz ≥32 znaków)* |
-   | `NETDASH_DEFAULT_ADMIN_PASSWORD` | `changeme` |
-   | `NETDASH_DEFAULT_ADMIN_USER` | `admin` |
-   | `NETDASH_SYNC_ADMIN_PASSWORD` | `true` *(domyślnie w compose)* |
-   | `NETDASH_SCAN_CIDR` | `192.168.1.0/24` *(opcjonalnie)* |
-   **Nie dodawaj** `NETDASH_PORT` — compose ustawia `NETDASH_LISTEN_PORT: "18787"`.
-5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:1.3.79`.
+4. **Environment** — **nic nie musisz dodawać** (v1.3.80+). Opcjonalnie: `NETDASH_SCAN_CIDR=192.168.1.0/24`. **Nie dodawaj** `NETDASH_PORT`.
+5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:1.3.80`.
 6. Otwórz: `http://192.168.1.150:18787` (nie `:8787`).
 7. W logach: `NetDash listening on port 18787` i `Uvicorn running on http://0.0.0.0:18787`.
 
@@ -191,9 +182,9 @@ Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i C
 
 1. **Applications** — zostaw **jedną** aplikację `netdash`; usuń duplikaty.
 2. **Delete Application** (Remove containers) i zaimportuj compose od nowa — CS trzyma stare env w szablonie aplikacji.
-3. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.79` (nie `:latest`).
+3. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.80` (nie `:latest`).
 4. **Start**.
-5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.79",...}`.
+5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.80","admin_ready":true,...}`.
 
 Jeśli nadal błąd — przez SSH na QNAP:
 
@@ -216,7 +207,7 @@ Import compose **dwa razy** tworzy dwie aplikacje z tym samym `container_name: n
 
 | Sprawdź | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.79` po **Pull** |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.80` po **Pull** |
 | Compose URL | `docker-compose.full.yml` z GitHub **main** (`NETDASH_LISTEN_PORT: "18787"`) |
 | CS Environment | tylko SECRET_KEY / hasło; **brak** `NETDASH_PORT` |
 | Log kontenera | `Uvicorn running on http://0.0.0.0:18787` |
@@ -237,22 +228,21 @@ Jeśli log nadal pokazuje `:8787` — usuń aplikację CS i zaimportuj compose o
 
 Portal działa (`http://<IP-QNAP>:18787`), ale formularz logowania odrzuca hasło.
 
-**Od v1.3.79 (zalecane):** compose ustawia `NETDASH_DEFAULT_ADMIN_PASSWORD=changeme` i `NETDASH_SYNC_ADMIN_PASSWORD=true`. Przy **każdym starcie** kontenera hasło admina jest synchronizowane z env — `admin` / `changeme` powinno działać także ze **starym wolumenem** `/share/Container/netdash/data`. Zrestartuj kontener po **Pull** obrazu `1.3.79`.
+**Od v1.3.80 (zalecane):** compose ma twarde `admin` / `changeme` / `sync=true` (QNAP CS ignoruje `${VAR:-default}`). Przy **każdym starcie** hasło admina jest synchronizowane ze **starym wolumenem** `/share/Container/netdash/data`. Zrestartuj kontener po **Pull** obrazu `1.3.80`.
 
-**Bezpieczeństwo (homelab):** po ustawieniu własnego hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false` w Container Station — inaczej każdy restart przywróci `changeme` z env.
+**Bezpieczeństwo (homelab):** po ustawieniu własnego hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false` w Container Station — inaczej każdy restart przywróci `changeme`.
 
 **Co sprawdzić:**
 
 | Element | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.79` (Pull w CS) |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | `changeme` (lub wartość z compose) |
-| `NETDASH_SYNC_ADMIN_PASSWORD` | `true` (domyślnie) |
-| Login | `admin` — hasło case-sensitive |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.80` (Pull w CS) |
+| Health | `http://<IP>:18787/api/health` → `"admin_ready": true` |
+| Login | `admin` / `changeme` (wielkość liter w loginie bez znaczenia) |
 
-W logu kontenera po starcie (v1.3.79+): `Admin password synced from NETDASH_DEFAULT_ADMIN_PASSWORD`.
+W logu kontenera po starcie (v1.3.80+): `Admin bootstrap: ... admin_ready=True`.
 
-**Starsze wersje (< 1.3.79):** `changeme` działało tylko przy pustej bazie — patrz opcje poniżej.
+**Starsze wersje (< 1.3.80):** sync wymagał obecności env w kontenerze — patrz opcje poniżej.
 
 **Opcja A — świeży start (bez SSH, File Station)** — tracisz ustawienia i listę usług w portalu:
 

@@ -266,34 +266,83 @@ async def _sanitize_stored_urls() -> None:
             await db.commit()
 
 
-async def _sync_admin_password_from_env(db: AsyncSession) -> None:
-    """Homelab post-deploy login: ensure admin exists and password matches env on start."""
-    if not settings.sync_admin_password:
-        return
-    if "NETDASH_DEFAULT_ADMIN_PASSWORD" not in os.environ:
-        return
-    password = settings.default_admin_password.strip()
-    if not password:
-        return
+async def _sync_admin_password_from_env(db: AsyncSession) -> dict[str, object]:
+    """Homelab post-deploy login: ensure admin exists and password matches settings on start."""
     username = settings.default_admin_user
-    result = await db.execute(select(User).where(User.username == username))
+    password = settings.default_admin_password
+    status: dict[str, object] = {
+        "username": username,
+        "sync_enabled": settings.sync_admin_password,
+        "admin_exists": False,
+        "password_synced": False,
+        "password_matches": False,
+    }
+    if not settings.sync_admin_password:
+        result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
+        user = result.scalar_one_or_none()
+        status["admin_exists"] = user is not None
+        if user and verify_password(password, user.password_hash):
+            status["password_matches"] = True
+        return status
+
+    result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
     user = result.scalar_one_or_none()
     if user is None:
         db.add(User(username=username, password_hash=hash_password(password)))
         await db.commit()
+        status["admin_exists"] = True
+        status["password_synced"] = True
+        status["password_matches"] = True
         logger.info(
-            "Admin user %r created; password from NETDASH_DEFAULT_ADMIN_PASSWORD "
-            "(change in Settings after login)",
+            "Admin user %r created with default password (change in Settings after login)",
             username,
         )
-        return
+        return status
+
+    status["admin_exists"] = True
     if verify_password(password, user.password_hash):
-        return
+        status["password_matches"] = True
+        return status
+
     user.password_hash = hash_password(password)
     await db.commit()
+    status["password_synced"] = True
+    status["password_matches"] = True
     logger.info(
-        "Admin password synced from NETDASH_DEFAULT_ADMIN_PASSWORD (change in Settings after login)",
+        "Admin password synced to default for %r (change in Settings after login)",
+        username,
     )
+    return status
+
+
+async def _admin_ready(db: AsyncSession) -> bool:
+    """True when default admin exists and password matches configured default (if sync enabled)."""
+    username = settings.default_admin_user
+    password = settings.default_admin_password
+    result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return False
+    if settings.sync_admin_password:
+        return verify_password(password, user.password_hash)
+    return True
+
+
+def _log_admin_startup_status(status: dict[str, object], ready: bool) -> None:
+    logger.info(
+        "Admin bootstrap: user=%r exists=%s sync_enabled=%s password_synced=%s password_matches=%s admin_ready=%s",
+        status.get("username"),
+        status.get("admin_exists"),
+        status.get("sync_enabled"),
+        status.get("password_synced"),
+        status.get("password_matches"),
+        ready,
+    )
+    if not settings.secret_key_configured:
+        logger.warning(
+            "NETDASH_SECRET_KEY is missing or too short — sessions may fail; "
+            "set NETDASH_SECRET_KEY or rely on entrypoint auto-generation in /app/data/.secret",
+        )
 
 
 async def _maybe_reset_admin_password(db: AsyncSession) -> None:
@@ -323,7 +372,7 @@ async def init_db():
         await conn.run_sync(_migrate_db)
 
     async with async_session() as db:
-        await _sync_admin_password_from_env(db)
+        admin_status = await _sync_admin_password_from_env(db)
         result = await db.execute(select(func.count()).select_from(User))
         if (result.scalar_one() or 0) == 0:
             db.add(
@@ -333,8 +382,11 @@ async def init_db():
                 )
             )
             await db.commit()
+            admin_status["admin_exists"] = True
+            admin_status["password_matches"] = True
         await _maybe_reset_admin_password(db)
         await _get_or_create_settings(db)
+        _log_admin_startup_status(admin_status, await _admin_ready(db))
 
     await _ensure_local_host_service()
     await _sanitize_stored_urls()
@@ -400,7 +452,7 @@ async def index():
 
 
 @app.get("/api/health")
-async def health():
+async def health(db: AsyncSession = Depends(get_db)):
     return {
         "ok": True,
         "version": VERSION,
@@ -408,6 +460,10 @@ async def health():
         "github": GITHUB_REPO,
         "ghcr_image": GHCR_IMAGE,
         "update_apply_available": update_apply_available(),
+        "admin_ready": await _admin_ready(db),
+        "admin_user": settings.default_admin_user,
+        "sync_admin_password": settings.sync_admin_password,
+        "secret_key_configured": settings.secret_key_configured,
     }
 
 
@@ -457,7 +513,10 @@ async def apply_update(_: User = Depends(get_current_user)):
 
 @app.post("/api/auth/login", response_model=Token)
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == data.username))
+    username = (data.username or "").strip()
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
+    result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
     user = result.scalar_one_or_none()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")

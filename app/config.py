@@ -2,10 +2,11 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.79"
+VERSION = "1.3.80"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -93,9 +94,44 @@ class Settings(BaseSettings):
     class Config:
         env_prefix = "NETDASH_"
 
+    @field_validator("default_admin_password", mode="before")
+    @classmethod
+    def _default_admin_password(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "changeme"
+        return str(v).strip()
+
+    @field_validator("default_admin_user", mode="before")
+    @classmethod
+    def _default_admin_user(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "admin"
+        return str(v).strip()
+
+    @field_validator("sync_admin_password", mode="before")
+    @classmethod
+    def _sync_admin_password(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("secret_key", mode="before")
+    @classmethod
+    def _secret_key(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env"
+        return str(v).strip()
+
     @property
     def port(self) -> int:
         return resolve_listen_port()
+
+    @property
+    def secret_key_configured(self) -> bool:
+        key = (self.secret_key or "").strip()
+        return key not in ("", "CHANGE-ME-set-NETDASH_SECRET_KEY-in-env") and len(key) >= 16
 
 
 settings = Settings()

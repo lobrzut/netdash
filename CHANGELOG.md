@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.80
+
+- **Fix QNAP login (definitive)**: `_sync_admin_password_from_env` nie wymaga już obecności `NETDASH_DEFAULT_ADMIN_PASSWORD` w `os.environ` — używa wartości z Settings (domyślnie `changeme`). Puste stringi z Container Station są normalizowane do domyślnych.
+- **Entrypoint**: auto-generacja `NETDASH_SECRET_KEY` do `/app/data/.secret` gdy brak w env (homelab bez ręcznej konfiguracji CS).
+- **QNAP compose**: twarde literały `admin` / `changeme` / `sync=true` (CS ignoruje `${VAR:-default}`); obraz `1.3.80`.
+- **Health**: `/api/health` zwraca `admin_ready`, `secret_key_configured`.
+- **Login**: porównanie nazwy użytkownika bez rozróżniania wielkości liter.
+- **Startup log**: `Admin bootstrap: ... admin_ready=true/false`.
+
 ## v1.3.79
 
 - **Post-deploy login (homelab)**: przy starcie kontenera, gdy `NETDASH_DEFAULT_ADMIN_PASSWORD` jest w env i `NETDASH_SYNC_ADMIN_PASSWORD=true` (domyślnie), aplikacja tworzy użytkownika admin (jeśli brak) i **synchronizuje hash hasła** z env — działa `admin`/`changeme` po każdym deployu, także ze starym wolumenem SQLite.

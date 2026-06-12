@@ -66,17 +66,15 @@ Skopiuj z repozytorium GitHub (na PC):
 - `docker-compose.yml`
 - `.env.example` → `.env`
 
-Na QNAP w `.env` ustaw minimum:
+Na QNAP w `.env` (opcjonalnie — compose v1.3.80+ ma twarde domyślne):
 
 ```env
-NETDASH_SECRET_KEY=<losowy-klucz-min-32-znakow>
-NETDASH_DEFAULT_ADMIN_PASSWORD=changeme
-NETDASH_DEFAULT_ADMIN_USER=admin
-NETDASH_SYNC_ADMIN_PASSWORD=true
-NETDASH_IMAGE_TAG=latest
+# NETDASH_SECRET_KEY opcjonalny — entrypoint zapisze klucz w data/.secret
+NETDASH_SCAN_CIDR=192.168.1.0/24
+NETDASH_IMAGE_TAG=1.3.80
 ```
 
-> **Homelab:** przy `NETDASH_SYNC_ADMIN_PASSWORD=true` (domyślnie) hasło admina jest synchronizowane z env przy każdym starcie kontenera — `admin`/`changeme` działa po deployu także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`, żeby restart nie przywracał `changeme`.
+> **Homelab (v1.3.80+):** login `admin`/`changeme` działa bez env w CS; sync hasła przy starcie także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`.
 
 Opcjonalnie sieć skanowania:
 
