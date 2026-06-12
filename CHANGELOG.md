@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.76
+
+- **QNAP compose**: `NETDASH_PORT` ustawiony na stałe na **18787** w `deploy/qnap/docker-compose.yml` i `docker-compose.full.yml` — stara zmienna `NETDASH_PORT=8787` w Container Station nie nadpisuje już portu przez `${NETDASH_PORT:-18787}`.
+- **Dokumentacja QNAP**: rozszerzona sekcja „wciąż nasłuchuje na 8787” — kroki CS bez SSH (usuń aplikację, pull, ponowny import).
+
 ## v1.3.75
 
 - **Domyślne logowanie `admin` / `changeme`** — jak w innych homelab stackach; dotyczy tylko **nowych** instalacji bez użytkowników w bazie. Istniejące hasła bez zmian.

@@ -17,7 +17,8 @@ services:
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_SCAN_CIDR: ${NETDASH_SCAN_CIDR:-}
-      NETDASH_PORT: ${NETDASH_PORT:-18787}
+      # Hardcoded 18787 — remove NETDASH_PORT=8787 from Container Station env if set (Readarr conflict).
+      NETDASH_PORT: "18787"
     volumes:
       - /share/Container/netdash/data:/app/data
     cap_add:
@@ -25,7 +26,7 @@ services:
     labels:
       com.centurylinklabs.watchtower.enable: "true"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:$${NETDASH_PORT:-18787}/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
