@@ -71,7 +71,7 @@ Na QNAP w `.env` (opcjonalnie — compose v1.3.80+ ma twarde domyślne):
 ```env
 # NETDASH_SECRET_KEY opcjonalny — entrypoint zapisze klucz w data/.secret
 NETDASH_SCAN_CIDR=192.168.1.0/24
-NETDASH_IMAGE_TAG=1.3.83
+NETDASH_IMAGE_TAG=1.3.84
 ```
 
 > **Homelab (v1.3.80+):** login `admin`/`changeme` działa bez env w CS; sync hasła przy starcie także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`.

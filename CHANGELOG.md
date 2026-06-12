@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.84
+
+- **QNAP port nuclear fix**: aplikacja **nigdy** nie binduje **8787** — `resolve_listen_port()` czyta wyłącznie `NETDASH_LISTEN_PORT`; `NETDASH_PORT` jest całkowicie ignorowany. `entrypoint.sh` zawsze ustawia `NETDASH_LISTEN_PORT=18787` i `unset NETDASH_PORT`. Log startowy: `LISTEN_PORT=18787 (8787 blocked)`.
+- **compose.full.yml**: obraz przypięty `ghcr.io/lobrzut/netdash:1.3.84` (do czasu Pull przez użytkownika).
+
 ## v1.3.83
 
 - **Portal — aktualizacje (fix QNAP)**: przycisk „Aktualizuj teraz” zawsze widoczny gdy jest nowa wersja; bez docker.sock otwiera modal z instrukcją Watchtower / Pull w Container Station i „Sprawdź ponownie” (polling GitHub).

@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 # QNAP Container Station may persist NETDASH_PORT=8787 (Readarr conflict).
-# App listens on NETDASH_LISTEN_PORT only; drop stale NETDASH_PORT before start.
-export NETDASH_LISTEN_PORT="${NETDASH_LISTEN_PORT:-18787}"
+# Nuclear fix: always 18787; NETDASH_PORT is never read by the app.
 unset NETDASH_PORT
+export NETDASH_LISTEN_PORT=18787
 
 # Homelab: persist NETDASH_SECRET_KEY on the data volume (/app/data/.secret).
 SECRET_FILE="/app/data/.secret"

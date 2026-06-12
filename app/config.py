@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.83"
+VERSION = "1.3.84"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -81,19 +81,12 @@ def _persist_secret_file(key: str) -> None:
 
 
 def resolve_listen_port() -> int:
-    """Resolve HTTP listen port; ignore stale QNAP CS NETDASH_PORT=8787."""
+    """Resolve HTTP listen port from NETDASH_LISTEN_PORT only (NETDASH_PORT ignored)."""
     listen = os.environ.get("NETDASH_LISTEN_PORT", "").strip()
-    if listen:
-        return int(listen)
-
-    legacy = os.environ.get("NETDASH_PORT", "").strip()
-    if legacy:
-        port = int(legacy)
-        if port == FORBIDDEN_LISTEN_PORT:
-            return DEFAULT_LISTEN_PORT
-        return port
-
-    return DEFAULT_LISTEN_PORT
+    port = int(listen) if listen else DEFAULT_LISTEN_PORT
+    if port == FORBIDDEN_LISTEN_PORT:
+        return DEFAULT_LISTEN_PORT
+    return port
 
 
 class Settings(BaseSettings):
