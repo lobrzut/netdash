@@ -22,16 +22,16 @@ WEB_PORTS = [
     8080, 8081, 8443, 8888, 9000, 9090, 9443, 6443, 8787, 18787,
 ]
 
-# Safe mode: common homelab ports only — avoids 254×50 TCP flood on weak hosts.
-SAFE_WEB_PORTS = [80, 443, 8080, 8443, 5000, 5001, 8000, 9000, 18787]
+# Safe mode: minimal ports — QNAP kernel can OOM/crash on TCP floods even with container mem_limit.
+SAFE_WEB_PORTS = [80, 443, 8080, 5000, 18787]
 
 # Desktop / OS-revealing ports scanned in default mode (alongside WEB_PORTS).
 HOST_DISCOVERY_PORTS = [22, 445, 3389, 5900]
 DEFAULT_HOST_SCAN_PORTS = "22,445,3389,5900"
 # Ports probed when ICMP ping is blocked (common in Docker without usable NET_RAW).
 TCP_DISCOVERY_PORTS = [80, 443, 22, 445, 8080, 5000, 8000, 8443]
-SAFE_TCP_DISCOVERY_PORTS = [80, 443, 22]
-SAFE_HOST_DISCOVERY_PORTS = [22, 445]
+SAFE_TCP_DISCOVERY_PORTS = [80, 443]
+SAFE_HOST_DISCOVERY_PORTS = [22]
 HOST_ONLY_PORT = 0
 
 OS_PORT_HINTS: dict[int, str] = {
@@ -346,7 +346,15 @@ def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
         if scan_cidr_default:
             add(scan_cidr_default)
     if not cidrs:
-        add("192.168.1.0/24")
+        add("192.168.1.144/28" if settings.scan_safe_mode else "192.168.1.0/24")
+    if settings.scan_safe_mode:
+        min_pfx = settings.scan_safe_min_prefix
+        narrow = [
+            c for c in cidrs
+            if ipaddress.ip_network(c, strict=False).prefixlen >= min_pfx
+        ]
+        if narrow:
+            return narrow
     return cidrs
 
 
@@ -484,7 +492,7 @@ def safe_mode_scan_cidrs(cidr: str) -> list[str]:
 
 def expand_cidrs_for_safe_mode(cidrs: list[str]) -> list[str]:
     """Expand each CIDR into safe-mode chunks; dedupe preserving order."""
-    if not settings.scan_safe_mode:
+    if not settings.scan_safe_mode or settings.scan_safe_block_wide:
         return cidrs
     expanded: list[str] = []
     seen: set[str] = set()
@@ -494,6 +502,22 @@ def expand_cidrs_for_safe_mode(cidrs: list[str]) -> list[str]:
                 seen.add(sub)
                 expanded.append(sub)
     return expanded
+
+
+def validate_cidrs_for_safe_mode(cidrs: list[str]) -> None:
+    """Reject wide-CIDR scans that can crash weak NAS hosts (QNAP)."""
+    if not settings.scan_safe_mode:
+        return
+    min_pfx = settings.scan_safe_min_prefix
+    for cidr in cidrs:
+        network = ipaddress.ip_network(cidr.strip(), strict=False)
+        if network.prefixlen < min_pfx:
+            raise ScanError(
+                f"Tryb bezpieczny: zakres {cidr} jest zbyt szeroki (max /{min_pfx}, np. 192.168.1.144/28). "
+                "Skan /24 może zawiesić cały QNAP — użyj Opcje skanu z węższym CIDR "
+                "lub NETDASH_SCAN_SAFE_MODE=false (ryzyko).",
+                code="cidr_too_wide",
+            )
 
 
 def parse_host_scan_ports(ports_str: str | None) -> list[int]:
@@ -593,7 +617,8 @@ def parse_cidr(cidr: str, *, max_hosts: int | None = None) -> list[str]:
 async def _scan_batch_pause(done: int) -> None:
     if not settings.scan_safe_mode:
         return
-    if done > 0 and done % settings.scan_batch_size == 0:
+    batch = settings.effective_scan_batch_size
+    if done > 0 and done % batch == 0:
         await asyncio.sleep(settings.scan_batch_delay)
 
 
@@ -672,14 +697,14 @@ async def discover_live_hosts_tcp(
                 await progress_callback("ping", done, total)
         return None
 
-    # Safe mode: probe hosts in small batches instead of 254 parallel tasks.
+    # Safe mode: tiny batches — parallel TCP probes can saturate QNAP network stack.
     if settings.scan_safe_mode:
-        batch = max(4, settings.effective_scan_concurrency)
+        batch = max(1, settings.effective_scan_concurrency)
         results: list[str | None] = []
         for i in range(0, len(candidates), batch):
             chunk = candidates[i : i + batch]
             results.extend(await asyncio.gather(*(probe_host(host) for host in chunk)))
-            await asyncio.sleep(settings.scan_batch_delay)
+            await asyncio.sleep(settings.scan_batch_delay * 2)
     else:
         results = await asyncio.gather(*(probe_host(host) for host in candidates))
     for host in results:
@@ -718,11 +743,11 @@ async def discover_live_hosts(
                 await progress_callback("ping", done, total)
 
         if settings.scan_safe_mode:
-            batch = max(4, settings.effective_scan_concurrency)
+            batch = max(1, settings.effective_scan_concurrency)
             for i in range(0, len(candidates), batch):
                 chunk = candidates[i : i + batch]
                 await asyncio.gather(*(ping_one(host) for host in chunk))
-                await asyncio.sleep(settings.scan_batch_delay)
+                await asyncio.sleep(settings.scan_batch_delay * 2)
         else:
             await asyncio.gather(*(ping_one(host) for host in candidates))
         if progress_callback:
@@ -753,7 +778,8 @@ async def discover_live_hosts_quick(
     if network.num_addresses > 2:
         seeds.add(str(network.broadcast_address - 1))
 
-    for host in parse_cidr(cidr, max_hosts=32):
+    seed_cap = settings.effective_scan_max_hosts
+    for host in parse_cidr(cidr, max_hosts=seed_cap):
         seeds.add(host)
 
     if extra_hosts:
@@ -764,13 +790,14 @@ async def discover_live_hosts_quick(
             except ValueError:
                 continue
 
-    try:
-        from app.arp_scan import read_arp_hosts_in_cidr
+    if not settings.scan_safe_mode:
+        try:
+            from app.arp_scan import read_arp_hosts_in_cidr
 
-        for host in await asyncio.to_thread(read_arp_hosts_in_cidr, cidr):
-            seeds.add(host)
-    except Exception:
-        pass
+            for host in await asyncio.to_thread(read_arp_hosts_in_cidr, cidr):
+                seeds.add(host)
+        except Exception:
+            pass
 
     seed_list = sorted(seeds)
     total = len(seed_list)
@@ -814,6 +841,8 @@ async def discover_live_hosts_quick(
             done += 1
             if progress_callback:
                 await progress_callback("ping", min(done, total), total)
+            if settings.scan_safe_mode:
+                await asyncio.sleep(settings.scan_batch_delay)
 
     if progress_callback:
         await progress_callback("ping", total, total)
@@ -1247,11 +1276,9 @@ async def scan_network(
             await progress_callback("ports", done, total)
 
     if settings.scan_safe_mode:
-        batch = max(settings.scan_batch_size, settings.effective_scan_concurrency)
-        for i in range(0, len(pairs), batch):
-            chunk = pairs[i : i + batch]
-            await asyncio.gather(*(scan_one(host, port) for host, port in chunk))
-            await asyncio.sleep(settings.scan_batch_delay)
+        for host, port in pairs:
+            await scan_one(host, port)
+            await asyncio.sleep(settings.scan_batch_delay * 0.5)
     else:
         await asyncio.gather(*(scan_one(host, port) for host, port in pairs))
     if progress_callback:
@@ -1310,7 +1337,7 @@ async def scan_networks(
     scan_cidrs = expand_cidrs_for_safe_mode(cidrs)
     for idx, cidr in enumerate(scan_cidrs):
         if idx > 0 and settings.scan_safe_mode:
-            await asyncio.sleep(settings.scan_batch_delay * 4)
+            await asyncio.sleep(settings.scan_inter_chunk_delay)
         discovered = await scan_network(
             cidr,
             full_scan=full_scan,

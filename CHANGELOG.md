@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.111
+
+- **Fix krytyczny QNAP — /24 zabronione w safe mode**: `POST /api/scan` odrzuca CIDR szersze niż /28 (400). RAM limit kontenera nie chroni hosta przed przeciążeniem sieci/CPU.
+- **Ultra-safe scan**: 2 równoległe sondy, 16 hostów, chunk 4, opóźnienie 0,4 s, sekwencyjny skan portów, bez ARP w safe mode, 5 portów web + SSH.
+- **Env**: `NETDASH_SCAN_SAFE_MAX_HOSTS`, `NETDASH_SCAN_CHUNK_SIZE`, `NETDASH_SCAN_BATCH_DELAY`, `NETDASH_SCAN_SAFE_BLOCK_WIDE`.
+- **UI**: baner QNAP, blokada one-click na /24, confirm przed skanem, polling 6 s.
+- **Compose QNAP**: `mem_limit: 512m`, `cpus: 0.5`, domyślne `192.168.1.144/28`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.111`.
+
 ## v1.3.110
 
 - **Fix krytyczny QNAP OOM**: bez limitu RAM skan `/24` może crashować cały NAS. Compose QNAP: `mem_limit: 768m`, domyślne CIDR `192.168.1.144/28`, ostrzeżenia w README.

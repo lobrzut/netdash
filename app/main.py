@@ -36,6 +36,7 @@ from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.url_utils import sanitize_service_url
 from app.scanner import (
     expand_cidrs_for_safe_mode,
+    validate_cidrs_for_safe_mode,
     DiscoveredService,
     ScanError,
     _fallback_service_name,
@@ -531,6 +532,9 @@ async def health(db: AsyncSession = Depends(get_db)):
         "secret_key_stable": settings.secret_key_stable,
         "scan_safe_mode": settings.scan_safe_mode,
         "resource_profile": settings.resource_profile,
+        "scan_safe_min_prefix": settings.scan_safe_min_prefix,
+        "scan_max_hosts": settings.effective_scan_max_hosts,
+        "scan_chunk_size": settings.effective_scan_batch_size,
     }
 
 
@@ -649,6 +653,9 @@ async def network_info(
             resource_profile=settings.resource_profile,
             detected_cidrs=["10.0.0.0/24", "10.0.0.0/28"],
             env_scan_cidr=None,
+            scan_safe_min_prefix=settings.scan_safe_min_prefix,
+            scan_max_hosts=settings.effective_scan_max_hosts,
+            scan_chunk_size=settings.effective_scan_batch_size,
         )
     app_settings = await _get_or_create_settings(db)
     ping_ok = await icmp_ping_available()
@@ -663,6 +670,9 @@ async def network_info(
         resource_profile=settings.resource_profile,
         detected_cidrs=get_detected_cidrs(app_settings.scan_cidr_default),
         env_scan_cidr=env_cidr,
+        scan_safe_min_prefix=settings.scan_safe_min_prefix,
+        scan_max_hosts=settings.effective_scan_max_hosts,
+        scan_chunk_size=settings.effective_scan_batch_size,
     )
 
 
@@ -1519,6 +1529,12 @@ async def start_scan(
             status_code=400,
             detail="Nie podano sieci do skanowania — ustaw CIDR w Ustawienia → Skanowanie lub NETDASH_SCAN_CIDR.",
         )
+
+    try:
+        validate_cidrs_for_safe_mode(cidrs)
+    except ScanError as exc:
+        logger.warning("POST /api/scan rejected wide CIDR in safe mode: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     requested_label = format_cidr_list(cidrs)
     scan_cidrs = expand_cidrs_for_safe_mode(cidrs)

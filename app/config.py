@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.110"
+VERSION = "1.3.111"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -100,17 +100,20 @@ class Settings(BaseSettings):
     scan_concurrency: int = 80
     # Weak homelab hardware (RPi, old PC, NAS, N100): gentler scan — ON by default everywhere
     scan_safe_mode: bool = True
-    scan_safe_concurrency: int = 4
-    scan_safe_max_hosts: int = 32
+    scan_safe_concurrency: int = 2
+    scan_safe_max_hosts: int = 16
     scan_max_hosts: int = 256
-    scan_batch_delay: float = 0.15
-    scan_batch_size: int = 8
+    scan_batch_delay: float = 0.4
+    scan_batch_size: int = 4
+    scan_chunk_size: int = 4
     scan_max_duration: float = 600.0
-    scan_safe_max_duration: float = 240.0
-    # Safe mode: never scan wider than /28 per chunk; max 2 chunks per /24 request.
+    scan_safe_max_duration: float = 180.0
+    scan_inter_chunk_delay: float = 3.0
+    # Safe mode: reject /24 and wider (NETDASH_SCAN_SAFE_BLOCK_WIDE=false to allow auto-shrink).
+    scan_safe_min_prefix: int = 28
     scan_safe_max_prefix: int = 28
-    scan_safe_max_subnets: int = 2
-    # Optional anchor IP for safe-mode chunk selection (e.g. 192.168.1.150 on QNAP).
+    scan_safe_max_subnets: int = 1
+    scan_safe_block_wide: bool = True
     scan_safe_anchor: str | None = None
     default_admin_user: str = "admin"
     default_admin_password: str = "changeme"
@@ -166,6 +169,22 @@ class Settings(BaseSettings):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)
 
+    @field_validator("scan_safe_block_wide", mode="before")
+    @classmethod
+    def _scan_safe_block_wide(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("scan_chunk_size", mode="before")
+    @classmethod
+    def _scan_chunk_size(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 4
+        return int(v)
+
     @field_validator("sync_admin_password", mode="before")
     @classmethod
     def _sync_admin_password(cls, v: object) -> bool:
@@ -193,6 +212,9 @@ class Settings(BaseSettings):
             self.secret_key_from_file = True
         elif not _is_placeholder_secret(self.secret_key):
             _persist_secret_file(self.secret_key)
+        if self.scan_safe_mode:
+            chunk = max(1, self.scan_chunk_size)
+            self.scan_batch_size = chunk
         return self
 
     @property
@@ -230,7 +252,13 @@ class Settings(BaseSettings):
 
     @property
     def scan_identify_concurrency(self) -> int:
-        return 3 if self.scan_safe_mode else 20
+        return 2 if self.scan_safe_mode else 20
+
+    @property
+    def effective_scan_batch_size(self) -> int:
+        if self.scan_safe_mode:
+            return max(1, self.scan_chunk_size)
+        return self.scan_batch_size
 
 
 settings = Settings()

@@ -19,10 +19,11 @@ let appSettings = {};
 let scanPollTimer = null;
 let scanPollFailures = 0;
 let lastScanServicesRefresh = 0;
-const SCAN_POLL_BASE_MS = 3000;
-const SCAN_POLL_MAX_MS = 15000;
-const SCAN_POLL_MAX_FAILURES = 10;
-const SCAN_SERVICES_REFRESH_MS = 12000;
+const SCAN_POLL_BASE_MS = 6000;
+const SCAN_POLL_MAX_MS = 20000;
+const SCAN_POLL_MAX_FAILURES = 12;
+const SCAN_SERVICES_REFRESH_MS = 30000;
+const SCAN_SAFE_MIN_PREFIX = 28;
 let healthPollInterval = null;
 let clockInterval = null;
 let revealedKeys = new Set();
@@ -917,6 +918,9 @@ const DEFAULT_NETWORK = Object.freeze({
   resource_profile: 'safe',
   detected_cidrs: [],
   env_scan_cidr: null,
+  scan_safe_min_prefix: SCAN_SAFE_MIN_PREFIX,
+  scan_max_hosts: 16,
+  scan_chunk_size: 4,
 });
 
 function resolveNetwork(netRes) {
@@ -939,8 +943,21 @@ function scanNeedsCidrConfig(netRes, settings) {
   return false;
 }
 
+function cidrPrefixLen(cidr) {
+  if (!cidr || typeof cidr !== 'string') return 32;
+  const m = cidr.trim().match(/\/(\d{1,2})$/);
+  return m ? parseInt(m[1], 10) : 32;
+}
+
+function isWideScanCidr(cidr, netRes) {
+  if (!cidr) return false;
+  const minPrefix = netRes?.scan_safe_min_prefix ?? SCAN_SAFE_MIN_PREFIX;
+  return cidrPrefixLen(cidr) < minPrefix;
+}
+
 function scanNeedsConfirm(netRes) {
   const net = resolveNetwork(netRes);
+  if (net.scan_safe_mode && net.docker_bridge) return true;
   if (localStorage.getItem(SCAN_CONFIRM_SKIP_KEY) === '1') return false;
   if (net.scan_safe_mode) return true;
   return net.docker_bridge === true && net.ping_available === false;
@@ -1050,6 +1067,9 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
       ip: net.local_ip,
       network: net.local_network,
     });
+  } else if (net.scan_safe_mode && net.docker_bridge && !isScanSafeBannerDismissed()) {
+    message = t('scan.qnapSafeWarning');
+    dismissible = true;
   } else if ((net.scan_safe_mode || scanNeedsConfirm(net)) && !isScanSafeBannerDismissed()) {
     message = t('scan.safeModeWarning');
     dismissible = true;
@@ -3696,6 +3716,11 @@ async function startScan(cidr, fullScan = false, opts = {}) {
     resolvedCidr = resolveOneClickScanCidr(appSettings, netRes);
     console.log('[NetDash] scan: CIDR Docker → fallback', { resolvedCidr });
   }
+  if (netRes?.scan_safe_mode && isWideScanCidr(resolvedCidr, netRes)) {
+    showScanError(t('scan.error.cidrTooWide', { cidr: resolvedCidr, max: netRes.scan_safe_min_prefix || SCAN_SAFE_MIN_PREFIX }));
+    openScanModal();
+    return;
+  }
   const networkLabel = resolvedCidr || t('scan.localNetwork');
   if (!skipConfirm) {
     const confirmed = await confirmScanStart(netRes, networkLabel);
@@ -3742,14 +3767,16 @@ async function startScan(cidr, fullScan = false, opts = {}) {
 }
 
 async function oneClickScan() {
-  const cidr = resolveOneClickScanCidr(appSettings, window.__netdashNetwork);
+  const netRes = window.__netdashNetwork;
+  const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
+  if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
+    showScanError(t('scan.error.cidrTooWide', { cidr, max: netRes.scan_safe_min_prefix || SCAN_SAFE_MIN_PREFIX }));
+    openScanModal();
+    return;
+  }
   void logScanUiAttempt(cidr, 'ui-one-click');
-  showToast(t('scan.launched', { cidr }), 'info');
-  $('#scan-bar')?.classList.remove('hidden');
-  const statusEl = $('#scan-status-text');
-  if (statusEl) statusEl.textContent = t('scan.starting', { network: cidr });
-  await startScan(cidr, false, { skipConfirm: true, suppressStartToast: true });
+  await startScan(cidr, false, { skipConfirm: false, suppressStartToast: false });
 }
 
 function openScanModal() {

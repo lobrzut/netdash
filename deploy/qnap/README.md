@@ -140,38 +140,34 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 **Baner ostrzeżenia:** Na zakładce Serwisy, gdy kontener jest w sieci Docker bez CIDR, NetDash pokazuje żółty komunikat z instrukcją — ustaw CIDR i zrestartuj.
 
-### Skan wywalił cały QNAP (OOM — potwierdzone)
+### Skan wywalił cały QNAP (OOM / sieć — potwierdzone)
 
-Skan `/24` **bez limitu RAM** na kontenerze może zużyć całą pamięć QNAP i **zawiesić cały NAS** (nie tylko NetDash). Objawy: czerwony baner „Brak połączenia z NetDash” w trakcie skanu (~60–70% postępu), stare statystyki w UI, QNAP nie odpowiada.
+Skan `/24` może **zawiesić cały NAS** nawet z `mem_limit: 768m` na kontenerze — limit RAM chroni kontener Docker, **nie** kernel sieciowy QNAP (TCP/ARP/ping flood, CPU, I/O).
 
-**Od v1.3.110** compose QNAP ma `mem_limit: 768m` i domyślne CIDR `/28`. Safe mode jest agresywniejszy (4 równoległe połączenia, max 2×/28 na żądanie /24).
+**Od v1.3.111** skan `/24` jest **zablokowany** przy `NETDASH_SCAN_SAFE_MODE=true`. Domyślne CIDR: `192.168.1.144/28`. One-click „Skanuj sieć” wymaga potwierdzenia.
 
-### Limit RAM — OBOWIĄZKOWY na QNAP
+### Limit RAM + CPU na QNAP
 
-1. **Container Station** → aplikacja `netdash` → edycja kontenera `netdash`
-2. Zakładka **Resource** (Zasoby)
-3. **Memory limit** → **768 MB** (słabszy NAS: 512 MB; większy: 1 GB) → zapisz
-4. **CPU limit** (opcjonalnie): 50–100%
-5. Zrestartuj kontener
+1. **Container Station** → `netdash` → **Resource**
+2. **Memory limit** → **512 MB** (v1.3.111 compose) — mniejszy limit = wcześniejsze ubicie kontenera zamiast NAS
+3. **CPU limit** → **50%** (`cpus: 0.5` w compose)
+4. `NETDASH_SCAN_CIDR` → **/28** (np. `192.168.1.144/28` dla NAS `.150`)
 
-Compose z GitHub (v1.3.110+) ma już `mem_limit: 768m` — po re-imporcie sprawdź w CS, czy limit się zastosował.
-
-| Parametr (safe mode v1.3.110) | Wartość |
+| Parametr (safe mode v1.3.111) | Wartość |
 |-------------------------------|---------|
-| Równoległość | 4 połączenia |
-| Max hostów / chunk | 32 |
-| Skan /24 w safe mode | max 2× `/28` (okolica .144 w /24) |
-| Timeout skanu | 240 s |
-| Pełny skan | wyłączony |
-| UI polling | 3 s + backoff, bez pełnego reload dashboardu |
+| Max CIDR | **/28** (szersze odrzucone) |
+| Równoległość | 2 sondy |
+| Max hostów | 16 |
+| Chunk / opóźnienie | 4 / 0,4 s |
+| Porty | 80, 443, 8080, 5000, 18787 + SSH |
+| UI polling | 6 s + backoff |
 
 **Odzyskiwanie po crashu QNAP:**
 
-1. Wyłącz zasilanie QNAP (przycisk zasilania lub odłącz) na **30–60 s**
-2. Włącz — poczekaj aż QTS wstanie (5–10 min)
-3. **Container Station** → NetDash → **Pull** obraz `1.3.110` → ustaw **Memory limit 768 MB** → **Restart**
-4. Ustaw `NETDASH_SCAN_CIDR` na `/28` wokół IP NAS (np. `192.168.1.144/28` dla `.150`)
-5. Skan tylko z **Serwisy** → **Skanuj sieć** (nie pełny /24 bez RAM limit)
+1. Wyłącz zasilanie QNAP na **30–60 s** → włącz → poczekaj na QTS
+2. **Pull** obraz `1.3.111`, ustaw RAM **512 MB** + CPU **50%**
+3. Zmień `NETDASH_SCAN_CIDR` na `/28` — **nie** `/24`
+4. Skan: **Serwisy** → **Opcje skanu…** → `192.168.1.144/28` → **Rozpocznij skan**
 
 ---
 

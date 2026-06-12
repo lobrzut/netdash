@@ -171,6 +171,9 @@ class NetworkInfo(BaseModel):
     resource_profile: str = "safe"
     detected_cidrs: list[str] = Field(default_factory=list)
     env_scan_cidr: str | None = None
+    scan_safe_min_prefix: int = 28
+    scan_max_hosts: int = 16
+    scan_chunk_size: int = 4
 
 
 class NetworkDiagnostics(BaseModel):
