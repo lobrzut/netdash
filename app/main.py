@@ -515,6 +515,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "sync_admin_password": settings.sync_admin_password,
         "secret_key_configured": settings.secret_key_configured,
         "secret_key_stable": settings.secret_key_stable,
+        "scan_safe_mode": settings.scan_safe_mode,
     }
 
 
@@ -626,6 +627,7 @@ async def network_info(_: User = Depends(get_current_user)):
             docker_bridge=False,
             scan_cidr_configured=True,
             ping_available=True,
+            scan_safe_mode=settings.scan_safe_mode,
         )
     ping_ok = await icmp_ping_available()
     return NetworkInfo(
@@ -634,6 +636,7 @@ async def network_info(_: User = Depends(get_current_user)):
         docker_bridge=is_likely_docker_bridge(),
         scan_cidr_configured=bool(settings.scan_cidr),
         ping_available=ping_ok,
+        scan_safe_mode=settings.scan_safe_mode,
     )
 
 
@@ -1286,14 +1289,18 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
         host_ports = parse_host_scan_ports(app_settings.host_scan_ports)
         host_only = app_settings.host_only_entries is not False
 
+    scan_timeout = settings.effective_scan_max_duration
     try:
-        discovered = await scan_networks(
-            cidrs,
-            full_scan=full_scan,
-            host_scan_ports=host_ports,
-            host_only_entries=host_only,
-            progress_callback=on_progress,
-            service_callback=on_service,
+        discovered = await asyncio.wait_for(
+            scan_networks(
+                cidrs,
+                full_scan=full_scan,
+                host_scan_ports=host_ports,
+                host_only_entries=host_only,
+                progress_callback=on_progress,
+                service_callback=on_service,
+            ),
+            timeout=scan_timeout,
         )
         if host_only:
             local_key = await _upsert_service(build_local_host_service())
@@ -1334,7 +1341,10 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
             format_cidr_list(cidrs),
         )
     except asyncio.TimeoutError:
-        msg = "Skanowanie przekroczyło limit czasu — spróbuj mniejszej podsieci (/24) lub pełnego skanu wyłączonego."
+        msg = (
+            f"Skanowanie przekroczyło limit czasu ({int(settings.effective_scan_max_duration)} s). "
+            "Na QNAP użyj NETDASH_SCAN_SAFE_MODE=true, mniejszego CIDR (/28) lub wyłącz pełny skan."
+        )
         logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
             result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
@@ -1389,6 +1399,11 @@ async def start_scan(
     if any(not t.done() for t in scan_tasks.values()):
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
 
+    full_scan = data.full_scan
+    if settings.scan_safe_mode and full_scan:
+        logger.warning("full_scan requested but scan_safe_mode=true — forcing quick scan")
+        full_scan = False
+
     app_settings = await _get_or_create_settings(db)
     try:
         cidrs = resolve_scan_cidrs(data.cidr, app_settings.scan_cidr_default)
@@ -1415,12 +1430,21 @@ async def start_scan(
     cidr_label = format_cidr_list(cidrs)
     ping_ok = await icmp_ping_available()
     if ping_ok:
-        logger.info("Network scan started CIDR=%s full_scan=%s", cidr_label, data.full_scan)
+        logger.info(
+            "Network scan started CIDR=%s full_scan=%s safe_mode=%s concurrency=%s max_hosts=%s timeout=%ss",
+            cidr_label,
+            full_scan,
+            settings.scan_safe_mode,
+            settings.effective_scan_concurrency,
+            settings.effective_scan_max_hosts,
+            int(settings.effective_scan_max_duration),
+        )
     else:
         logger.warning(
-            "Network scan started CIDR=%s full_scan=%s — ICMP ping unavailable (QNAP/Docker), using TCP discovery",
+            "Network scan started CIDR=%s full_scan=%s safe_mode=%s — ICMP ping unavailable (QNAP/Docker), using TCP discovery",
             cidr_label,
-            data.full_scan,
+            full_scan,
+            settings.scan_safe_mode,
         )
 
     job = ScanJob(cidr=cidr_label, status="pending")
@@ -1433,7 +1457,7 @@ async def start_scan(
     await db.commit()
     await db.refresh(job)
 
-    task = asyncio.create_task(_run_scan(job.id, cidrs, data.full_scan))
+    task = asyncio.create_task(_run_scan(job.id, cidrs, full_scan))
     scan_tasks[job.id] = task
     return job
 

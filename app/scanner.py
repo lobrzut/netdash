@@ -19,11 +19,16 @@ WEB_PORTS = [
     8080, 8081, 8443, 8888, 9000, 9090, 9443, 6443, 8787, 18787,
 ]
 
+# Safe mode (QNAP): common homelab ports only — avoids 254×50 TCP flood on weak NAS kernels.
+SAFE_WEB_PORTS = [80, 443, 8080, 8443, 5000, 5001, 8000, 9000, 18787]
+
 # Desktop / OS-revealing ports scanned in default mode (alongside WEB_PORTS).
 HOST_DISCOVERY_PORTS = [22, 445, 3389, 5900]
 DEFAULT_HOST_SCAN_PORTS = "22,445,3389,5900"
 # Ports probed when ICMP ping is blocked (common on QNAP Docker without usable NET_RAW).
 TCP_DISCOVERY_PORTS = [80, 443, 22, 445, 8080, 5000, 8000, 8443]
+SAFE_TCP_DISCOVERY_PORTS = [80, 443, 22]
+SAFE_HOST_DISCOVERY_PORTS = [22, 445]
 HOST_ONLY_PORT = 0
 
 OS_PORT_HINTS: dict[int, str] = {
@@ -431,12 +436,20 @@ def _create_host_only_service(host: str) -> DiscoveredService:
     )
 
 
-def parse_cidr(cidr: str) -> list[str]:
+def parse_cidr(cidr: str, *, max_hosts: int | None = None) -> list[str]:
     network = ipaddress.ip_network(cidr.strip(), strict=False)
     hosts = [str(host) for host in network.hosts()]
-    if len(hosts) > 1024:
-        hosts = hosts[:1024]
+    cap = max_hosts if max_hosts is not None else settings.effective_scan_max_hosts
+    if len(hosts) > cap:
+        hosts = hosts[:cap]
     return hosts
+
+
+async def _scan_batch_pause(done: int) -> None:
+    if not settings.scan_safe_mode:
+        return
+    if done > 0 and done % settings.scan_batch_size == 0:
+        await asyncio.sleep(settings.scan_batch_delay)
 
 
 async def _ping_host(host: str) -> bool:
@@ -489,27 +502,41 @@ async def discover_live_hosts_tcp(
     progress_callback: ProgressCallback | None = None,
 ) -> set[str]:
     """Find hosts with at least one open TCP port — fallback when ping is blocked."""
-    probe_ports = ports or TCP_DISCOVERY_PORTS
+    if ports is None:
+        probe_ports = SAFE_TCP_DISCOVERY_PORTS if settings.scan_safe_mode else TCP_DISCOVERY_PORTS
+    else:
+        probe_ports = ports
     candidates = parse_cidr(cidr)
     live = _discovery_extras(cidr)
     total = len(candidates) * len(probe_ports)
     done = 0
-    sem = asyncio.Semaphore(settings.scan_concurrency)
+    sem = asyncio.Semaphore(settings.effective_scan_concurrency)
 
     async def probe_host(host: str) -> str | None:
         nonlocal done
         for port in probe_ports:
             if await _check_port(host, port, sem):
                 done += 1
+                await _scan_batch_pause(done)
                 if progress_callback and done % 40 == 0:
                     await progress_callback("ping", done, total)
                 return host
             done += 1
+            await _scan_batch_pause(done)
             if progress_callback and done % 40 == 0:
                 await progress_callback("ping", done, total)
         return None
 
-    results = await asyncio.gather(*(probe_host(host) for host in candidates))
+    # Safe mode: probe hosts in small batches instead of 254 parallel tasks.
+    if settings.scan_safe_mode:
+        batch = max(4, settings.effective_scan_concurrency)
+        results: list[str | None] = []
+        for i in range(0, len(candidates), batch):
+            chunk = candidates[i : i + batch]
+            results.extend(await asyncio.gather(*(probe_host(host) for host in chunk)))
+            await asyncio.sleep(settings.scan_batch_delay)
+    else:
+        results = await asyncio.gather(*(probe_host(host) for host in candidates))
     for host in results:
         if host:
             live.add(host)
@@ -528,7 +555,8 @@ async def discover_live_hosts(
     extra = _discovery_extras(cidr)
     icmp_ok = await icmp_ping_available()
 
-    sem = asyncio.Semaphore(32)
+    ping_sem = settings.effective_scan_concurrency if settings.scan_safe_mode else 32
+    sem = asyncio.Semaphore(ping_sem)
     live: set[str] = set(extra)
     total = len(candidates)
     done = 0
@@ -540,10 +568,18 @@ async def discover_live_hosts(
                 if await _ping_host(host):
                     live.add(host)
             done += 1
+            await _scan_batch_pause(done)
             if progress_callback and done % 20 == 0:
                 await progress_callback("ping", done, total)
 
-        await asyncio.gather(*(ping_one(host) for host in candidates))
+        if settings.scan_safe_mode:
+            batch = max(4, settings.effective_scan_concurrency)
+            for i in range(0, len(candidates), batch):
+                chunk = candidates[i : i + batch]
+                await asyncio.gather(*(ping_one(host) for host in chunk))
+                await asyncio.sleep(settings.scan_batch_delay)
+        else:
+            await asyncio.gather(*(ping_one(host) for host in candidates))
         if progress_callback:
             await progress_callback("ping", total, total)
     elif progress_callback:
@@ -944,8 +980,11 @@ async def scan_network(
     progress_callback: ProgressCallback | None = None,
     service_callback: ServiceCallback | None = None,
 ) -> list[DiscoveredService]:
-    if full_scan:
+    if full_scan and not settings.scan_safe_mode:
         ports = COMMON_PORTS
+    elif settings.scan_safe_mode:
+        extra = host_scan_ports if host_scan_ports is not None else SAFE_HOST_DISCOVERY_PORTS
+        ports = sorted(set(SAFE_WEB_PORTS + extra))
     else:
         extra = host_scan_ports if host_scan_ports is not None else HOST_DISCOVERY_PORTS
         ports = sorted(set(WEB_PORTS + extra))
@@ -957,24 +996,33 @@ async def scan_network(
     if progress_callback:
         await progress_callback("ports", 0, len(live_hosts) * len(ports))
 
-    sem = asyncio.Semaphore(settings.scan_concurrency)
+    sem = asyncio.Semaphore(settings.effective_scan_concurrency)
     open_ports: list[tuple[str, int]] = []
     total = len(live_hosts) * len(ports)
     done = 0
+    pairs = [(host, port) for host in live_hosts for port in ports]
 
     async def scan_one(host: str, port: int):
         nonlocal done
         if await _check_port(host, port, sem):
             open_ports.append((host, port))
         done += 1
+        await _scan_batch_pause(done)
         if progress_callback and done % 50 == 0:
             await progress_callback("ports", done, total)
 
-    await asyncio.gather(*(scan_one(host, port) for host in live_hosts for port in ports))
+    if settings.scan_safe_mode:
+        batch = max(settings.scan_batch_size, settings.effective_scan_concurrency)
+        for i in range(0, len(pairs), batch):
+            chunk = pairs[i : i + batch]
+            await asyncio.gather(*(scan_one(host, port) for host, port in chunk))
+            await asyncio.sleep(settings.scan_batch_delay)
+    else:
+        await asyncio.gather(*(scan_one(host, port) for host, port in pairs))
     if progress_callback:
         await progress_callback("ports", total, total)
 
-    identify_sem = asyncio.Semaphore(20)
+    identify_sem = asyncio.Semaphore(8 if settings.scan_safe_mode else 20)
     unique: dict[tuple[str, int], DiscoveredService] = {}
 
     async def identify(host: str, port: int):

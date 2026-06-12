@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.93
+
+- **Fix krytyczny QNAP (crash NAS przy skanie)**: `NETDASH_SCAN_SAFE_MODE=true` domyślnie w compose QNAP — niska równoległość (8), krótka lista portów, opóźnienia między partiami, limit hostów (64), twardy timeout (300 s). Pełny skan zablokowany w safe mode.
+- **Skan**: batch processing zamiast 254 równoległych zadań TCP; `mem_limit: 512m` i `cpus: 1.0` w compose QNAP.
+- **UI**: potwierdzenie przed skanem na słabym sprzęcie; baner trybu bezpiecznego; „Failed to fetch” → czytelny komunikat po polsku.
+- **API**: `/api/health` i `/api/network` zwracają `scan_safe_mode`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.93`.
+
 ## v1.3.92
 
 - **Skan (UI)**: usunięty przycisk „Skanuj sieć” z Pulpitu (`#scan-btn-home`); skan jednym kliknięciem tylko na zakładce Serwisy (`#scan-btn`, `#empty-scan-btn`) — `POST /api/scan` + pasek postępu.

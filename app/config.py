@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.92"
+VERSION = "1.3.93"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -98,6 +98,15 @@ class Settings(BaseSettings):
     scan_timeout: float = 0.8
     http_timeout: float = 3.0
     scan_concurrency: int = 80
+    # QNAP / weak NAS: gentler scan (lower parallelism, fewer ports, caps, delays)
+    scan_safe_mode: bool = False
+    scan_safe_concurrency: int = 8
+    scan_safe_max_hosts: int = 64
+    scan_max_hosts: int = 256
+    scan_batch_delay: float = 0.08
+    scan_batch_size: int = 16
+    scan_max_duration: float = 600.0
+    scan_safe_max_duration: float = 300.0
     default_admin_user: str = "admin"
     default_admin_password: str = "changeme"
     # Sync admin password from NETDASH_DEFAULT_ADMIN_PASSWORD on every container start (homelab default)
@@ -137,6 +146,15 @@ class Settings(BaseSettings):
     @field_validator("cookie_secure", mode="before")
     @classmethod
     def _cookie_secure(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("scan_safe_mode", mode="before")
+    @classmethod
+    def _scan_safe_mode(cls, v: object) -> bool:
         if v is None or (isinstance(v, str) and not v.strip()):
             return False
         if isinstance(v, str):
@@ -183,6 +201,18 @@ class Settings(BaseSettings):
     @property
     def secret_key_stable(self) -> bool:
         return self.secret_key_from_file and SECRET_FILE.is_file()
+
+    @property
+    def effective_scan_concurrency(self) -> int:
+        return self.scan_safe_concurrency if self.scan_safe_mode else self.scan_concurrency
+
+    @property
+    def effective_scan_max_hosts(self) -> int:
+        return self.scan_safe_max_hosts if self.scan_safe_mode else self.scan_max_hosts
+
+    @property
+    def effective_scan_max_duration(self) -> float:
+        return self.scan_safe_max_duration if self.scan_safe_mode else self.scan_max_duration
 
 
 settings = Settings()

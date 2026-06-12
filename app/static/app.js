@@ -115,13 +115,31 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   }
 }
 
+function friendlyFetchError(err) {
+  const msg = err?.message || '';
+  if (err?.name === 'AbortError') return t('error.requestTimeout');
+  if (msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('Load failed')) {
+    return t('error.networkFetch', { host: location.hostname });
+  }
+  return msg || t('error.unknown');
+}
+
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  let res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers });
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers });
+  } catch (err) {
+    throw new Error(friendlyFetchError(err));
+  }
   if (res.status === 401 && headers.Authorization) {
     const cookieOnly = { 'Content-Type': 'application/json', ...options.headers };
-    res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers: cookieOnly });
+    try {
+      res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers: cookieOnly });
+    } catch (err) {
+      throw new Error(friendlyFetchError(err));
+    }
   }
   if (res.status === 401) {
     if (authBootComplete && sessionEstablished) {
@@ -885,6 +903,17 @@ function scanNeedsCidrConfig(netRes, settings) {
   return false;
 }
 
+function scanNeedsConfirm(netRes) {
+  if (!netRes) return false;
+  if (netRes.scan_safe_mode) return true;
+  return netRes.docker_bridge === true && netRes.ping_available === false;
+}
+
+function confirmScanStart(netRes) {
+  if (!scanNeedsConfirm(netRes)) return true;
+  return window.confirm(t('scan.confirmLowResource'));
+}
+
 function scanEmptyResultHint(lastScan, netRes) {
   if (!lastScan || lastScan.status !== 'completed') return '';
   if (lastScan.error_message) return lastScan.error_message;
@@ -922,6 +951,11 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
       ip: netRes.local_ip,
       network: netRes.local_network,
     });
+    el.classList.remove('hidden');
+    return;
+  }
+  if (netRes.scan_safe_mode || scanNeedsConfirm(netRes)) {
+    el.textContent = t('scan.safeModeWarning');
     el.classList.remove('hidden');
     return;
   }
@@ -3296,6 +3330,12 @@ function setScanControlsDisabled(disabled) {
 
 async function startScan(cidr, fullScan = false) {
   clearScanError();
+  const netRes = window.__netdashNetwork;
+  if (!confirmScanStart(netRes)) return;
+  if (netRes?.scan_safe_mode && fullScan) {
+    fullScan = false;
+    showToast(t('scan.safeModeFullScanDisabled'), 'info');
+  }
   const resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   closeModal('scan-modal');
   $('#scan-bar')?.classList.remove('hidden');
