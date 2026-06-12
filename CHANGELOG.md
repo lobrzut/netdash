@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.115
+
+- **Fix krytyczny QNAP — wieczne „Ładowanie sesji…”**: regresja v1.3.114 — błąd składni w `app.js` (uszkodzona funkcja `startHealthPolling`) powodował crash całego JS przy parsowaniu; **zero** żądań `GET /api/auth/me` w logach serwera. Przywrócono `startHealthPolling`, watchdog 5 s na boot.
+- **Entrypoint**: `ENTRYPOINT_VERSION` zsynchronizowany z `VERSION` (wcześniej 1.3.92 vs 1.3.114 = mieszany obraz po częściowym update).
+- **Discovery UI**: defensywne `try/catch` — stary backend bez pól discovery nie wywali bootu.
+- **QNAP README**: sekcja o pełnym zastąpieniu obrazu (usuń kontener + pull `:1.3.115`), nie częściowy update warstw.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.115`.
+
 ## v1.3.114
 
 - **Discovery bez klikania (QNAP)**: lokalny skan ukryty — stały pasek statusu „Discovery: ostatni import X min temu z homelab (N hostów)” lub „Czekam na agenta…”.

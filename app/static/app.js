@@ -1005,21 +1005,25 @@ function updateDiscoverySettingsPanel(netRes, settings) {
 }
 
 function updateRemoteDiscoveryUI(netRes, settings) {
-  const remote = isRemoteDiscovery(netRes);
-  document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
-  $('#scan-options-btn')?.classList.toggle('hidden', remote);
-  $('#empty-scan-btn')?.classList.toggle('hidden', remote);
-  $('#empty-scan-options-btn')?.classList.toggle('hidden', remote);
-  $('.settings-tab[data-tab="scan"]')?.classList.toggle('hidden', remote);
-  $('#scan-error')?.classList.add('hidden');
-  const emptyHint = $('#empty-hint');
-  if (emptyHint) {
-    emptyHint.textContent = remote
-      ? formatDiscoveryStatusLine(netRes, settings)
-      : t('empty.services.hint');
+  try {
+    const remote = isRemoteDiscovery(netRes);
+    document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
+    $('#scan-options-btn')?.classList.toggle('hidden', remote);
+    $('#empty-scan-btn')?.classList.toggle('hidden', remote);
+    $('#empty-scan-options-btn')?.classList.toggle('hidden', remote);
+    $('.settings-tab[data-tab="scan"]')?.classList.toggle('hidden', remote);
+    $('#scan-error')?.classList.add('hidden');
+    const emptyHint = $('#empty-hint');
+    if (emptyHint) {
+      emptyHint.textContent = remote
+        ? formatDiscoveryStatusLine(netRes, settings)
+        : t('empty.services.hint');
+    }
+    updateDiscoveryStatusBar(netRes, settings);
+    updateDiscoverySettingsPanel(netRes, settings);
+  } catch (err) {
+    console.warn('[NetDash] updateRemoteDiscoveryUI:', err?.message || err);
   }
-  updateDiscoveryStatusBar(netRes, settings);
-  updateDiscoverySettingsPanel(netRes, settings);
 }
 
 function isLocalScanDisabled(netRes) {
@@ -1354,10 +1358,16 @@ function startDiscoveryStatusPolling() {
       appSettings = settings;
       updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
     } catch {
-      updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+      try {
+        updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+      } catch {
+        /* ignore stale-backend UI errors */
+      }
     }
   }, 60000);
 }
+
+function startHealthPolling() {
   pauseHealthPolling();
   if (appSettings.health_check_enabled === false) return;
   const intervalSec = Math.max(15, Math.min(900, appSettings.health_check_interval || 60));
@@ -5265,36 +5275,61 @@ $('#scan-test-btn')?.addEventListener('click', async () => {
   }
 });
 
-// Init
+function finishBoot(sessionOk) {
+  authBootComplete = true;
+  reconcilePageScrollLock();
+  if (sessionOk) {
+    showView('dashboard-view');
+    loadDashboard().catch(handleDashboardLoadError);
+  } else {
+    showView('login-view');
+  }
+  if ($('#boot-view')?.classList.contains('hidden') === false) {
+    console.error('[NetDash boot] boot-view still visible after finishBoot — forcing login');
+    showView('login-view');
+  }
+}
+
+// Init — auth/me must run within 5s; watchdog guarantees login form if JS hangs
 (async () => {
   showView('boot-view');
+  let bootFinished = false;
+  const bootWatchdog = setTimeout(() => {
+    if (bootFinished) return;
+    console.error('[NetDash boot] 5s watchdog — forcing login (check console for JS errors if /api/auth/me missing in server logs)');
+    finishBoot(false);
+  }, AUTH_ME_TIMEOUT_MS);
+
   try {
-    await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
+    const sessionPromise = restoreSession().catch((err) => {
+      console.error('[NetDash boot] restoreSession failed:', err?.message || err);
+      return false;
+    });
+    const langPromise = loadLanguage(localStorage.getItem('netdash_lang') || 'pl').catch((err) => {
+      console.error('[NetDash boot] loadLanguage failed:', err?.message || err);
+    });
+    const [sessionOk] = await Promise.all([
+      sessionPromise,
+      langPromise,
+      checkServerHealth(),
+    ]);
     syncDashboardLayoutSelect();
     applyI18n();
     ['edit', 'add'].forEach((prefix) => {
-      refreshIconPickerTabs(prefix);
-      refreshIconPickerGrid(prefix);
+      try {
+        refreshIconPickerTabs(prefix);
+        refreshIconPickerGrid(prefix);
+      } catch (err) {
+        console.warn('[NetDash boot] icon picker init:', err?.message || err);
+      }
     });
-    const [, sessionOk] = await Promise.all([
-      checkServerHealth(),
-      restoreSession(),
-    ]);
-    reconcilePageScrollLock();
-    if (sessionOk) {
-      showView('dashboard-view');
-      loadDashboard().catch(handleDashboardLoadError);
-    } else {
-      showView('login-view');
-    }
+    finishBoot(sessionOk);
   } catch (err) {
-    console.error('[NetDash boot]', err);
-    showView('login-view');
+    console.error('[NetDash boot] fatal:', err?.message || err);
+    finishBoot(false);
   } finally {
-    authBootComplete = true;
-    if (!$('#boot-view')?.classList.contains('hidden')) {
-      console.warn('[NetDash boot] boot-view still visible — forcing login');
-      showView('login-view');
-    }
+    bootFinished = true;
+    clearTimeout(bootWatchdog);
+    if (!authBootComplete) finishBoot(false);
   }
 })();

@@ -440,11 +440,30 @@ python scripts/reset-admin-password.py --db /share/Container/netdash/data/netdas
 
 ### Ekran „Ładowanie sesji…” nie znika (wisi w nieskończoność)
 
-**Przyczyna (v1.3.89):** `GET /api/auth/me` bez timeoutu — gdy brak cookie lub sieć wolna, fetch wisi, a ekran boot nigdy nie przechodzi do logowania.
+**Przyczyna (v1.3.114):** błąd składni w `app.js` — cały skrypt się nie ładuje, boot nigdy nie woła `GET /api/auth/me` (w logach kontenera **zero** takich żądań z IP przeglądarki). W logach entrypoint może być stara wersja (np. `v1.3.92`) przy `app.js?v=1.3.114` — **mieszany obraz** po częściowym update.
+
+**Naprawa od v1.3.115:** przywrócony `startHealthPolling`, watchdog 5 s, entrypoint zsynchronizowany z `VERSION`.
+
+**Pełny upgrade (wymagany — nie częściowy update):**
+
+```bash
+# Na QNAP (SSH) lub z hosta z dostępem do Dockera
+docker stop netdash && docker rm netdash
+docker pull ghcr.io/lobrzut/netdash:1.3.115
+# Uruchom ponownie z compose (deploy/qnap/docker-compose.yml) lub Container Station
+```
+
+Po starcie sprawdź zgodność wersji:
+
+- Logi kontenera: `NetDash entrypoint v1.3.115`
+- `curl http://<IP>:18787/api/health` → `"version":"1.3.115"`
+- DevTools → Network: `app.js?v=1.3.115` i po odświeżeniu `GET /api/auth/me`
+
+**Obejście natychmiastowe (przed upgrade):** **Ctrl+Shift+R** (twarde odświeżenie), wyczyść `localStorage` (`netdash_token`) i ciasteczka dla hosta, spróbuj okna incognito. Jeśli w logach nadal brak `/api/auth/me` — to crash JS; upgrade do 1.3.115 jest konieczny.
+
+**Starsze przyczyny (v1.3.89):** `GET /api/auth/me` bez timeoutu — gdy brak cookie lub sieć wolna, fetch wisi.
 
 **Naprawa od v1.3.90:** timeout 5 s → automatycznie ekran logowania; logi w konsoli przeglądarki (`[NetDash]`) i w kontenerze (`GET /api/auth/me: brak cookie sesji`).
-
-**Obejście przed upgrade:** wyczyść ciasteczka dla `http://<IP-QNAP>:18787` (DevTools → Application → Cookies) i twarde odświeżenie **Ctrl+F5** (Safari: Cmd+Shift+R).
 
 ### Po odświeżeniu strony (F5) trzeba logować się od nowa
 
