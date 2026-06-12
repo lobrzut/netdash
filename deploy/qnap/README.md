@@ -146,26 +146,17 @@ Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesi
 
 **Od v1.3.94+** safe mode i limity zasobów są domyślne **w całym projekcie NetDash** (każdy deploy, nie tylko QNAP): `NETDASH_SCAN_SAFE_MODE=true`, limit RAM **512 MB**. Na słabym sprzęcie użyj węższego CIDR (`/28`).
 
-### Limit RAM (512 MB) w compose
+### Limit RAM (512 MB) — Container Station UI
 
-Compose QNAP używa standardowego [Compose Specification](https://docs.docker.com/compose/compose-file/) — **bez** klucza `version` i **bez** legacy `mem_limit`:
-
-```yaml
-deploy:
-  resources:
-    limits:
-      memory: 512M
-```
-
-**Docker Compose v2** (`docker compose`, bez myślnika) stosuje `deploy.resources.limits` na pojedynczym hoście — **bez trybu Swarm**. **Container Station 3.x** (QTS 5.1+) opiera się na Compose v2 i powinien zastosować ten limit przy imporcie YAML z GitHub.
-
-**Stary Container Station (< 3.0) lub brak limitu po imporcie:** ustaw ręcznie w UI:
+Compose QNAP jest **minimalny** (bez `version`, bez `mem_limit`, bez `deploy.resources`) — przechodzi walidację YAML w IDE i import w CS bez fałszywych ostrzeżeń. **Limit RAM ustaw raz ręcznie** (na słabym NAS to pewniejsze niż pole w YAML):
 
 1. **Container Station** → aplikacja `netdash` → edycja kontenera `netdash`
 2. Zakładka **Resource** (Zasoby)
 3. **Memory limit** → **512 MB** → zapisz i zrestartuj kontener
 
-Opcjonalny limit CPU: ta sama zakładka **Resource** → **CPU limit** (compose QNAP nie ustawia twardego limitu CPU).
+Opcjonalny limit CPU: ta sama zakładka **Resource** → **CPU limit**.
+
+> Żółte trójkąty w VS Code/Cursor przy polach limitów w compose to **walidator schematu IDE**, nie błąd QNAP — compose na GitHub celowo nie zawiera limitów zasobów.
 
 | Parametr (safe mode) | Wartość |
 |----------------------|---------|

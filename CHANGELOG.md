@@ -2,8 +2,8 @@
 
 ## v1.3.103
 
-- **Compose (QNAP)**: prawdziwa poprawka YAML na GitHub (import URL) — usunięto `version: "2.4"` i legacy `mem_limit`; limit RAM przez `deploy.resources.limits.memory: 512M` (Compose Specification, zgodne ze schematem Schema Store). Usunięto własny `qnap-compose.schema.json` i modeline IDE.
-- **README (QNAP)**: `deploy.resources` + ręczny fallback 512 MB w CS Resource przy starym Container Station.
+- **Compose (QNAP)**: czysty minimalny YAML — bez `version`, `mem_limit`, `deploy.resources` ani `cpus` (żadnych fałszywych ostrzeżeń IDE/Schema Store). Limit RAM 512 MB: komentarz w compose + **Container Station → Resource → Memory limit** (patrz README).
+- **README (QNAP)**: sekcja limitu RAM tylko przez UI CS; wyjaśnienie żółtych trójkątów IDE vs QNAP.
 - **Obraz**: bez zmian — `ghcr.io/lobrzut/netdash:1.3.102`.
 
 ## v1.3.102
