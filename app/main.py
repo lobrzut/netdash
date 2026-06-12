@@ -25,7 +25,7 @@ from app.auth import (
     set_auth_cookie,
     verify_password,
 )
-from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, settings
+from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, WHATS_NEW, settings
 from app.docker_update import pull_and_restart, update_apply_available
 from app.updates import fetch_latest_release, is_newer_version, normalize_version
 from app.database import Base, async_session, engine, get_db
@@ -593,6 +593,7 @@ async def health(db: AsyncSession = Depends(get_db)):
     return {
         "ok": True,
         "version": VERSION,
+        "whats_new": WHATS_NEW,
         "build_date": BUILD_DATE or None,
         "github": GITHUB_REPO,
         "ghcr_image": GHCR_IMAGE,

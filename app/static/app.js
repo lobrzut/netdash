@@ -4,6 +4,7 @@ const BOOT_WATCHDOG_MS = 5000;
 const BOOT_HEALTH_TIMEOUT_MS = 5000;
 let appVersion = null;
 let buildDate = null;
+let whatsNewItems = [];
 let githubRepo = 'https://github.com/lobrzut/netdash';
 let token = null;
 let sessionEstablished = false;
@@ -40,6 +41,7 @@ const SERVICE_ICON_PRESETS = [
 const RECENT_ICONS_KEY = 'netdash_recent_icons';
 const SCAN_CONFIRM_SKIP_KEY = 'netdash_scan_confirm_skip';
 const SCAN_SAFE_BANNER_DISMISS_KEY = 'netdash_scan_safe_banner_dismiss';
+const LAST_SEEN_VERSION_KEY = 'netdash_last_seen_version';
 const SCAN_CIDR_CUSTOM = '__custom__';
 const MAX_RECENT_ICONS = 8;
 const SERVICE_ICON_GROUPS = [
@@ -458,6 +460,55 @@ function isUpdateApplyAvailable() {
   return Boolean(updateApplyAvailable || lastUpdateCheck?.update_apply_available);
 }
 
+function isVersionNewer(current, lastSeen) {
+  if (!current) return false;
+  if (!lastSeen) return true;
+  return versionReached(current, lastSeen) && normalizeVersionTag(current) !== normalizeVersionTag(lastSeen);
+}
+
+function dismissWhatsNewBanner() {
+  const banner = $('#update-whats-new-banner');
+  if (banner) banner.classList.add('hidden');
+  if (appVersion) {
+    try {
+      localStorage.setItem(LAST_SEEN_VERSION_KEY, normalizeVersionTag(appVersion));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function maybeShowWhatsNewBanner() {
+  const banner = $('#update-whats-new-banner');
+  const titleEl = $('#update-whats-new-title');
+  const listEl = $('#update-whats-new-list');
+  if (!banner || !titleEl || !listEl) return;
+  if (!appVersion || !Array.isArray(whatsNewItems) || !whatsNewItems.length) {
+    banner.classList.add('hidden');
+    return;
+  }
+  let lastSeen = null;
+  try {
+    lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY);
+  } catch {
+    lastSeen = null;
+  }
+  if (!isVersionNewer(appVersion, lastSeen)) {
+    banner.classList.add('hidden');
+    return;
+  }
+  const verLabel = formatVersion(appVersion);
+  titleEl.textContent = `NetDash zaktualizowany do ${verLabel}`;
+  listEl.replaceChildren(
+    ...whatsNewItems.map((item) => {
+      const li = document.createElement('li');
+      li.textContent = String(item);
+      return li;
+    }),
+  );
+  banner.classList.remove('hidden');
+}
+
 function normalizeVersionTag(version) {
   return String(version || '').replace(/^v/i, '').trim();
 }
@@ -749,6 +800,7 @@ async function checkServerHealth() {
     if (!data.ok) throw new Error(t('error.serverHealth'));
     appVersion = data.version || null;
     buildDate = data.build_date || null;
+    whatsNewItems = Array.isArray(data.whats_new) ? data.whats_new : [];
     if (data.github) githubRepo = data.github;
     if (data.update_apply_available) updateApplyAvailable = true;
     if (data.watchtower_enabled) {
@@ -1556,6 +1608,7 @@ async function loadDashboard() {
   startClock();
   startHealthPolling();
   startDiscoveryStatusPolling();
+  maybeShowWhatsNewBanner();
 }
 
 let serviceRefreshInterval = null;
@@ -4343,6 +4396,7 @@ function bindScanUi() {
     localStorage.setItem(SCAN_SAFE_BANNER_DISMISS_KEY, '1');
     updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
   });
+  $('#update-whats-new-dismiss')?.addEventListener('click', () => dismissWhatsNewBanner());
 }
 
 // Events

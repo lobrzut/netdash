@@ -6,8 +6,14 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.128"
+VERSION = "1.3.129"
 DEFAULT_LISTEN_PORT = 18787
+WHATS_NEW = [
+    "TCP discovery automatyczne — serwisy same w bazie",
+    "Szybszy skan homelab (2 chunki/cykl)",
+    "Ukryte mylące opcje ręcznego skanu na QNAP",
+    "Informacja po aktualizacji (ten komunikat)",
+]
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
 GHCR_IMAGE = "ghcr.io/lobrzut/netdash"

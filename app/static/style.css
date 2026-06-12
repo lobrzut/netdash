@@ -2281,6 +2281,53 @@ body.modal-open {
   border: 1px solid rgba(59, 130, 246, 0.15);
 }
 
+.update-whats-new-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 2rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(99, 102, 241, 0.1);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+.update-whats-new-banner:not(.hidden) {
+  display: flex;
+}
+
+.update-whats-new-content {
+  flex: 1;
+  min-width: min(100%, 42rem);
+}
+
+.update-whats-new-title {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text);
+}
+
+.update-whats-new-list {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+}
+
+.update-whats-new-list li {
+  margin: 0.2rem 0;
+}
+
+.update-whats-new-dismiss {
+  flex-shrink: 0;
+  align-self: flex-end;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+}
+
 .discovery-status-card {
   padding: 0.75rem 1rem;
   border-radius: 8px;

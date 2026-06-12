@@ -1,6 +1,6 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.128**
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.129**
 
 ## Najprostsze ścieżki (bez git na serwerze)
 
@@ -151,7 +151,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.128",...}
+curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.129",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```

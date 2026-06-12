@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.129
+
+- **Po aktualizacji — banner „co nowego”**: przy pierwszym wejściu po podbiciu wersji (gdy `version` > `netdash_last_seen_version` w localStorage) nieblokujący pasek pod statusem discovery z tytułem „NetDash zaktualizowany do vX.Y.Z”, 3–5 punktów po polsku i przyciskiem „OK, rozumiem”.
+- **API**: `GET /api/health` zwraca `whats_new: []` z `app/config.py` (łatwa aktualizacja przy kolejnym release).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.129`.
+
 ## v1.3.128
 
 - **Audyt release (2026-06-13)**: pełny przegląd v1.3.124–v1.3.127 — `discovery_pipeline.py`, `main.py`, UI skanu (`app.js`), spójność wersji, `compose.full.yml` (`:latest`, Watchtower 3600 s), CI `:latest`, 24/24 testów, `node --check app.js`, importy OK.

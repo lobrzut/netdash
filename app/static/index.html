@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.128" />
-  <script src="/static/i18n.js?v=1.3.128"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.129" />
+  <script src="/static/i18n.js?v=1.3.129"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -118,6 +118,13 @@
     <div id="discovery-status-bar" class="discovery-status-bar hidden" role="status">
       <span id="discovery-status-bar-text"></span>
       <button type="button" class="link-btn discovery-settings-link hidden" id="discovery-settings-scan-link" data-i18n="scan.settingsCidrLink">Ustawienia → Skanowanie (CIDR)</button>
+    </div>
+    <div id="update-whats-new-banner" class="update-whats-new-banner hidden" role="region" aria-labelledby="update-whats-new-title">
+      <div class="update-whats-new-content">
+        <p class="update-whats-new-title" id="update-whats-new-title"></p>
+        <ul class="update-whats-new-list" id="update-whats-new-list"></ul>
+        <button type="button" id="update-whats-new-dismiss" class="btn btn-primary update-whats-new-dismiss">OK, rozumiem</button>
+      </div>
     </div>
 
     <main class="main">
@@ -1246,6 +1253,6 @@ sol --udp-port 9
       }
     })();
   </script>
-  <script src="/static/app.js?v=1.3.128"></script>
+  <script src="/static/app.js?v=1.3.129"></script>
 </body>
 </html>
