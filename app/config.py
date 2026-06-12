@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.87"
+VERSION = "1.3.88"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"

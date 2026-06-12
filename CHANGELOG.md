@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.88
+
+- **QNAP entrypoint (impossible to miss)**: banner `NetDash entrypoint v1.3.88`, `LISTEN_PORT=18787 (8787 blocked)` w pierwszych liniach logu — łatwa diagnoza starego obrazu GHCR bez entrypoint.
+- **QNAP compose.full.yml**: obraz przypięty `ghcr.io/lobrzut/netdash:1.3.87` (nie `:latest` — unika cache CS ze starym 8787).
+
 ## v1.3.87
 
 - **Fix skanu QNAP (UI)**: przycisk „Skanuj sieć” widoczny na Pulpicie i w pustym stanie Serwisów; delegacja zdarzeń `#scan-start` — zawsze wysyła `POST /api/scan`; czerwony baner `#scan-error` gdy start skanu się nie powiedzie.

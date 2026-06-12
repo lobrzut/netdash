@@ -47,7 +47,7 @@ Od **v1.3.80** compose ma **twarde domyślne** (`admin` / `changeme`) — Contai
 | `NETDASH_SCAN_CIDR` | **w compose od v1.3.81** | `192.168.1.0/24` (dostosuj do swojej podsieci) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | w compose: `false` | restart **nie** nadpisuje hasła z SQLite; odzysk: `NETDASH_RESET_ADMIN_PASSWORD` |
 
-> Compose **v1.3.87** (aktualny release): obraz **`ghcr.io/lobrzut/netdash:latest`** w **docker-compose.full.yml** (Watchtower wymaga `:latest`). Fix skanu UI (`POST /api/scan`), sesja `netdash_session`, skan LAN **`NETDASH_SCAN_CIDR`**. Gdy host mode nie skanuje → **docker-compose.bridge.yml**. Po upgrade: ponowny import compose lub **Pull** `:latest`.
+> Compose na GitHub **main**: obraz **`ghcr.io/lobrzut/netdash:1.3.87`** w **docker-compose.full.yml** — **NIE `:latest`** (QNAP CS cache'uje stary obraz → crash 8787). Po imporcie: **Pull** `1.3.87` przed Start; w logach musi być `LISTEN_PORT=18787`. Gdy host mode nie skanuje → **docker-compose.bridge.yml**.
 
 Opcjonalnie wygeneruj `NETDASH_SECRET_KEY` na PC:
 
@@ -235,35 +235,36 @@ Skopiuj do `/share/Container/netdash/` przez File Station, potem **Import** → 
 
 ### Crash loop: `Errno 98` / „Address already in use” na porcie 8787
 
+**Diagnoza w 5 sekund:** otwórz logi kontenera. **Brak** linii `NetDash entrypoint` i `LISTEN_PORT=18787` = **stary obraz GHCR** (sprzed v1.3.84, hardcoded 8787). Compose z `:latest` na QNAP często nie pobiera nowego warstwa — używaj przypiętego **`1.3.87`**.
+
 **Przyczyna:** NetDash próbuje nasłuchiwać na **8787** zamiast **18787**. Najczęstsze źródła:
 
-1. **Stary obraz GHCR** (sprzed v1.3.73) — domyślny port w kodzie to wtedy 8787.
-2. **`NETDASH_PORT=8787` w Container Station** — stara zmienna utrwalona w szablonie CS (naprawione w **v1.3.84**: `NETDASH_PORT` całkowicie ignorowany, entrypoint wymusza `18787`).
-3. **Stary obraz `:latest` w cache CS** — compose ≥ v1.3.79 przypina `ghcr.io/lobrzut/netdash:1.3.79`.
-4. **Zombie kontener** — druga instancja NetDash lub duplikat aplikacji CS.
+1. **Stary obraz w cache CS** — `:latest` wskazuje na warstwę sprzed entrypoint (brak `LISTEN_PORT=18787` w logu).
+2. **Watchtower / reimport** odtworzył kontener ze starym obrazem.
+3. **Dwa kontenery netdash** — duplikat aplikacji CS lub zombie.
+4. **`NETDASH_PORT=8787` w CS** — stara zmienna w szablonie (v1.3.84+ ją ignoruje, ale stary obraz nie).
 
-Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i CS go restartuje w kółko.
+Port **8787** = **Readarr** na wielu QNAP → crash loop.
 
-**Naprawa w Container Station (bez SSH):**
+#### Pilna checklista (Container Station, bez SSH)
 
-1. **Applications** → zatrzymaj aplikację `netdash`.
-2. **Delete Application** → zaznacz **Remove containers** (usuwa stary kontener ze starym env).
-3. **Create** → **Create Application** → **Import from URL** — wklej **świeży** compose:
+1. **SSH lub Terminal CS** (opcjonalnie): `docker ps -a | grep netdash` — musi być **JEDEN** kontener `netdash`. Jeśli dwa → usuń duplikat aplikacji CS.
+2. **Applications** → **Stop** → **Delete Application** → zaznacz **Remove containers** (pełne usunięcie starego obrazu/env).
+3. **Create Application** → **Import from URL**:
    ```
    https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
    ```
-4. **Environment** — **nic nie musisz dodawać** (v1.3.81+ ma CIDR w compose). Dostosuj `NETDASH_SCAN_CIDR` jeśli Twoja sieć ≠ `192.168.1.0/24`. **Nie dodawaj** `NETDASH_PORT`.
-5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:latest`.
-6. Otwórz: `http://192.168.1.150:18787` (nie `:8787`).
-7. W logach: `LISTEN_PORT=18787 (8787 blocked)`, `NetDash listening on port 18787` i `Uvicorn running on http://0.0.0.0:18787`.
+   Compose ma obraz **`ghcr.io/lobrzut/netdash:1.3.87`** (nie `:latest`).
+4. **Environment** — nic nie dodawaj poza ewentualną zmianą `NETDASH_SCAN_CIDR`. **Nie dodawaj** `NETDASH_PORT`.
+5. **Przed Start:** **Images** → **Pull** → `ghcr.io/lobrzut/netdash:1.3.87` (ręczny pull wymuszony).
+6. **Start** → otwórz logi kontenera. **Pierwsze linie MUSZĄ zawierać:**
+   - `NetDash entrypoint`
+   - `LISTEN_PORT=18787 (8787 blocked)`
+   - `Uvicorn running on http://0.0.0.0:18787`
+7. Portal: `http://<IP-QNAP>:18787` (nie `:8787`).
+8. Health: `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.87"` lub nowsza.
 
-**Jeśli masz już działającą aplikację (bez pełnego reinstall):**
-
-1. **Applications** — zostaw **jedną** aplikację `netdash`; usuń duplikaty.
-2. **Delete Application** (Remove containers) i zaimportuj compose od nowa — CS trzyma stare env w szablonie aplikacji.
-3. **Pull** obrazu `ghcr.io/lobrzut/netdash:latest`.
-4. **Start**.
-5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.87","admin_ready":true,...}`.
+**Jeśli log nadal pokazuje 8787 lub brak entrypoint** — powtórz kroki 1–6; CS trzyma cache obrazu mimo reimportu.
 
 Jeśli nadal błąd — przez SSH na QNAP:
 
@@ -286,10 +287,10 @@ Import compose **dwa razy** tworzy dwie aplikacje z tym samym `container_name: n
 
 | Sprawdź | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:latest` po **Pull** |
-| Compose URL | `docker-compose.full.yml` z GitHub **main** (`NETDASH_LISTEN_PORT: "18787"`) |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.87` po **ręcznym Pull** |
+| Compose URL | `docker-compose.full.yml` z GitHub **main** (pin `1.3.87`, nie `:latest`) |
 | CS Environment | tylko SECRET_KEY / hasło; **brak** `NETDASH_PORT` |
-| Log kontenera | `Uvicorn running on http://0.0.0.0:18787` |
+| Log kontenera (pierwsze linie) | `NetDash entrypoint` + `LISTEN_PORT=18787` + `Uvicorn ... :18787` |
 | URL w przeglądarce | `http://<IP-QNAP>:18787` |
 
 Jeśli log nadal pokazuje `:8787` — usuń aplikację CS i zaimportuj compose od nowa (patrz sekcja crash loop powyżej).
