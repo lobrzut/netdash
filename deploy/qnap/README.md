@@ -152,9 +152,15 @@ To **kosmetyka IDE**, nie błąd deployu na QNAP. `mem_limit` (Compose 2.4) jest
 
 Yaml-language-server domyślnie ładuje schemat z [Schema Store](https://www.schemastore.org) (`docker-compose.json`, Compose v3+), który **nie zna** `mem_limit` na poziomie serwisu → żółte „additional property”.
 
-**Fix (v1.3.102+):** pierwsza linia compose ma modeline z **pełnym URL** schematu NetDash na GitHubie. Działa gdy plik otwierasz z `C:\opt\netdash`, z innego workspace (np. `brain-client`) lub po imporcie URL — nie wymaga lokalnego `qnap-compose.schema.json` obok pliku.
+**Fix (v1.3.102+):** pierwsza linia compose ma modeline z **pełnym URL** schematu NetDash na GitHubie + `.vscode/settings.json` z `yaml.schemaStore.enable: false` i mapowaniem schematu (żeby Schema Store nie narzucał `docker-compose.json` v3+).
 
-Po aktualizacji modeline: zamknij i otwórz plik albo **Developer: Reload Window**. QNAP Container Station (web UI) nie używa yaml-language-server — tam tego ostrzeżenia nie ma.
+| Gdzie edytujesz | Co zrobić |
+|-----------------|-----------|
+| **`C:\opt\netdash` jako folder główny** | Użyj ustawień z `C:\opt\netdash\.vscode\settings.json` (w repo). |
+| **`brain-client` jako folder główny** | Użyj `brain-client\.vscode\settings.json` — mapuje `C:/opt/netdash/deploy/qnap/*.yml` na schemat NetDash. |
+| Inny workspace | Skopiuj blok `yaml.schemas` + `yaml.schemaStore.enable: false` do `.vscode/settings.json` tego workspace albo otwórz `C:\opt\netdash` jako osobny folder. |
+
+Po aktualizacji: **Developer: Reload Window** (albo zamknij i otwórz plik). Jeśli żółty trójkąt zostaje — to kosmetyka IDE; deploy na QNAP jest poprawny. Container Station nie używa yaml-language-server.
 
 | Parametr (safe mode) | Wartość |
 |----------------------|---------|
