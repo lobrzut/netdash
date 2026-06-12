@@ -1,4 +1,6 @@
 const API = '';
+const AUTH_ME_TIMEOUT_MS = 5000;
+const BOOT_HEALTH_TIMEOUT_MS = 5000;
 let appVersion = null;
 let buildDate = null;
 let githubRepo = 'https://github.com/lobrzut/netdash';
@@ -102,6 +104,16 @@ function categoryAccentColor(category) {
   return CATEGORY_ACCENTS[Math.abs(hash) % CATEGORY_ACCENTS.length];
 }
 const $$ = (sel) => document.querySelectorAll(sel);
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
@@ -584,7 +596,7 @@ function updateFooterNetwork(netLabel) {
 
 async function checkServerHealth() {
   try {
-    const res = await fetch('/api/health', { credentials: 'include' });
+    const res = await fetchWithTimeout('/api/health', { credentials: 'include' }, BOOT_HEALTH_TIMEOUT_MS);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (!data.ok) throw new Error(t('error.serverHealth'));
@@ -4461,13 +4473,26 @@ setupSettingsFaviconUpload();
 document.addEventListener('visibilitychange', reconcilePageScrollLock);
 window.addEventListener('pageshow', reconcilePageScrollLock);
 
+function clearStoredSession() {
+  token = null;
+  localStorage.removeItem('netdash_token');
+  sessionEstablished = false;
+}
+
 async function restoreSession() {
   try {
-    const res = await fetch(`${API}/api/auth/me`, { credentials: 'include' });
+    const res = await fetchWithTimeout(
+      `${API}/api/auth/me`,
+      { credentials: 'include' },
+      AUTH_ME_TIMEOUT_MS,
+    );
     if (!res.ok) {
-      token = null;
-      localStorage.removeItem('netdash_token');
-      sessionEstablished = false;
+      if (res.status === 401) {
+        console.info('[NetDash] Brak aktywnej sesji (401) — pokazuję logowanie');
+      } else {
+        console.warn('[NetDash] /api/auth/me HTTP', res.status);
+      }
+      clearStoredSession();
       return false;
     }
     const data = await res.json().catch(() => ({}));
@@ -4477,10 +4502,10 @@ async function restoreSession() {
     }
     sessionEstablished = true;
     return true;
-  } catch {
-    token = null;
-    localStorage.removeItem('netdash_token');
-    sessionEstablished = false;
+  } catch (err) {
+    const reason = err?.name === 'AbortError' ? 'timeout (5s)' : (err?.message || 'unknown');
+    console.warn('[NetDash] /api/auth/me failed:', reason);
+    clearStoredSession();
     return false;
   }
 }
@@ -4532,20 +4557,30 @@ $('#scan-test-btn')?.addEventListener('click', async () => {
 // Init
 (async () => {
   showView('boot-view');
-  await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
-  syncDashboardLayoutSelect();
-  applyI18n();
-  ['edit', 'add'].forEach((prefix) => {
-    refreshIconPickerTabs(prefix);
-    refreshIconPickerGrid(prefix);
-  });
-  await checkServerHealth();
-  reconcilePageScrollLock();
-  if (await restoreSession()) {
-    showView('dashboard-view');
-    loadDashboard().catch(handleDashboardLoadError);
-  } else {
+  try {
+    await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
+    syncDashboardLayoutSelect();
+    applyI18n();
+    ['edit', 'add'].forEach((prefix) => {
+      refreshIconPickerTabs(prefix);
+      refreshIconPickerGrid(prefix);
+    });
+    await checkServerHealth();
+    reconcilePageScrollLock();
+    if (await restoreSession()) {
+      showView('dashboard-view');
+      loadDashboard().catch(handleDashboardLoadError);
+    } else {
+      showView('login-view');
+    }
+  } catch (err) {
+    console.error('[NetDash boot]', err);
     showView('login-view');
+  } finally {
+    authBootComplete = true;
+    if (!$('#boot-view')?.classList.contains('hidden')) {
+      console.warn('[NetDash boot] boot-view still visible — forcing login');
+      showView('login-view');
+    }
   }
-  authBootComplete = true;
 })();

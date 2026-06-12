@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.90
+
+- **Fix „Ładowanie sesji…” (QNAP)**: `GET /api/auth/me` ma timeout 5 s — po błędzie/timeout natychmiast ekran logowania (bez wiecznego spinnera).
+- **Boot**: `try/finally` gwarantuje wyjście z `boot-view` → zawsze logowanie lub dashboard; timeout także na `/api/health`.
+- **Logi**: klient `console.warn` przy timeout/błędzie sesji; serwer loguje `GET /api/auth/me: brak cookie sesji` przy 401 bez cookie.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.90`.
+
 ## v1.3.89
 
 - **Fix sesji QNAP (F5)**: ekran „Ładowanie sesji…” do czasu `GET /api/auth/me`; brak odczytu starego tokena z localStorage przy starcie; przy 401 retry cookie-only i `restoreSession()` zamiast natychmiastowego wylogowania.

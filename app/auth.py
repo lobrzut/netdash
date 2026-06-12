@@ -102,17 +102,26 @@ async def get_current_user(
     )
     token = session_token or legacy_token or _extract_bearer_token(request)
     if not token:
+        if request.url.path == "/api/auth/me":
+            client = request.client.host if request.client else "?"
+            logger.info("GET /api/auth/me: brak cookie sesji (client=%s)", client)
         raise credentials_error
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         username: str | None = payload.get("sub")
         if username is None:
+            if request.url.path == "/api/auth/me":
+                logger.info("GET /api/auth/me: token bez subject")
             raise credentials_error
     except JWTError:
+        if request.url.path == "/api/auth/me":
+            logger.info("GET /api/auth/me: nieprawidłowy lub wygasły token")
         raise credentials_error
 
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
     if user is None:
+        if request.url.path == "/api/auth/me":
+            logger.info("GET /api/auth/me: użytkownik %s nie istnieje", username)
         raise credentials_error
     return user
