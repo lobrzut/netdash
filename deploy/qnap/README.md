@@ -1,12 +1,33 @@
-# NetDash na QNAP — 2 kroki (discovery automatyczne)
+# NetDash na QNAP — szybki start (v1.3.115)
 
-Obraz: `ghcr.io/lobrzut/netdash:1.3.114` — **bez skanowania z NAS** (bezpieczeństwo). Pełna sieć `/24` skanuje agent na homelab co ~10 min.
+Obraz: `ghcr.io/lobrzut/netdash:1.3.115` — **bez skanowania z NAS** (bezpieczeństwo). Pełna sieć `/24` skanuje agent na homelab co ~10 min.
+
+## Import z GitHub (zalecane)
+
+**URL compose (NetDash + Watchtower):**
+
+```
+https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
+```
+
+*(Tylko NetDash, bez Watchtower: [`docker-compose.yml`](docker-compose.yml) — ten sam URL w [`compose.url`](compose.url).)*
+
+## Upgrade / re-import (wymagany przy v1.3.114 → v1.3.115)
+
+QNAP Container Station **cache'uje stary obraz** — częściowy update (Pull bez usunięcia aplikacji) daje mieszany obraz i wieczne „Ładowanie sesji…”. **Zawsze pełny re-import:**
+
+1. **Container Station** → aplikacja `netdash` → **Stop**
+2. **Delete Application** → zaznacz **Remove containers** (dane w `/share/Container/netdash/data` zostają)
+3. **Create Application** → **Import from URL** → wklej URL **docker-compose.full.yml** (powyżej)
+4. **Images** → **Pull** → `ghcr.io/lobrzut/netdash:1.3.115` (ręczny pull przed Start)
+5. **Start** → sprawdź logi: `NetDash entrypoint v1.3.115` i `LISTEN_PORT=18787`
+6. Portal: `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.115"`
 
 ## Krok 1 — NetDash na QNAP (.150)
 
 1. **Container Station** → **Create Application** → **Import from URL**
-2. Wklej: `https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml`
-3. **Pull** obraz `1.3.114` → **Start** → `http://192.168.1.150:18787` (login `admin` / `changeme`)
+2. Wklej: `https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml`
+3. **Pull** obraz `1.3.115` → **Start** → `http://192.168.1.150:18787` (login `admin` / `changeme`)
 
 Portal pokazuje pasek: *„Discovery: czekam na agenta…”* — to normalne przed krokiem 2.
 
@@ -71,7 +92,7 @@ Od **v1.3.80** compose ma **twarde domyślne** (`admin` / `changeme`) — Contai
 | `NETDASH_SCAN_CIDR` | **w compose od v1.3.81** | `192.168.1.0/24` (dostosuj do swojej podsieci) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | w compose: `false` | restart **nie** nadpisuje hasła z SQLite; odzysk: `NETDASH_RESET_ADMIN_PASSWORD` |
 
-> Compose na GitHub **main**: obraz **`ghcr.io/lobrzut/netdash:1.3.90`** w **docker-compose.full.yml** — **NIE `:latest`** (QNAP CS cache'uje stary obraz → crash 8787). Po imporcie: **Pull** `1.3.90` przed Start; w logach musi być `LISTEN_PORT=18787` i `NetDash entrypoint v1.3.90`. Compose jest już w trybie **bridge** (port `18787:18787`).
+> Compose na GitHub **main**: obraz **`ghcr.io/lobrzut/netdash:1.3.115`** w **docker-compose.full.yml** — **NIE `:latest`** (QNAP CS cache'uje stary obraz). Po imporcie: **Pull** `1.3.115` przed Start; w logach musi być `LISTEN_PORT=18787` i `NetDash entrypoint v1.3.115`. Domyślnie `NETDASH_SCAN_DISABLED=true` + `NETDASH_DISCOVERY_MODE=remote`.
 
 Opcjonalnie wygeneruj `NETDASH_SECRET_KEY` na PC:
 
@@ -331,15 +352,15 @@ Port **8787** = **Readarr** na wielu QNAP → crash loop.
    ```
    https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
    ```
-   Compose ma obraz **`ghcr.io/lobrzut/netdash:1.3.90`** (nie `:latest`).
-4. **Environment** — nic nie dodawaj poza ewentualną zmianą `NETDASH_SCAN_CIDR`. **Nie dodawaj** `NETDASH_PORT`.
-5. **Przed Start:** **Images** → **Pull** → `ghcr.io/lobrzut/netdash:1.3.90` (ręczny pull wymuszony).
+   Compose ma obraz **`ghcr.io/lobrzut/netdash:1.3.115`** (nie `:latest`).
+4. **Environment** — nic nie dodawaj. **Nie dodawaj** `NETDASH_PORT`.
+5. **Przed Start:** **Images** → **Pull** → `ghcr.io/lobrzut/netdash:1.3.115` (ręczny pull wymuszony).
 6. **Start** → otwórz logi kontenera. **Pierwsze linie MUSZĄ zawierać:**
    - `NetDash entrypoint`
    - `LISTEN_PORT=18787 (8787 blocked)`
    - `Uvicorn running on http://0.0.0.0:18787`
 7. Portal: `http://<IP-QNAP>:18787` (nie `:8787`).
-8. Health: `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.90"`.
+8. Health: `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.115"`.
 
 **Jeśli log nadal pokazuje 8787 lub brak entrypoint** — powtórz kroki 1–6; CS trzyma cache obrazu mimo reimportu.
 
@@ -364,8 +385,8 @@ Import compose **dwa razy** tworzy dwie aplikacje z tym samym `container_name: n
 
 | Sprawdź | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.90` po **ręcznym Pull** |
-| Compose URL | `docker-compose.full.yml` z GitHub **main** (pin `1.3.90`, bridge, nie `:latest`) |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.115` po **ręcznym Pull** |
+| Compose URL | `docker-compose.full.yml` z GitHub **main** (pin `1.3.115`, nie `:latest`) |
 | CS Environment | tylko SECRET_KEY / hasło; **brak** `NETDASH_PORT` |
 | Log kontenera (pierwsze linie) | `NetDash entrypoint` + `LISTEN_PORT=18787` + `Uvicorn ... :18787` |
 | URL w przeglądarce | `http://<IP-QNAP>:18787` |
