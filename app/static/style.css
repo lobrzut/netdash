@@ -1346,6 +1346,77 @@ body.modal-open {
   margin: 0.5rem 0 0;
 }
 
+.update-modal-content {
+  max-width: 28rem;
+}
+
+.update-view.hidden {
+  display: none;
+}
+
+.update-progress-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.update-spinner {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border: 3px solid rgba(var(--accent-rgb), 0.2);
+  border-top-color: var(--accent-bright);
+  border-radius: 50%;
+  animation: update-spin 0.8s linear infinite;
+}
+
+@keyframes update-spin {
+  to { transform: rotate(360deg); }
+}
+
+.update-version-lines {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-version-line {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.update-steps {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.update-step--active {
+  color: var(--accent-bright);
+  font-weight: 600;
+}
+
+.update-step--done {
+  color: var(--success, #4ade80);
+}
+
+.update-manual-steps {
+  margin: 0.5rem 0 1rem;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.update-manual-steps li + li {
+  margin-top: 0.375rem;
+}
+
 .about-tech-chip {
   padding: 0.25rem 0.5625rem;
   border-radius: 999px;

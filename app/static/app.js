@@ -200,6 +200,10 @@ function authorInitials(name) {
 
 let lastUpdateCheck = null;
 let updateApplyAvailable = false;
+let updateInProgress = false;
+let updatePollTimer = null;
+const UPDATE_POLL_MS = 2500;
+const UPDATE_TIMEOUT_MS = 120000;
 
 function renderAboutPanel() {
   const prose = $('#about-prose-text');
@@ -279,10 +283,171 @@ function renderUpdateCheckUI(data) {
   }
 
   const canApply = data.update_apply_available || updateApplyAvailable;
-  if (applyBtn && data.update_available && canApply) {
+  if (applyBtn && data.update_available) {
     applyBtn.hidden = false;
-  } else if (applyHintEl && data.update_available && !canApply) {
+    applyBtn.disabled = updateInProgress;
+  }
+  if (applyHintEl && data.update_available && !canApply) {
     applyHintEl.hidden = false;
+  }
+}
+
+function isUpdateApplyAvailable() {
+  return Boolean(updateApplyAvailable || lastUpdateCheck?.update_apply_available);
+}
+
+function normalizeVersionTag(version) {
+  return String(version || '').replace(/^v/i, '').trim();
+}
+
+function versionReached(current, target) {
+  if (!target) return false;
+  const currentTag = normalizeVersionTag(current);
+  const targetTag = normalizeVersionTag(target);
+  if (!currentTag || !targetTag) return false;
+  if (currentTag === targetTag) return true;
+  const currentParts = currentTag.split('.').map((n) => parseInt(n, 10) || 0);
+  const targetParts = targetTag.split('.').map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(currentParts.length, targetParts.length); i += 1) {
+    const a = currentParts[i] || 0;
+    const b = targetParts[i] || 0;
+    if (a > b) return true;
+    if (a < b) return false;
+  }
+  return true;
+}
+
+function showUpdateView(viewId) {
+  $$('#update-modal .update-view').forEach((el) => el.classList.add('hidden'));
+  const view = $(`#update-view-${viewId}`);
+  if (view) view.classList.remove('hidden');
+  const titleKeys = {
+    confirm: 'about.updates.modal.confirmTitle',
+    progress: 'about.updates.modal.progressTitle',
+    manual: 'about.updates.modal.manualTitle',
+    result: 'about.updates.modal.resultTitle',
+  };
+  const titleEl = $('#update-modal-title');
+  if (titleEl && titleKeys[viewId]) titleEl.textContent = t(titleKeys[viewId]);
+}
+
+function stopUpdatePolling() {
+  if (updatePollTimer) {
+    clearInterval(updatePollTimer);
+    updatePollTimer = null;
+  }
+}
+
+async function fetchHealthVersion() {
+  try {
+    const res = await fetch('/api/health', { credentials: 'include' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.ok ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderUpdateProgressSteps(activeStep) {
+  const stepsEl = $('#update-progress-steps');
+  if (!stepsEl) return;
+  const steps = [
+    { id: 'pull', key: 'about.updates.modal.stepPulling' },
+    { id: 'restart', key: 'about.updates.modal.stepRestarting' },
+    { id: 'wait', key: 'about.updates.modal.stepWaiting' },
+  ];
+  const activeIndex = steps.findIndex((s) => s.id === activeStep);
+  stepsEl.innerHTML = steps.map((step, index) => {
+    let cls = '';
+    if (index < activeIndex) cls = 'update-step--done';
+    else if (index === activeIndex) cls = 'update-step--active';
+    return `<li class="update-step ${cls}">${esc(t(step.key))}</li>`;
+  }).join('');
+}
+
+function startUpdateHealthPoll(startVersion, targetVersion, onSuccess, onFailure) {
+  stopUpdatePolling();
+  const startedAt = Date.now();
+  renderUpdateProgressSteps('wait');
+  const statusEl = $('#update-progress-status');
+  if (statusEl) statusEl.textContent = t('about.updates.modal.checkingVersion');
+
+  updatePollTimer = setInterval(async () => {
+    if (Date.now() - startedAt > UPDATE_TIMEOUT_MS) {
+      stopUpdatePolling();
+      onFailure(t('about.updates.modal.timeout'));
+      return;
+    }
+    const health = await fetchHealthVersion();
+    if (!health) {
+      if (statusEl) statusEl.textContent = t('about.updates.modal.waitingRestart');
+      return;
+    }
+    const ver = health.version;
+    if (statusEl) {
+      statusEl.textContent = `${t('about.updates.modal.checkingVersion')} (${formatVersion(ver)})`;
+    }
+    if (versionReached(ver, targetVersion) && normalizeVersionTag(ver) !== normalizeVersionTag(startVersion)) {
+      stopUpdatePolling();
+      onSuccess(ver);
+    }
+  }, UPDATE_POLL_MS);
+}
+
+function openUpdateManualModal() {
+  const target = lastUpdateCheck?.latest_version;
+  const verEl = $('#update-manual-version');
+  if (verEl) {
+    verEl.textContent = target
+      ? t('about.updates.modal.targetVersion', { version: formatVersion(target) })
+      : '';
+  }
+  showUpdateView('manual');
+  openModal('update-modal');
+}
+
+function openUpdateConfirmModal() {
+  showUpdateView('confirm');
+  openModal('update-modal');
+}
+
+function showUpdateResult(success, message, showReload = false) {
+  updateInProgress = false;
+  const btn = $('#btn-apply-update');
+  if (btn) btn.disabled = false;
+  const msgEl = $('#update-result-message');
+  if (msgEl) msgEl.textContent = message;
+  const reloadBtn = $('#update-result-reload');
+  if (reloadBtn) reloadBtn.classList.toggle('hidden', !showReload);
+  showUpdateView('result');
+  const titleEl = $('#update-modal-title');
+  if (titleEl) {
+    titleEl.textContent = t(success ? 'about.updates.modal.successTitle' : 'about.updates.modal.failedTitle');
+  }
+  openModal('update-modal');
+}
+
+async function recheckUpdateFromModal() {
+  const recheckBtn = $('#update-manual-recheck');
+  if (recheckBtn) recheckBtn.disabled = true;
+  const verEl = $('#update-manual-version');
+  if (verEl) verEl.textContent = t('about.updates.modal.checkingVersion');
+  try {
+    const data = await checkForUpdates({ silent: true });
+    if (!verEl) return;
+    if (data.update_available) {
+      verEl.textContent = t('about.updates.modal.stillAvailable', {
+        version: formatVersion(data.latest_version),
+      });
+    } else {
+      verEl.textContent = t('about.updates.toastCurrent');
+      setTimeout(() => closeModal('update-modal'), 1800);
+    }
+  } catch {
+    if (verEl) verEl.textContent = t('about.updates.failed');
+  } finally {
+    if (recheckBtn) recheckBtn.disabled = false;
   }
 }
 
@@ -312,17 +477,74 @@ async function checkForUpdates({ silent = false } = {}) {
 }
 
 async function applyNetDashUpdate() {
-  if (!confirm(t('about.updates.applyConfirm'))) return;
+  if (updateInProgress) return;
+  if (!lastUpdateCheck?.update_available) {
+    await checkForUpdates();
+    if (!lastUpdateCheck?.update_available) return;
+  }
+  if (!isUpdateApplyAvailable()) {
+    openUpdateManualModal();
+    return;
+  }
+  openUpdateConfirmModal();
+}
+
+async function executeNetDashUpdate() {
+  if (updateInProgress) return;
+  updateInProgress = true;
   const btn = $('#btn-apply-update');
   if (btn) btn.disabled = true;
+
+  const startVersion = appVersion;
+  const targetVersion = lastUpdateCheck?.latest_version;
+  showUpdateView('progress');
+  openModal('update-modal');
+
+  const curEl = $('#update-progress-current');
+  const tgtEl = $('#update-progress-target');
+  if (curEl) {
+    curEl.textContent = t('about.updates.modal.currentVersion', { version: formatVersion(startVersion) });
+  }
+  if (tgtEl) {
+    tgtEl.textContent = t('about.updates.modal.targetVersion', { version: formatVersion(targetVersion) });
+  }
+
+  renderUpdateProgressSteps('pull');
+  const statusEl = $('#update-progress-status');
+  if (statusEl) statusEl.textContent = t('about.updates.modal.stepPulling');
+
   try {
-    const result = await api('/api/updates/apply', { method: 'POST' });
-    showToast(result.message || t('about.updates.applyStarted'), 'success');
-    setTimeout(() => location.reload(), 12000);
+    await api('/api/updates/apply', { method: 'POST' });
+    renderUpdateProgressSteps('restart');
+    if (statusEl) statusEl.textContent = t('about.updates.modal.stepRestarting');
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    startUpdateHealthPoll(
+      startVersion,
+      targetVersion,
+      (newVer) => {
+        showUpdateResult(
+          true,
+          t('about.updates.modal.successBody', { version: formatVersion(newVer) }),
+          true,
+        );
+        appVersion = newVer;
+        applyVersionDisplay();
+        if (lastUpdateCheck) {
+          lastUpdateCheck = { ...lastUpdateCheck, update_available: false, current_version: newVer };
+          renderUpdateCheckUI(lastUpdateCheck);
+        }
+      },
+      (errMsg) => {
+        showUpdateResult(false, errMsg || t('about.updates.applyFailed'));
+      },
+    );
   } catch (err) {
-    showToast(err.message || t('about.updates.applyFailed'), 'error');
-  } finally {
-    if (btn) btn.disabled = false;
+    stopUpdatePolling();
+    const msg = err.message || t('about.updates.applyFailed');
+    if (msg.includes('docker.sock') || msg.includes('Watchtower') || msg.includes('Container Station')) {
+      showToast(t('about.updates.dockerSockError'), 'error');
+    }
+    showUpdateResult(false, msg);
   }
 }
 
@@ -2936,8 +3158,10 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+  if (id === 'update-modal' && updateInProgress) return;
   const el = $(`#${id}`);
   if (!el || el.classList.contains('hidden')) return;
+  if (id === 'update-modal') stopUpdatePolling();
   el.classList.add('hidden');
   try {
     closeIconPopover();
@@ -3035,6 +3259,12 @@ $('#login-form').addEventListener('submit', async (e) => {
 
 $('#btn-check-updates')?.addEventListener('click', () => checkForUpdates());
 $('#btn-apply-update')?.addEventListener('click', () => applyNetDashUpdate());
+$('#update-confirm-cancel')?.addEventListener('click', () => closeModal('update-modal'));
+$('#update-confirm-ok')?.addEventListener('click', () => executeNetDashUpdate());
+$('#update-manual-close')?.addEventListener('click', () => closeModal('update-modal'));
+$('#update-manual-recheck')?.addEventListener('click', () => recheckUpdateFromModal());
+$('#update-result-close')?.addEventListener('click', () => closeModal('update-modal'));
+$('#update-result-reload')?.addEventListener('click', () => location.reload());
 $('#logout-btn').addEventListener('click', logout);
 $('#nav-home-btn')?.addEventListener('click', () => navigateTo('home'));
 $('#nav-services-btn')?.addEventListener('click', () => navigateTo('services'));
@@ -3915,6 +4145,7 @@ $('#note-delete').addEventListener('click', async () => {
 $$('.modal-backdrop').forEach((b) => {
   b.addEventListener('click', () => {
     const modal = b.closest('.modal');
+    if (modal?.id === 'update-modal' && updateInProgress) return;
     if (modal?.id) closeModal(modal.id);
   });
 });

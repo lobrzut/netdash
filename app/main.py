@@ -504,7 +504,7 @@ async def apply_update(_: User = Depends(get_current_user)):
     if not update_apply_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Aktualizacja z poziomu aplikacji jest wyłączona (brak docker.sock lub NETDASH_UPDATE_APPLY_ENABLED)",
+            detail="Aktualizacja z portalu wymaga docker.sock — na QNAP użyj Watchtower lub Pull w Container Station",
         )
     image = f"{settings.docker_image}:{settings.docker_image_tag}"
     try:

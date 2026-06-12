@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.83
+
+- **Portal — aktualizacje (fix QNAP)**: przycisk „Aktualizuj teraz” zawsze widoczny gdy jest nowa wersja; bez docker.sock otwiera modal z instrukcją Watchtower / Pull w Container Station i „Sprawdź ponownie” (polling GitHub).
+- **Modal postępu**: potwierdzenie bez `confirm()`, overlay „Aktualizacja w toku…”, kroki pull/restart, polling `/api/health` co 2,5 s do wykrycia nowej wersji; blokada double-click i zamknięcia podczas aktualizacji.
+- **API**: czytelniejszy komunikat 503 gdy brak docker.sock; i18n pl/en/de/uk dla nowych stringów.
+
 ## v1.3.82
 
 - **QNAP auto-update (fix)**: `docker-compose.full.yml` używa obrazu `:latest` zamiast przypiętego semver — Watchtower może pobierać nowe wersje. Literały env Watchtower (QNAP CS ignoruje `${VAR:-default}`), `WATCHTOWER_INCLUDE_STOPPED=true`.

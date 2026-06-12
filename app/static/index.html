@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.82" />
-  <script src="/static/i18n.js?v=1.3.82"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.83" />
+  <script src="/static/i18n.js?v=1.3.83"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -687,6 +687,56 @@ sol --udp-port 9
     </div>
   </div>
 
+  <!-- Update Modal -->
+  <div id="update-modal" class="modal hidden" role="dialog" aria-labelledby="update-modal-title" aria-modal="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-form update-modal-content">
+      <h2 id="update-modal-title" data-i18n="about.updates.modal.progressTitle">Aktualizacja w toku…</h2>
+
+      <div id="update-view-confirm" class="update-view hidden">
+        <p class="modal-desc" data-i18n="about.updates.modal.confirmBody">Pobrać najnowszy obraz Docker i zrestartować NetDash? Strona będzie niedostępna przez kilkanaście sekund.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="update-confirm-cancel" data-i18n="modal.cancel">Anuluj</button>
+          <button type="button" class="btn btn-accent" id="update-confirm-ok" data-i18n="about.updates.modal.confirmBtn">Aktualizuj</button>
+        </div>
+      </div>
+
+      <div id="update-view-progress" class="update-view hidden">
+        <div class="update-progress-header">
+          <div class="update-spinner" aria-hidden="true"></div>
+          <div class="update-version-lines">
+            <p id="update-progress-current" class="update-version-line"></p>
+            <p id="update-progress-target" class="update-version-line"></p>
+          </div>
+        </div>
+        <ol id="update-progress-steps" class="update-steps" aria-live="polite"></ol>
+        <p id="update-progress-status" class="hint" data-i18n="about.updates.modal.checkingVersion">Sprawdzam wersję…</p>
+      </div>
+
+      <div id="update-view-manual" class="update-view hidden">
+        <p class="modal-desc" data-i18n="about.updates.modal.manualIntro">Aktualizacja z portalu wymaga docker.sock na hoście. Na QNAP zaktualizuj obraz ręcznie:</p>
+        <ol class="update-manual-steps">
+          <li data-i18n="about.updates.modal.manualStep1">Watchtower (docker-compose.full.yml z obrazem :latest) — automatycznie co 24 h</li>
+          <li data-i18n="about.updates.modal.manualStep2">Container Station → aplikacja NetDash → Pull obrazu ghcr.io/lobrzut/netdash</li>
+          <li data-i18n="about.updates.modal.manualStep3">Po Pull zrestartuj kontener i sprawdź wersję w Ustawienia → O projekcie</li>
+        </ol>
+        <p id="update-manual-version" class="hint"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="update-manual-close" data-i18n="modal.close">Zamknij</button>
+          <button type="button" class="btn btn-accent" id="update-manual-recheck" data-i18n="about.updates.modal.recheckBtn">Sprawdź ponownie</button>
+        </div>
+      </div>
+
+      <div id="update-view-result" class="update-view hidden">
+        <p id="update-result-message" class="modal-desc"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-accent" id="update-result-close" data-i18n="modal.close">Zamknij</button>
+          <button type="button" class="btn btn-ghost hidden" id="update-result-reload" data-i18n="about.updates.modal.reloadBtn">Odśwież stronę</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scan Modal -->
   <div id="scan-modal" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -1066,6 +1116,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.82"></script>
+  <script src="/static/app.js?v=1.3.83"></script>
 </body>
 </html>
