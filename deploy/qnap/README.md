@@ -1,4 +1,4 @@
-# NetDash na QNAP — import raz, zero edycji YAML (v1.3.125)
+# NetDash na QNAP — import raz, zero edycji YAML (v1.3.126)
 
 > **Container Station nie pozwala edytować compose po deployu.** Użyj **jednego** URL poniżej — wszystko (discovery, Watchtower, auto-update) jest już w pliku.
 
@@ -21,7 +21,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 |---------|---------|
 | Obraz NetDash | `ghcr.io/lobrzut/netdash:latest` |
 | Watchtower | co **1 h** (`WATCHTOWER_POLL_INTERVAL=3600`) |
-| Discovery | TCP-first (porty 22/80/443/8006/8080…), rotacja /28, `network_mode: host` |
+| Discovery | TCP-first (porty 22/80/443/8006/8080…), **2 chunki /28 na cykl**, `network_mode: host` |
 | Sieć | `NETDASH_SCAN_CIDR=192.168.1.0/24` — **zmień w Ustawienia → Skanowanie** dla dowolnej adresacji |
 | Portal | port **18787**, safe mode, startup defer |
 | Kontenery | `netdash` + `netdash-watchtower` (oba **Running**) |
@@ -34,7 +34,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 ### Auto-aktualizacja (Watchtower)
 
-- GitHub Actions publikuje `:latest` + `:1.3.125` przy każdym tagu `v*`
+- GitHub Actions publikuje `:latest` + `:1.3.126` przy każdym tagu `v*`
 - Watchtower co ~1 h sprawdza nowy digest `:latest` na GHCR i **sam** restartuje NetDash
 - Portal pokazuje: *„Aktualizacja automatyczna przez Watchtower (co ~1 h)”* — przycisk „Aktualizuj teraz” nie działa na QNAP (brak docker.sock w kontenerze) i **nie jest potrzebny**
 - Samo-aktualizacja z wnętrza kontenera bez docker.sock jest **niemożliwa** — Watchtower **jest** rozwiązaniem
@@ -53,7 +53,7 @@ NetDash **automatycznie wykrywa wszystkie serwisy** na LAN (TCP + identyfikacja 
 | | **weak (QNAP .150)** | **strong (serwer .201)** |
 |---|---|---|
 | Wykrywanie | TCP-first, te same porty | TCP-first, pełny CIDR co cykl |
-| Zakres /24 | Rotacja **16 chunków /28** (~5 min/cykl → pełna sieć ~80 min) | Cały CIDR **co 2 min** |
+| Zakres /24 | **2 chunki /28** na cykl (N + N+8, np. 1+9/16) → pełna sieć **~40 min**; `.200` Proxmox ~**11 min** | Cały CIDR **co 2 min** |
 | Równoległość | 8 IP, 4 porty | 32 IP, 16 portów |
 | Wynik końcowy | **Ten sam** — wszystkie serwisy | **Ten sam**, szybciej |
 | Dlaczego wolniej? | QNAP: mało RAM, kernel pada przy floodzie TCP na /24 | Docker na serwerze: więcej CPU/RAM |
@@ -64,7 +64,7 @@ NetDash **automatycznie wykrywa wszystkie serwisy** na LAN (TCP + identyfikacja 
 
 Przykłady auto-wykrywania: Proxmox `:8006`, QNAP `:8080`, NetDash `:18787`, SSH `:22`, HTTP `:80`/`:443`.
 
-Pasek statusu: *„Skan TCP: chunk 3/16, znaleziono 12 serwisów"*.
+Pasek statusu: *„Skan TCP: chunk 1+9/16, znaleziono 12 serwisów"*.
 
 ---
 

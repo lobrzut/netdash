@@ -48,6 +48,20 @@ class StatusLineTests(unittest.TestCase):
         self.assertIn("12 serwisów", line)
         self.assertIn("profil: weak", line)
 
+    def test_format_status_line_dual_chunk(self):
+        line = format_status_line(
+            {
+                "tcp": 2,
+                "services": 6,
+                "chunk_index": 1,
+                "chunk_index_secondary": 9,
+                "chunk_total": 16,
+            },
+            "weak",
+        )
+        self.assertIn("Skan TCP: chunk 1+9/16", line)
+        self.assertIn("6 serwisów", line)
+
     def test_format_status_line_full_cidr(self):
         line = format_status_line({"tcp": 8, "services": 24}, "strong")
         self.assertIn("8 hostów", line)
@@ -61,14 +75,28 @@ class ChunkSelectionTests(unittest.TestCase):
         chunk = _select_cycle_cidr("192.168.1.0/24", profile)
         self.assertTrue(chunk.endswith("/28"))
 
-    def test_weak_rotates_single_chunk_per_cycle(self):
+    def test_weak_rotates_dual_chunks_per_cycle(self):
         original_cidr = settings.scan_cidr
         try:
             settings.scan_cidr = "192.168.1.0/24"
             profile = get_profile_config("weak")
+            import app.discovery_pipeline as dp
+
+            dp._chunk_index = 0
             cidrs = _select_cycle_cidrs("192.168.1.0/24", profile)
-            self.assertEqual(len(cidrs), 1)
-            self.assertTrue(cidrs[0].endswith("/28"))
+            self.assertEqual(len(cidrs), 2)
+            self.assertTrue(all(c.endswith("/28") for c in cidrs))
+            self.assertEqual(cidrs[0], "192.168.1.0/28")
+            self.assertEqual(cidrs[1], "192.168.1.128/28")
+            self.assertEqual(dp._state["chunk_index"], 1)
+            self.assertEqual(dp._state["chunk_index_secondary"], 9)
+
+            cidrs2 = _select_cycle_cidrs("192.168.1.0/24", profile)
+            self.assertEqual(cidrs2[0], "192.168.1.32/28")
+            self.assertEqual(cidrs2[1], "192.168.1.160/28")
+            self.assertEqual(dp._state["chunk_index"], 3)
+            self.assertEqual(dp._state["chunk_index_secondary"], 11)
+            dp._chunk_index = 0
         finally:
             settings.scan_cidr = original_cidr
 

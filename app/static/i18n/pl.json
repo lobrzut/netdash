@@ -18,7 +18,7 @@
   "discovery.remoteOnlyBanner": "Skan lokalny wyłączony na NAS. Opcjonalny agent zdalny — patrz Ustawienia → Automatyczne discovery.",
   "discovery.remoteOnlyHint": "Lokalny skan wyłączony — opcjonalny agent zdalny na innym hoście LAN (deploy/agent).",
   "discovery.arpIntro": "Skan ARP działa lokalnie na QNAP (jak WatchYourLAN / Pi.Alert) — host network + arp-scan co kilka minut. Pełny skan TCP tylko w Opcje skanu.",
-  "discovery.adaptiveIntro": "Discovery TCP-first: skanuje porty (22, 80, 443, 8006 Proxmox itd.) i automatycznie tworzy serwisy. Profil weak (QNAP) rotuje chunki /28; strong (serwer) skanuje cały CIDR co cykl.",
+  "discovery.adaptiveIntro": "Discovery TCP-first: skanuje porty (22, 80, 443, 8006 Proxmox itd.) i automatycznie tworzy serwisy. Profil weak (QNAP) skanuje 2 chunki /28 na cykl (rotacja + druga połowa sieci, pełny /24 ~40 min); strong skanuje cały CIDR co cykl.",
   "discovery.tcpWaiting": "Skan TCP: pierwszy cykl w toku…",
   "discovery.tcpRunning": "Skan TCP w toku ({tier}, profil: {profile})…",
   "discovery.adaptiveWaiting": "Skan TCP: pierwszy cykl w toku…",

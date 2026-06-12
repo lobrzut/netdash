@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.126
+
+- **Weak profile — dual /28 per cycle**: każdy cykl skanuje chunk rotowany (N) **oraz** chunk przeciwnej połowy sieci `(N + 8) % 16` — np. chunk 1+9/16 obejmuje `.0-.15` i `.128-.143` w jednym cyklu.
+- **Pełny /24 w ~40 min** (8 cykli × 5 min) zamiast ~80 min; **Proxmox `.200`** (chunk 13, `.192/28`) pierwszy skan TCP po **~11 min** zamiast ~65 min.
+- **UI**: pasek statusu `Skan TCP: chunk 1+9/16, znaleziono …` gdy skan dual.
+
 ## v1.3.125
 
 - **TCP-first discovery** (`NETDASH_DISCOVERY_MODE=adaptive`): Tier 1 skanuje porty `[22, 80, 443, 8006, 8080, 3000, 5000, 8000, 8443, 9000]` — dowolny otwarty port = host żywy. Automatyczne tworzenie wpisów usług (Proxmox :8006, QNAP :8080 itd.).

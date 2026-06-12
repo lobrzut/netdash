@@ -772,6 +772,7 @@ async def network_info(
         discovery_current_tier=(auto_status or {}).get("current_tier"),
         discovery_interval_sec=(auto_status or {}).get("interval_sec"),
         discovery_chunk_index=(adaptive or {}).get("chunk_index"),
+        discovery_chunk_index_secondary=(adaptive or {}).get("chunk_index_secondary"),
         discovery_chunk_total=(adaptive or {}).get("chunk_total"),
         discovery_services_found=((adaptive or {}).get("last_tiers") or {}).get("services"),
         discovery_method=(adaptive or {}).get("discovery_method"),

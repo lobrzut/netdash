@@ -220,6 +220,7 @@ class NetworkInfo(BaseModel):
     discovery_current_tier: str | None = None
     discovery_interval_sec: int | None = None
     discovery_chunk_index: int | None = None
+    discovery_chunk_index_secondary: int | None = None
     discovery_chunk_total: int | None = None
     discovery_services_found: int | None = None
     discovery_method: str | None = None

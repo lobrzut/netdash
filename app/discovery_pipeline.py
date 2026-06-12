@@ -5,7 +5,7 @@ Tier 1: TCP connect sweep on common ports — ANY open port = host live + auto s
 Tier 2: arp-scan / ip neigh for MAC enrichment only (not a discovery gate)
 Tier 3: HTTP health checks — independent loop in main.py (unchanged)
 
-Weak QNAP: rotates /28 chunks — full SCAN_CIDR covered over N cycles (~80 min /24).
+Weak QNAP: dual /28 chunks per cycle (rotated + opposite half) — full /24 in ~40 min.
 """
 
 from __future__ import annotations
@@ -45,6 +45,7 @@ from app.schemas import DiscoveryHostEntry
 logger = logging.getLogger("netdash")
 
 ARP_BROKEN_STREAK = 3
+WEAK_CHUNKS_PER_CYCLE = 2
 
 _task: asyncio.Task | None = None
 _known_ips: set[str] = set()
@@ -68,6 +69,7 @@ _state: dict[str, Any] = {
     "arp_skipped": False,
     "interval_sec": None,
     "chunk_index": 0,
+    "chunk_index_secondary": None,
     "chunk_total": 0,
 }
 
@@ -136,11 +138,16 @@ def format_status_line(tiers: dict[str, int], profile: str) -> str:
     services_n = tiers.get("services", 0)
     hosts_n = tiers.get("tcp", 0)
     chunk_idx = tiers.get("chunk_index")
+    chunk_idx2 = tiers.get("chunk_index_secondary")
     chunk_total = tiers.get("chunk_total")
 
     if chunk_total and chunk_total > 1 and chunk_idx:
+        if chunk_idx2 and chunk_idx2 != chunk_idx:
+            chunk_label = f"chunk {chunk_idx}+{chunk_idx2}/{chunk_total}"
+        else:
+            chunk_label = f"chunk {chunk_idx}/{chunk_total}"
         return (
-            f"Skan TCP: chunk {chunk_idx}/{chunk_total}, "
+            f"Skan TCP: {chunk_label}, "
             f"znaleziono {services_n} serwisów ({hosts_n} hostów, profil: {profile})"
         )
     return f"Skan TCP: {hosts_n} hostów, {services_n} serwisów (profil: {profile})"
@@ -152,7 +159,7 @@ def _select_cycle_cidr(cidr: str, profile: ProfileConfig) -> str:
 
 
 def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
-    """Rotate /28 chunks on weak hosts; scan full CIDR on normal/strong."""
+    """Rotate /28 chunks on weak hosts (dual per cycle); scan full CIDR on normal/strong."""
     global _chunk_index
     wide = (settings.scan_cidr or cidr).strip()
     try:
@@ -163,16 +170,48 @@ def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
     if wide_net.prefixlen >= profile.chunk_prefix:
         _state["chunk_total"] = 1
         _state["chunk_index"] = 1
+        _state["chunk_index_secondary"] = None
         return [str(wide_net)]
 
     all_chunks = [str(c) for c in wide_net.subnets(new_prefix=profile.chunk_prefix)]
     if not all_chunks:
         return [wide]
 
-    selected = all_chunks[_chunk_index % len(all_chunks)]
+    chunk_total = len(all_chunks)
+    primary_idx = _chunk_index % chunk_total
+
+    if profile.name == "weak" and chunk_total > 1:
+        secondary_idx = (primary_idx + chunk_total // 2) % chunk_total
+        indices = [primary_idx]
+        if secondary_idx != primary_idx:
+            indices.append(secondary_idx)
+        selected = [all_chunks[i] for i in indices]
+        _chunk_index += WEAK_CHUNKS_PER_CYCLE
+        _state["chunk_total"] = chunk_total
+        _state["chunk_index"] = primary_idx + 1
+        _state["chunk_index_secondary"] = (
+            secondary_idx + 1 if secondary_idx != primary_idx else None
+        )
+        chunk_log = (
+            f"{_state['chunk_index']}+{_state['chunk_index_secondary']}"
+            if _state["chunk_index_secondary"]
+            else str(_state["chunk_index"])
+        )
+        logger.info(
+            "Adaptive discovery: profile=%s chunk %s/%s %s (from %s)",
+            profile.name,
+            chunk_log,
+            chunk_total,
+            selected,
+            wide,
+        )
+        return selected
+
+    selected = all_chunks[primary_idx]
     _chunk_index += 1
-    _state["chunk_total"] = len(all_chunks)
-    _state["chunk_index"] = (_chunk_index - 1) % len(all_chunks) + 1
+    _state["chunk_total"] = chunk_total
+    _state["chunk_index"] = primary_idx + 1
+    _state["chunk_index_secondary"] = None
 
     logger.info(
         "Adaptive discovery: profile=%s chunk %s/%s %s (from %s)",
@@ -354,6 +393,7 @@ async def run_discovery_cycle() -> int:
 
         if _state.get("chunk_total", 0) > 1:
             tiers["chunk_index"] = _state.get("chunk_index", 0)
+            tiers["chunk_index_secondary"] = _state.get("chunk_index_secondary")
             tiers["chunk_total"] = _state.get("chunk_total", 0)
 
         tcp_ips: set[str] = set()
@@ -499,6 +539,7 @@ def get_discovery_pipeline_status() -> dict[str, Any]:
         "arp_zero_streak": _arp_zero_streak,
         "interval_sec": _state.get("interval_sec") or effective_interval(get_profile_config()),
         "chunk_index": _state.get("chunk_index"),
+        "chunk_index_secondary": _state.get("chunk_index_secondary"),
         "chunk_total": _state.get("chunk_total"),
         "tcp_ports": TCP_DISCOVERY_PRIMARY_PORTS,
     }
