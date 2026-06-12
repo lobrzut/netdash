@@ -10,7 +10,7 @@
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.117
+    image: ghcr.io/lobrzut/netdash:1.3.118
     container_name: netdash
     restart: always
     network_mode: host
@@ -21,6 +21,8 @@ services:
       NETDASH_DISCOVERY_MODE: "arp"
       NETDASH_SCAN_CIDR: "192.168.1.0/24"
       NETDASH_ARP_INTERVAL: "300"
+      # NETDASH_ARP_IFACE: "bond0"
+      NETDASH_ARP_EXTRA_HOSTS: "192.168.1.200,192.168.1.201"
       NETDASH_SCAN_SAFE_MODE: "true"
       NETDASH_ARP_PROBE_NEW_HOSTS: "true"
       NETDASH_COOKIE_SECURE: "false"

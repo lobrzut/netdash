@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.117"
+VERSION = "1.3.118"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -133,6 +133,14 @@ class Settings(BaseSettings):
     arp_probe_new_hosts: bool = True
     arp_probe_delay: float = 2.0
     arp_probe_max_hosts: int = 3
+    # LAN interface for arp-scan (-I); auto-detect via `ip route get` when unset
+    arp_iface: str | None = None
+    # Comma-separated IPs always probed each cycle (e.g. homelab servers)
+    arp_extra_hosts: str | None = None
+    # Ping/TCP sweep when arp-scan returns 0 hosts
+    arp_ping_fallback: bool = True
+    arp_ping_max_hosts: int = 128
+    arp_ping_delay: float = 0.1
     # HttpOnly session cookie Secure flag — false for plain HTTP homelab (default).
     cookie_secure: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
@@ -211,6 +219,29 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)
+
+    @field_validator("arp_ping_fallback", mode="before")
+    @classmethod
+    def _arp_ping_fallback(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("arp_ping_max_hosts", mode="before")
+    @classmethod
+    def _arp_ping_max_hosts(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 128
+        return max(8, int(v))
+
+    @field_validator("arp_ping_delay", mode="before")
+    @classmethod
+    def _arp_ping_delay(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 0.1
+        return max(0.05, float(v))
 
     @field_validator("scan_safe_block_wide", mode="before")
     @classmethod

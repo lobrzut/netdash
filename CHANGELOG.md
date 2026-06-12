@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.118
+
+- **Fix ARP discovery returning 0 hosts on QNAP**: when `arp-scan` finds nothing, auto-fallback to `ip neigh`, rate-limited ping/TCP sweep, and quick-scan style discovery; log full `arp-scan` command and stderr.
+- **Interface auto-detect**: `NETDASH_ARP_IFACE` or parse `ip route get <gateway>` (bond0/eth0) — passed to `arp-scan -I`.
+- **Explicit homelab hosts**: `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.201` probed every cycle via ping/TCP.
+- **Safer offline marking**: only mark missing hosts offline when `arp-scan` itself returned hosts (fallback-only cycles no longer mass-offline).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.118`.
+
 ## v1.3.117
 
 - **ARP discovery on QNAP (WatchYourLAN / Pi.Alert style)**: `NETDASH_DISCOVERY_MODE=arp` — background `arp-scan` every `NETDASH_ARP_INTERVAL` (default 300 s), rate-limited (`--interval=100ms --retry=1`), no TCP sweep during cycle. Optional light port probe for **new** hosts only (one at a time).
