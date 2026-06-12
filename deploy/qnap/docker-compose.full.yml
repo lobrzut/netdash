@@ -5,12 +5,13 @@
 # Portal: http://<IP-QNAP>:18787  (NETDASH_LISTEN_PORT; never 8787 — Readarr)
 #
 # Watchtower co 24 h pobiera nowe obrazy z GHCR (etykieta watchtower.enable).
-# Obraz 1.3.87 — fix skanu UI + sesja cookie netdash_session + skan LAN (NETDASH_SCAN_CIDR).
+# Obraz :latest — Watchtower wymaga :latest (nie semver 1.3.x). Aktualny release: 1.3.87
+#   (fix skanu UI POST /api/scan, sesja cookie netdash_session, skan LAN NETDASH_SCAN_CIDR).
 # Gdy host mode nie skanuje LAN na QNAP → docker-compose.bridge.yml (patrz README.md).
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.87
+    image: ghcr.io/lobrzut/netdash:latest
     container_name: netdash
     restart: always
     network_mode: host
@@ -19,11 +20,12 @@ services:
       # NETDASH_SECRET_KEY: optional — entrypoint auto-generates to /app/data/.secret if unset.
       NETDASH_DEFAULT_ADMIN_USER: admin
       NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
-      NETDASH_SYNC_ADMIN_PASSWORD: "true"
+      # false = hasło w SQLite nie jest nadpisywane przy restarcie (pierwszy start tworzy admin/changeme).
+      NETDASH_SYNC_ADMIN_PASSWORD: "false"
       # QNAP CS ignores ${VAR:-default} — literal CIDR required for LAN scan.
       NETDASH_SCAN_CIDR: "192.168.1.0/24"
-      # One-time override (optional): NETDASH_RESET_ADMIN_PASSWORD — remove after login
-      # NETDASH_RESET_ADMIN_PASSWORD: ${NETDASH_RESET_ADMIN_PASSWORD:-}
+      # One-time recovery: odkomentuj, ustaw hasło, zaloguj, usuń env i zrestartuj.
+      # NETDASH_RESET_ADMIN_PASSWORD: "twoje-haslo"
       # NETDASH_LISTEN_PORT only — never NETDASH_PORT (CS may persist 8787; entrypoint unsets it).
       NETDASH_LISTEN_PORT: "18787"
     volumes:

@@ -9,7 +9,7 @@
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.87
+    image: ghcr.io/lobrzut/netdash:latest
     container_name: netdash
     restart: always
     ports:
@@ -17,7 +17,7 @@ services:
     environment:
       NETDASH_DEFAULT_ADMIN_USER: admin
       NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
-      NETDASH_SYNC_ADMIN_PASSWORD: "true"
+      NETDASH_SYNC_ADMIN_PASSWORD: "false"
       NETDASH_SCAN_CIDR: "192.168.1.0/24"
       NETDASH_LISTEN_PORT: "18787"
     volumes:
