@@ -12,7 +12,7 @@ from typing import Awaitable, Callable
 import httpx
 
 from app.config import settings
-from app.icons import resolve_brand_icon, resolve_icon_url
+from app.icons import resolve_brand_icon, resolve_icon_url, resolve_port_brand_icon
 
 logger = logging.getLogger("netdash")
 from app.url_utils import ensure_str, sanitize_service_url
@@ -176,6 +176,7 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
     (r"esphome", "ESPHome", "home", "Smart Home"),
     (r"zigbee2mqtt|zigbee", "Zigbee2MQTT", "home", "Smart Home"),
     (r"proxmox", "Proxmox", "server", "DevOps"),
+    (r"mesh\s*central|meshcentral", "MeshCentral", "monitor", "Zdalny dostęp"),
     (r"uptime\s*kuma", "Uptime Kuma", "chart", "Monitoring"),
     (r"frigate", "Frigate", "home", "Smart Home"),
     (r"audiobookshelf", "Audiobookshelf", "play", "Media"),
@@ -1251,7 +1252,7 @@ async def _identify_service(host: str, port: int) -> DiscoveredService:
         protocol=protocol,
         category=category,
         icon=icon,
-        icon_url=resolve_brand_icon(name),
+        icon_url=resolve_brand_icon(name) or resolve_port_brand_icon(port),
         description=f"Wykryto otwarty port {port}",
     )
     return _apply_os_hint(service)

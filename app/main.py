@@ -29,7 +29,7 @@ from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, 
 from app.docker_update import pull_and_restart, update_apply_available
 from app.updates import fetch_latest_release, is_newer_version, normalize_version
 from app.database import Base, async_session, engine, get_db
-from app.enrich import enrich_all_services, enrich_mac_addresses, should_auto_wol
+from app.enrich import enrich_all_services, enrich_mac_addresses, enrich_service_icons, should_auto_wol
 from app.health import check_all_services
 from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
@@ -468,7 +468,13 @@ async def _deferred_startup_enrich():
     try:
         mac_count = await enrich_mac_addresses()
         svc_count = await enrich_all_services()
-        logger.info("Startup enrich completed (%s MAC, %s metadata)", mac_count, svc_count)
+        icon_count = await enrich_service_icons(limit=150)
+        logger.info(
+            "Startup enrich completed (%s MAC, %s metadata, %s icons)",
+            mac_count,
+            svc_count,
+            icon_count,
+        )
     except Exception:
         logger.exception("Startup enrich failed")
 
@@ -1112,7 +1118,8 @@ async def import_settings(
 async def enrich_services(_: User = Depends(get_current_user)):
     mac_count = await enrich_mac_addresses()
     count = await enrich_all_services()
-    return {"updated": count + mac_count}
+    icon_count = await enrich_service_icons(limit=150)
+    return {"updated": count + mac_count + icon_count}
 
 
 @app.post("/api/services/identify", response_model=ServiceIdentifyResponse)
@@ -1164,6 +1171,7 @@ async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(ge
             has_login=svc.has_login,
             name=svc.name,
             description=svc.description,
+            port=svc.port,
         )
         out.append(row)
     return out
@@ -1365,7 +1373,8 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
                 service.protocol = item.protocol
                 service.category = item.category
                 service.icon = item.icon
-                service.icon_url = item.icon_url
+                if item.icon_url or not service.icon_url:
+                    service.icon_url = item.icon_url
                 service.description = item.description
             elif item.health_detail:
                 service.health_detail = item.health_detail[:128]
@@ -1523,6 +1532,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         if not settings.scan_safe_mode:
             await enrich_mac_addresses()
         await enrich_all_services()
+        await enrich_service_icons(limit=150)
         async with async_session() as db:
             result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
             job = result.scalar_one()

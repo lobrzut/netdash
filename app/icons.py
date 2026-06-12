@@ -60,6 +60,7 @@ BRAND_SLUGS: list[tuple[str, str]] = [
     (r"n8n", "n8n"),
     (r"homebridge", "homebridge"),
     (r"proxmox", "proxmox"),
+    (r"mesh\s*central|meshcentral", "meshcentral"),
     (r"code-server", "visualstudiocode"),
     (r"ollama", "ollama"),
     (r"openwebui", "openai"),
@@ -117,6 +118,36 @@ BRAND_SLUGS: list[tuple[str, str]] = [
 ]
 
 
+# Common homelab ports → simple-icons slug (watermark when HTTP title is generic)
+PORT_BRAND_SLUGS: dict[int, str] = {
+    8006: "proxmox",
+    9090: "prometheus",
+    9000: "portainer",
+    8080: "qnap",
+    5000: "docker",
+    5001: "qnap",
+    8443: "nginx",
+    9443: "nginx",
+    3000: "nodedotjs",
+    3306: "mysql",
+    5432: "postgresql",
+    6379: "redis",
+    5672: "rabbitmq",
+    9200: "elasticsearch",
+    27017: "mongodb",
+    18787: "docker",
+}
+
+
+def resolve_port_brand_icon(port: int | None) -> str | None:
+    if port is None:
+        return None
+    slug = PORT_BRAND_SLUGS.get(port)
+    if slug:
+        return simple_icon_url(slug)
+    return None
+
+
 def simple_icon_url(slug: str) -> str:
     return f"https://cdn.simpleicons.org/{slug}"
 
@@ -153,15 +184,20 @@ def effective_browser_icon_url(
     has_login: bool = False,
     name: str | None = None,
     description: str | None = None,
+    port: int | None = None,
 ) -> str | None:
     """Icon URL safe for browser <img> — never homelab auth-gated favicons."""
     from app.url_utils import is_safe_browser_icon_url, should_strip_login_gated_icon_url
 
     if should_strip_login_gated_icon_url(icon_url, service_url, has_login=has_login):
-        return resolve_brand_icon(name, description, service_url)
+        brand = resolve_brand_icon(name, description, service_url) or resolve_port_brand_icon(port)
+        return brand
     if icon_url and is_safe_browser_icon_url(icon_url):
         return icon_url
-    return resolve_brand_icon(name, description, service_url)
+    return (
+        resolve_brand_icon(name, description, service_url)
+        or resolve_port_brand_icon(port)
+    )
 
 
 def resolve_icon_url(
@@ -176,6 +212,9 @@ def resolve_icon_url(
     brand = resolve_brand_icon(name, title, page_url)
     if brand:
         return brand
+    port_brand = resolve_port_brand_icon(port)
+    if port_brand:
+        return port_brand
     if has_login:
         return None
     if port in (5000, 5001, 8443, 9443):

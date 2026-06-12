@@ -44,6 +44,29 @@ from app.schemas import DiscoveryHostEntry
 
 logger = logging.getLogger("netdash")
 
+_icon_enrich_task: asyncio.Task | None = None
+
+
+def _schedule_icon_enrich(services_hint: int = 0) -> None:
+    """Background favicon fetch for auto-discovered services missing watermarks."""
+    global _icon_enrich_task
+
+    async def _run() -> None:
+        await asyncio.sleep(2)
+        try:
+            from app.enrich import enrich_service_icons
+
+            limit = max(20, min(150, services_hint + 10))
+            count = await enrich_service_icons(limit=limit)
+            if count:
+                logger.info("Discovery icon enrich updated %s service(s)", count)
+        except Exception:
+            logger.exception("Discovery icon enrich failed")
+
+    if _icon_enrich_task and not _icon_enrich_task.done():
+        return
+    _icon_enrich_task = asyncio.create_task(_run())
+
 ARP_BROKEN_STREAK = 3
 WEAK_CHUNKS_PER_CYCLE = 2
 
@@ -479,6 +502,8 @@ async def run_discovery_cycle() -> int:
             len(new_ips),
             services_created,
         )
+        if services_created:
+            _schedule_icon_enrich(services_created)
         return count
     except Exception as exc:
         _state["last_error"] = str(exc)[:256]

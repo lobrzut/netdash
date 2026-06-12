@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.130
+
+- **Fix — watermark ikon na kafelkach auto-wykrytych serwisów**: TCP discovery (v1.3.125+) tworzyło wpisy bez `icon_url` — kafelki pokazywały tylko generyczną ikonę CSS zamiast dużego watermarku marki. Po auto-create uruchamiane jest pobieranie favicon w tle (`/favicon.ico`, `<link rel=icon>`, cache w `/uploads/icons/`).
+- **Fallback po porcie**: mapowanie port → ikona marki (np. `:8006` Proxmox, `:9000` Portainer, `:9090` Prometheus) gdy HTTP title jest generyczny lub login-gated.
+- **Enrich**: startup, ręczny skan i cykl TCP discovery wywołują `enrich_service_icons` — uzupełnia brakujące ikony dla wszystkich serwisów bez bezpiecznego `icon_url`.
+- **Marki**: MeshCentral w mapowaniu; upsert nie nadpisuje istniejącego `icon_url` wartością `null`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.130`.
+
 ## v1.3.129
 
 - **Po aktualizacji — banner „co nowego”**: przy pierwszym wejściu po podbiciu wersji (gdy `version` > `netdash_last_seen_version` w localStorage) nieblokujący pasek pod statusem discovery z tytułem „NetDash zaktualizowany do vX.Y.Z”, 3–5 punktów po polsku i przyciskiem „OK, rozumiem”.

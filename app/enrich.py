@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.arp_scan import batch_lookup_macs, lookup_mac_for_ip
 from app.database import async_session
-from app.icons import resolve_brand_icon
+from app.icons import resolve_brand_icon, resolve_port_brand_icon
 from app.models import Service
 from app.scanner import LOGIN_KNOWN_SERVICES, LOGIN_TITLE_RE, _fallback_service_name, is_http_error_name
 from app.url_utils import sanitize_service_url, should_strip_login_gated_icon_url
@@ -85,7 +85,7 @@ async def enrich_all_services() -> int:
             if safe_url and svc.url != safe_url:
                 svc.url = safe_url
                 changed = True
-            icon = resolve_brand_icon(svc.name, svc.description, svc.url)
+            icon = resolve_brand_icon(svc.name, svc.description, svc.url) or resolve_port_brand_icon(svc.port)
             if should_strip_login_gated_icon_url(svc.icon_url, svc.url, has_login=svc.has_login):
                 replacement = icon or None
                 if svc.icon_url != replacement:
@@ -112,3 +112,10 @@ async def enrich_all_services() -> int:
                 updated += 1
         await db.commit()
     return updated
+
+
+async def enrich_service_icons(*, limit: int = 100) -> int:
+    """Fetch/cache favicons for services missing watermark icons."""
+    from app.favicon import enrich_missing_service_icons
+
+    return await enrich_missing_service_icons(limit=limit)
