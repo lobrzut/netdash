@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.111"
+VERSION = "1.3.112"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -123,6 +123,8 @@ class Settings(BaseSettings):
     reset_admin_password: str | None = None
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
     scan_cidr: str | None = None
+    # Disable built-in LAN scan (QNAP dashboard) — use remote discovery agent instead
+    scan_disabled: bool = False
     # HttpOnly session cookie Secure flag — false for plain HTTP homelab (default).
     cookie_secure: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
@@ -165,6 +167,15 @@ class Settings(BaseSettings):
     def _scan_safe_mode(cls, v: object) -> bool:
         if v is None or (isinstance(v, str) and not v.strip()):
             return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("scan_disabled", mode="before")
+    @classmethod
+    def _scan_disabled(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)

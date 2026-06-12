@@ -803,6 +803,7 @@ function applyLayout() {
   });
   $('#scan-btn')?.classList.toggle('hidden', !onServices);
   updateFooterNetwork();
+  updateScanButtonsState(window.__netdashNetwork);
   updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
 }
 
@@ -915,13 +916,59 @@ const DEFAULT_NETWORK = Object.freeze({
   scan_cidr_configured: false,
   ping_available: null,
   scan_safe_mode: true,
+  scan_disabled: false,
   resource_profile: 'safe',
   detected_cidrs: [],
   env_scan_cidr: null,
   scan_safe_min_prefix: SCAN_SAFE_MIN_PREFIX,
   scan_max_hosts: 16,
   scan_chunk_size: 4,
+  discovery_last_import_at: null,
+  discovery_last_import_source: null,
 });
+
+function isLocalScanDisabled(netRes) {
+  const net = resolveNetwork(netRes);
+  return net.scan_disabled === true;
+}
+
+function updateScanButtonsState(netRes) {
+  const disabled = isLocalScanDisabled(netRes);
+  $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !disabled);
+  ['#scan-btn', '#empty-scan-btn', '#scan-start', '#scan-options-btn', '#empty-scan-options-btn', '#scan-test-btn'].forEach((sel) => {
+    const el = $(sel);
+    if (!el) return;
+    el.disabled = disabled;
+    el.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+    if (sel === '#scan-btn' || sel === '#empty-scan-btn') {
+      el.classList.toggle('scan-disabled', disabled);
+    }
+  });
+}
+
+function formatDiscoveryImportLabel(netRes, settings) {
+  const at = settings?.discovery_last_import_at || netRes?.discovery_last_import_at;
+  const source = settings?.discovery_last_import_source || netRes?.discovery_last_import_source;
+  if (!at) return '';
+  const when = new Date(at);
+  const timeStr = Number.isNaN(when.getTime()) ? at : when.toLocaleString();
+  return source
+    ? t('discovery.lastImportWithSource', { time: timeStr, source })
+    : t('discovery.lastImport', { time: timeStr });
+}
+
+function updateDiscoveryImportStatus(netRes, settings) {
+  const el = $('#settings-discovery-import-status');
+  if (!el) return;
+  const text = formatDiscoveryImportLabel(netRes, settings);
+  if (text) {
+    el.textContent = text;
+    el.classList.remove('hidden');
+  } else {
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
+}
 
 function resolveNetwork(netRes) {
   if (!netRes || netRes.error) return { ...DEFAULT_NETWORK };
@@ -1062,6 +1109,15 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
     dismissBtn?.classList.add('hidden');
     return;
   }
+  if (isLocalScanDisabled(netRes)) {
+    let message = t('discovery.remoteOnlyBanner');
+    const importHint = formatDiscoveryImportLabel(net, settings);
+    if (importHint) message += ` ${importHint}`;
+    textEl.textContent = message;
+    dismissBtn?.classList.add('hidden');
+    el.classList.remove('hidden');
+    return;
+  }
   if (scanNeedsCidrConfig(net, settings)) {
     message = t('scan.configWarning', {
       ip: net.local_ip,
@@ -1159,6 +1215,8 @@ async function loadDashboard() {
     $('#cidr-input').placeholder = net.local_network;
   }
   updateDockerScanWarning(net, settings);
+  updateScanButtonsState(net);
+  updateDiscoveryImportStatus(net, settings);
   updateScanConfigWarning(net, settings, window.__lastScanStatus);
   resumeActiveScan(scansRes);
 
@@ -3711,6 +3769,10 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   console.log('[NetDash] scan: startScan', { cidr, fullScan, skipConfirm });
   clearScanError();
   const netRes = window.__netdashNetwork;
+  if (isLocalScanDisabled(netRes)) {
+    showScanError(t('discovery.remoteOnlyBanner'));
+    return;
+  }
   let resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   if (resolvedCidr && isDockerInternalCidr(resolvedCidr)) {
     resolvedCidr = resolveOneClickScanCidr(appSettings, netRes);
@@ -3768,6 +3830,10 @@ async function startScan(cidr, fullScan = false, opts = {}) {
 
 async function oneClickScan() {
   const netRes = window.__netdashNetwork;
+  if (isLocalScanDisabled(netRes)) {
+    showScanError(t('discovery.remoteOnlyBanner'));
+    return;
+  }
   const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
   if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
@@ -3963,6 +4029,8 @@ function fillSettingsForm() {
   updateDockerScanWarning(window.__netdashNetwork, appSettings);
   updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
   updateScanProfileUI(window.__netdashNetwork, appSettings);
+  updateDiscoveryImportStatus(window.__netdashNetwork, appSettings);
+  updateScanButtonsState(window.__netdashNetwork);
   $('#settings-full-scan').checked = !!appSettings.full_scan_default;
   $('#settings-host-ports').value = appSettings.host_scan_ports || '22,445,3389,5900';
   $('#settings-host-only').checked = appSettings.host_only_entries !== false;

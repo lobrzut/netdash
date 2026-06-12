@@ -146,6 +146,25 @@ Skan `/24` może **zawiesić cały NAS** nawet z `mem_limit: 768m` na kontenerze
 
 **Od v1.3.111** skan `/24` jest **zablokowany** przy `NETDASH_SCAN_SAFE_MODE=true`. Domyślne CIDR: `192.168.1.144/28`. One-click „Skanuj sieć” wymaga potwierdzenia.
 
+### Remote Discovery Agent (zalecane na QNAP od v1.3.112)
+
+Zamiast skanować LAN z NAS (ryzyko OOM), uruchom **lekki agent** na hoście z pełnym dostępem do sieci (np. homelab **192.168.1.201**):
+
+1. **QNAP (.150)** — compose ma `NETDASH_SCAN_DISABLED=true` (tylko dashboard).
+2. **Homelab (.201)** — `deploy/agent/docker-compose.yml`:
+
+   ```bash
+   export NETDASH_URL=http://192.168.1.150:18787
+   export NETDASH_PASSWORD=twoje-haslo
+   export SCAN_CIDR=192.168.1.0/24
+   cd deploy/agent && docker compose up -d --build
+   ```
+
+3. Agent co 5 min wysyła wyniki do `POST /api/discovery/import`.
+4. W portalu: baner „lokalny skan wyłączony” + **Ustawienia → Skanowanie** → czas/źródło ostatniego importu.
+
+Szczegóły: [`deploy/agent/README.md`](../../deploy/agent/README.md).
+
 ### Limit RAM + CPU na QNAP
 
 1. **Container Station** → `netdash` → **Resource**

@@ -161,6 +161,39 @@ class ScanStatus(BaseModel):
         from_attributes = True
 
 
+class DiscoveryPortEntry(BaseModel):
+    port: int = Field(ge=1, le=65535)
+    service: str | None = None
+
+
+class DiscoveryHostEntry(BaseModel):
+    ip: str
+    mac: str | None = None
+    hostname: str | None = None
+    ports: list[DiscoveryPortEntry] | None = None
+    online: bool | None = True
+
+
+class DiscoveryImportRequest(BaseModel):
+    source: str = "agent"
+    hostname: str | None = Field(default=None, description="Hostname agenta (źródło importu)")
+    hosts: list[DiscoveryHostEntry]
+    mark_missing_offline: bool = False
+
+
+class DiscoveryImportResult(BaseModel):
+    ok: bool
+    source: str
+    source_hostname: str | None = None
+    hosts_received: int = 0
+    hosts_imported: int = 0
+    created: int = 0
+    updated: int = 0
+    marked_offline: int = 0
+    skipped: int = 0
+    imported_at: datetime
+
+
 class NetworkInfo(BaseModel):
     local_network: str
     local_ip: str
@@ -168,12 +201,15 @@ class NetworkInfo(BaseModel):
     scan_cidr_configured: bool = False
     ping_available: bool = True
     scan_safe_mode: bool = True
+    scan_disabled: bool = False
     resource_profile: str = "safe"
     detected_cidrs: list[str] = Field(default_factory=list)
     env_scan_cidr: str | None = None
     scan_safe_min_prefix: int = 28
     scan_max_hosts: int = 16
     scan_chunk_size: int = 4
+    discovery_last_import_at: datetime | None = None
+    discovery_last_import_source: str | None = None
 
 
 class NetworkDiagnostics(BaseModel):
@@ -228,6 +264,8 @@ class AppSettingsOut(BaseModel):
     health_check_interval: int = 60
     gptwol_url: str | None = None
     stale_remove_days: int = 0
+    discovery_last_import_at: datetime | None = None
+    discovery_last_import_source: str | None = None
 
     class Config:
         from_attributes = True

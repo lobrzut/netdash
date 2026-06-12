@@ -124,6 +124,8 @@ class AppSettings(Base):
     health_check_interval: Mapped[int] = mapped_column(Integer, default=60)
     gptwol_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
     stale_remove_days: Mapped[int] = mapped_column(Integer, default=0)
+    discovery_last_import_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    discovery_last_import_source: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
 
 class ScanJob(Base):

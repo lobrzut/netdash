@@ -65,6 +65,18 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - Online/offline health checks with persistent tiles
 - Docker one-command deploy
 - i18n: English, Polish, German, Ukrainian
+- **Remote discovery agent** (v1.3.112) — lightweight LAN scanner on a separate host pushes to `POST /api/discovery/import` (ideal for QNAP dashboard + homelab agent)
+
+## Remote Discovery Agent
+
+When NetDash runs on a weak NAS (QNAP) without safe LAN access, disable local scan and use a remote agent:
+
+| Host | Role |
+|------|------|
+| QNAP `.150` | Dashboard only — `NETDASH_SCAN_DISABLED=true` |
+| Homelab `.201` | `deploy/agent/docker-compose.yml` — `network_mode: host`, arp-scan |
+
+See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md#remote-discovery-agent-zalecane-na-qnap-od-v13112).
 
 ## What's new in v1.3.27
 

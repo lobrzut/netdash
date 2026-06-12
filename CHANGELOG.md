@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.112
+
+- **Remote discovery agent (NetAlertX SYNC pattern)**: `POST /api/discovery/import` — merge hostów z agenta (IP/MAC/hostname, opcjonalne porty, mark offline).
+- **Agent**: `scripts/netdash-agent.py` + `deploy/agent/` (Docker host network, arp-scan → ip neigh → ping).
+- **Env**: `NETDASH_SCAN_DISABLED=true` — wyłącza lokalny skan na dashboardzie (QNAP); baner + status ostatniego importu w UI.
+- **Compose QNAP**: domyślnie `NETDASH_SCAN_DISABLED=true` — discovery z homelab agenta (.201).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.112`.
+
 ## v1.3.111
 
 - **Fix krytyczny QNAP — /24 zabronione w safe mode**: `POST /api/scan` odrzuca CIDR szersze niż /28 (400). RAM limit kontenera nie chroni hosta przed przeciążeniem sieci/CPU.

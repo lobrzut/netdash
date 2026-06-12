@@ -1,60 +1,122 @@
-# NetDash — QNAP Container Station (GHCR only, bez git)
-# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml
-#
-# !!! KRYTYCZNE — QNAP OOM / crash całego NAS !!!
-# Limit RAM kontenera (768 MB) NIE chroni hosta przed przeciążeniem sieci/CPU.
-# Skan /24 może zawiesić CAŁY QNAP nawet z mem_limit. Używaj TYLKO /28 w NETDASH_SCAN_CIDR.
-#
-# Portal: http://<IP-QNAP>:18787
-
-services:
-  netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.111
-    container_name: netdash
-    restart: always
-    mem_limit: 512m
-    memswap_limit: 512m
-    cpus: 0.5
-    ports:
-      - "18787:18787"
-    environment:
-      NETDASH_DEFAULT_ADMIN_USER: admin
-      NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
-      NETDASH_SYNC_ADMIN_PASSWORD: "false"
-      # /28 wokół IP NAS (dla .150 → 192.168.1.144/28). NIE używaj /24 na QNAP.
-      NETDASH_SCAN_CIDR: "192.168.1.144/28"
-      NETDASH_SCAN_SAFE_MODE: "true"
-      NETDASH_SCAN_SAFE_MAX_HOSTS: "16"
-      NETDASH_SCAN_SAFE_CONCURRENCY: "2"
-      NETDASH_SCAN_CHUNK_SIZE: "4"
-      NETDASH_SCAN_BATCH_DELAY: "0.4"
-      NETDASH_COOKIE_SECURE: "false"
-      NETDASH_LISTEN_PORT: "18787"
-    volumes:
-      - /share/Container/netdash/data:/app/data
-    cap_add:
-      - NET_RAW
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  watchtower:
-    image: containrrr/watchtower:1.7.1
-    container_name: netdash-watchtower
-    restart: unless-stopped
-    profiles:
-      - auto-update
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_INCLUDE_RESTARTING: "true"
-      WATCHTOWER_ROLLING_RESTART: "true"
-
+# NetDash — QNAP Container Station (GHCR only, bez git)
+
+# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml
+
+#
+
+# !!! KRYTYCZNE — QNAP OOM / crash całego NAS !!!
+
+# Limit RAM kontenera (768 MB) NIE chroni hosta przed przeciążeniem sieci/CPU.
+
+# Skan /24 może zawiesić CAŁY QNAP nawet z mem_limit. Używaj TYLKO /28 w NETDASH_SCAN_CIDR.
+
+#
+
+# Portal: http://<IP-QNAP>:18787
+
+
+
+services:
+
+  netdash:
+
+    image: ghcr.io/lobrzut/netdash:1.3.112
+
+    container_name: netdash
+
+    restart: always
+
+    mem_limit: 512m
+
+    memswap_limit: 512m
+
+    cpus: 0.5
+
+    ports:
+
+      - "18787:18787"
+
+    environment:
+
+      NETDASH_DEFAULT_ADMIN_USER: admin
+
+      NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
+
+      NETDASH_SYNC_ADMIN_PASSWORD: "false"
+
+      # /28 wokół IP NAS (dla .150 → 192.168.1.144/28). NIE używaj /24 na QNAP.
+
+      # Dashboard only — discovery via remote agent on homelab (.201). See deploy/agent/
+      NETDASH_SCAN_DISABLED: "true"
+
+      NETDASH_SCAN_CIDR: "192.168.1.144/28"
+
+      NETDASH_SCAN_SAFE_MODE: "true"
+
+      NETDASH_SCAN_SAFE_MAX_HOSTS: "16"
+
+      NETDASH_SCAN_SAFE_CONCURRENCY: "2"
+
+      NETDASH_SCAN_CHUNK_SIZE: "4"
+
+      NETDASH_SCAN_BATCH_DELAY: "0.4"
+
+      NETDASH_COOKIE_SECURE: "false"
+
+      NETDASH_LISTEN_PORT: "18787"
+
+    volumes:
+
+      - /share/Container/netdash/data:/app/data
+
+    cap_add:
+
+      - NET_RAW
+
+    labels:
+
+      com.centurylinklabs.watchtower.enable: "true"
+
+    healthcheck:
+
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
+
+      interval: 30s
+
+      timeout: 10s
+
+      retries: 3
+
+      start_period: 40s
+
+
+
+  watchtower:
+
+    image: containrrr/watchtower:1.7.1
+
+    container_name: netdash-watchtower
+
+    restart: unless-stopped
+
+    profiles:
+
+      - auto-update
+
+    volumes:
+
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+
+      WATCHTOWER_CLEANUP: "true"
+
+      WATCHTOWER_LABEL_ENABLE: "true"
+
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+
+      WATCHTOWER_ROLLING_RESTART: "true"
+
+

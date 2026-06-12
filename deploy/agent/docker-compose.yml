@@ -1,0 +1,24 @@
+# NetDash remote discovery agent — uruchom na hoście z dostępem do LAN (np. homelab .201)
+# Dashboard NetDash na QNAP (.150) z NETDASH_SCAN_DISABLED=true
+
+services:
+  netdash-agent:
+    build:
+      context: ../..
+      dockerfile: deploy/agent/Dockerfile
+    image: netdash-agent:local
+    container_name: netdash-agent
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      NETDASH_URL: ${NETDASH_URL:-http://192.168.1.150:18787}
+      NETDASH_USER: ${NETDASH_USER:-admin}
+      NETDASH_PASSWORD: ${NETDASH_PASSWORD:-changeme}
+      # NETDASH_TOKEN: optional Bearer JWT (skip login)
+      SCAN_CIDR: ${SCAN_CIDR:-192.168.1.0/24}
+      INTERVAL: ${INTERVAL:-300}
+      MARK_MISSING_OFFLINE: ${MARK_MISSING_OFFLINE:-true}
+      AGENT_HOSTNAME: ${AGENT_HOSTNAME:-homelab-agent}

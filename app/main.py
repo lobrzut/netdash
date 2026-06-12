@@ -56,6 +56,7 @@ from app.scanner import (
 )
 from app.arp_scan import lookup_mac_for_ip, scan_arp_network
 from app.wol import normalize_mac, send_magic_packet
+from app.discovery_import import import_discovery_hosts
 from app.schemas import (
     BACKUP_FORMAT,
     BACKUP_FORMAT_VERSION,
@@ -73,6 +74,8 @@ from app.schemas import (
     ArpDeviceOut,
     ArpLookupOut,
     ArpScanRequest,
+    DiscoveryImportRequest,
+    DiscoveryImportResult,
     HomerImportResult,
     LoginRequest,
     PasswordChangeRequest,
@@ -216,6 +219,8 @@ def _migrate_db(sync_conn):
             ("health_check_interval", "INTEGER DEFAULT 60"),
             ("gptwol_url", "VARCHAR(256)"),
             ("stale_remove_days", "INTEGER DEFAULT 0"),
+            ("discovery_last_import_at", "DATETIME"),
+            ("discovery_last_import_source", "VARCHAR(128)"),
         ]
         for name, ddl in settings_migrations:
             if name not in columns:
@@ -518,6 +523,7 @@ async def index():
 
 @app.get("/api/health")
 async def health(db: AsyncSession = Depends(get_db)):
+    app_settings = await _get_or_create_settings(db)
     return {
         "ok": True,
         "version": VERSION,
@@ -531,10 +537,13 @@ async def health(db: AsyncSession = Depends(get_db)):
         "secret_key_configured": settings.secret_key_configured,
         "secret_key_stable": settings.secret_key_stable,
         "scan_safe_mode": settings.scan_safe_mode,
+        "scan_disabled": settings.scan_disabled,
         "resource_profile": settings.resource_profile,
         "scan_safe_min_prefix": settings.scan_safe_min_prefix,
         "scan_max_hosts": settings.effective_scan_max_hosts,
         "scan_chunk_size": settings.effective_scan_batch_size,
+        "discovery_last_import_at": app_settings.discovery_last_import_at,
+        "discovery_last_import_source": app_settings.discovery_last_import_source,
     }
 
 
@@ -667,12 +676,15 @@ async def network_info(
         scan_cidr_configured=bool(env_cidr or app_settings.scan_cidr_default),
         ping_available=ping_ok,
         scan_safe_mode=settings.scan_safe_mode,
+        scan_disabled=settings.scan_disabled,
         resource_profile=settings.resource_profile,
         detected_cidrs=get_detected_cidrs(app_settings.scan_cidr_default),
         env_scan_cidr=env_cidr,
         scan_safe_min_prefix=settings.scan_safe_min_prefix,
         scan_max_hosts=settings.effective_scan_max_hosts,
         scan_chunk_size=settings.effective_scan_batch_size,
+        discovery_last_import_at=app_settings.discovery_last_import_at,
+        discovery_last_import_source=app_settings.discovery_last_import_source,
     )
 
 
@@ -1467,6 +1479,35 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         logger.debug("Scan %s task finished (removed from scan_tasks)", job_id)
 
 
+@app.post("/api/discovery/import", response_model=DiscoveryImportResult)
+async def discovery_import(
+    data: DiscoveryImportRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not data.hosts:
+        raise HTTPException(status_code=400, detail="Brak hostów do importu")
+    source_hostname = (data.hostname or "").strip() or None
+    client = request.client.host if request.client else "?"
+    logger.info(
+        "POST /api/discovery/import user=%s client=%s source=%s hostname=%s hosts=%s mark_offline=%s",
+        user.username,
+        client,
+        data.source,
+        source_hostname,
+        len(data.hosts),
+        data.mark_missing_offline,
+    )
+    return await import_discovery_hosts(
+        db,
+        data.hosts,
+        source=data.source,
+        source_hostname=source_hostname,
+        mark_missing_offline=data.mark_missing_offline,
+    )
+
+
 @app.post("/api/scan/ui-attempt")
 async def log_scan_ui_attempt(
     data: ScanUiAttemptRequest,
@@ -1488,6 +1529,11 @@ async def start_scan(
     _: User = Depends(get_current_user),
 ):
     logger.info("POST /api/scan body=%s user=%s", data.model_dump(), _.username)
+    if settings.scan_disabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Lokalny skan wyłączony — użyj agenta zdalnego (NETDASH_SCAN_DISABLED=true).",
+        )
     if any(not t.done() for t in scan_tasks.values()):
         logger.warning("POST /api/scan rejected: scan already in progress")
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
