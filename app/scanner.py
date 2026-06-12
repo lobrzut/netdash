@@ -18,19 +18,25 @@ logger = logging.getLogger("netdash")
 from app.url_utils import ensure_str, sanitize_service_url
 
 WEB_PORTS = [
-    80, 81, 443, 3000, 4000, 4200, 4443, 5000, 5001, 8000, 8008,
+    80, 81, 443, 3000, 4000, 4200, 4443, 5000, 5001, 8000, 8006, 8008,
     8080, 8081, 8443, 8888, 9000, 9090, 9443, 6443, 8787, 18787,
 ]
 
 # Safe mode: minimal ports — QNAP kernel can OOM/crash on TCP floods even with container mem_limit.
 SAFE_WEB_PORTS = [80, 443, 8080, 5000, 18787]
 
+# Primary TCP discovery ports — Tier 1 adaptive discovery (any open = host live).
+TCP_DISCOVERY_PRIMARY_PORTS = [22, 80, 443, 8006, 8080, 3000, 5000, 8000, 8443, 9000]
+
+# Optional bonus probe for NETDASH_ARP_EXTRA_HOSTS (not required for discovery).
+EXTRA_HOST_PROBE_PORTS = list(TCP_DISCOVERY_PRIMARY_PORTS)
+
 # Desktop / OS-revealing ports scanned in default mode (alongside WEB_PORTS).
 HOST_DISCOVERY_PORTS = [22, 445, 3389, 5900]
 DEFAULT_HOST_SCAN_PORTS = "22,445,3389,5900"
 # Ports probed when ICMP ping is blocked (common in Docker without usable NET_RAW).
-TCP_DISCOVERY_PORTS = [80, 443, 22, 445, 8080, 5000, 8000, 8443]
-SAFE_TCP_DISCOVERY_PORTS = [80, 443]
+TCP_DISCOVERY_PORTS = [80, 443, 22, 445, 8080, 5000, 8000, 8006, 8443]
+SAFE_TCP_DISCOVERY_PORTS = [80, 443, 8006]
 SAFE_HOST_DISCOVERY_PORTS = [22]
 HOST_ONLY_PORT = 0
 
@@ -41,7 +47,7 @@ OS_PORT_HINTS: dict[int, str] = {
     5900: "VNC (zdalny pulpit)",
 }
 
-HTTPS_PORTS = {443, 8443, 9443, 6443, 4443}
+HTTPS_PORTS = {443, 8443, 9443, 6443, 4443, 8006}
 HTTP_FIRST_PORTS = {80, 81, 8080, 8081, 8000, 8008, 3000, 5000, 5001, 8888, 9000, 9090, 8787, 18787, 4000, 4200}
 
 TLS_MISMATCH_RE = re.compile(
@@ -96,7 +102,8 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     5672: ("RabbitMQ", "queue", "Kolejka"),
     6379: ("Redis", "database", "Cache"),
     8000: ("HTTP Alt", "globe", "Web"),
-    8080: ("HTTP Proxy", "globe", "Web"),
+    8006: ("Proxmox VE", "proxmox", "DevOps"),
+    8080: ("QNAP / HTTP Alt", "nas", "NAS"),
     8443: ("HTTPS Alt", "lock", "Web"),
     9000: ("Portainer / Sonar", "docker", "DevOps"),
     9090: ("Prometheus", "chart", "Monitoring"),
@@ -809,6 +816,14 @@ async def discover_live_hosts_quick(
     done = 0
     sem = asyncio.Semaphore(max(4, settings.effective_scan_concurrency))
 
+    if extra_hosts:
+        timeout = min(settings.scan_timeout, 1.5)
+        for host in extra_hosts:
+            for port in EXTRA_HOST_PROBE_PORTS:
+                if tcp_port_open_sync(host, port, timeout=timeout) == "open":
+                    live.add(host)
+                    break
+
     if icmp_ok:
         async def ping_one(host: str) -> None:
             nonlocal done
@@ -860,6 +875,22 @@ async def _check_port(host: str, port: int, sem: asyncio.Semaphore) -> bool:
             return True
         except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
             return False
+
+
+def tcp_port_open_sync(ip: str, port: int, *, timeout: float | None = None) -> str:
+    """Sync TCP probe — returns 'open', 'refused', or 'timeout'."""
+    probe_timeout = timeout if timeout is not None else min(settings.scan_timeout, 1.5)
+    try:
+        with socket.create_connection((ip, port), timeout=probe_timeout):
+            return "open"
+    except ConnectionRefusedError:
+        return "refused"
+    except TimeoutError:
+        return "timeout"
+    except OSError as exc:
+        if exc.errno in {111, 61}:  # ECONNREFUSED (Linux/macOS)
+            return "refused"
+        return "timeout"
 
 
 def _match_hints(text: str, hints: list[tuple[str, str, str, str]]) -> tuple[str, str, str] | None:

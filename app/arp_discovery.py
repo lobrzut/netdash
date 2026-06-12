@@ -25,12 +25,14 @@ from app.database import async_session
 from app.discovery_import import import_discovery_hosts
 from app.models import AppSettings
 from app.scanner import (
+    EXTRA_HOST_PROBE_PORTS,
     SAFE_WEB_PORTS,
     _check_port,
     _identify_service,
     discover_live_hosts_quick,
     get_local_network,
     resolve_scan_cidrs,
+    tcp_port_open_sync,
 )
 from app.schemas import DiscoveryHostEntry
 
@@ -234,19 +236,81 @@ def _ping_host_sync(ip: str) -> bool:
         return False
 
 
-def _tcp_reachable_sync(ip: str) -> bool:
+def _tcp_reachable_sync(ip: str, ports: list[int] | None = None) -> tuple[bool, list[int]]:
     timeout = min(settings.scan_timeout, 1.5)
-    for port in SAFE_WEB_PORTS:
-        try:
-            with socket.create_connection((ip, port), timeout=timeout):
-                return True
-        except OSError:
-            continue
-    return False
+    open_ports: list[int] = []
+    for port in ports or EXTRA_HOST_PROBE_PORTS:
+        if tcp_port_open_sync(ip, port, timeout=timeout) == "open":
+            open_ports.append(port)
+    return bool(open_ports), open_ports
 
 
 def _host_is_live_sync(ip: str) -> bool:
-    return _ping_host_sync(ip) or _tcp_reachable_sync(ip)
+    ping_ok = _ping_host_sync(ip)
+    if ping_ok:
+        return True
+    tcp_ok, _ = _tcp_reachable_sync(ip)
+    return tcp_ok
+
+
+def _probe_explicit_hosts_with_ports(
+    ips: list[str],
+    cidr: str | None = None,
+) -> tuple[list[DiscoveryHostEntry], dict[str, list[int]]]:
+    """Always probe NETDASH_ARP_EXTRA_HOSTS — ping + TCP on well-known ports."""
+    found: list[DiscoveryHostEntry] = []
+    open_ports_by_ip: dict[str, list[int]] = {}
+    for ip in ips:
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            logger.warning("extra host probe: invalid IP %r — skipped", ip)
+            continue
+
+        ping_ok = _ping_host_sync(ip)
+        tcp_results: dict[int, str] = {}
+        open_ports: list[int] = []
+        timeout = min(settings.scan_timeout, 1.5)
+
+        for port in EXTRA_HOST_PROBE_PORTS:
+            result = tcp_port_open_sync(ip, port, timeout=timeout)
+            tcp_results[port] = result
+            if result == "open":
+                open_ports.append(port)
+
+        if ping_ok or open_ports:
+            found.append(
+                DiscoveryHostEntry(
+                    ip=ip,
+                    mac=None,
+                    hostname=_resolve_hostname(ip),
+                    online=True,
+                )
+            )
+            if open_ports:
+                open_ports_by_ip[ip] = open_ports
+            via = "ping" if ping_ok and not open_ports else f"tcp:{open_ports[0]}" if open_ports else "ping"
+            logger.info(
+                "extra host probe: %s is live (via=%s, ping=%s, open_ports=%s)",
+                ip,
+                via,
+                ping_ok,
+                open_ports or None,
+            )
+            continue
+
+        logger.warning(
+            "extra host probe: %s unreachable — ping=%s, tcp=%s",
+            ip,
+            "ok" if ping_ok else "timeout",
+            {port: tcp_results[port] for port in EXTRA_HOST_PROBE_PORTS},
+        )
+    return found, open_ports_by_ip
+
+
+def _probe_explicit_hosts(ips: list[str], cidr: str | None = None) -> list[DiscoveryHostEntry]:
+    entries, _ = _probe_explicit_hosts_with_ports(ips, cidr)
+    return entries
 
 
 def _run_ping_sweep_fallback(cidr: str) -> list[DiscoveryHostEntry]:
@@ -277,29 +341,6 @@ def _run_ping_sweep_fallback(cidr: str) -> list[DiscoveryHostEntry]:
         time.sleep(delay)
 
     logger.info("ping sweep fallback: %s live host(s) in %s", len(found), cidr)
-    return found
-
-
-def _probe_explicit_hosts(ips: list[str], cidr: str | None = None) -> list[DiscoveryHostEntry]:
-    """Always probe NETDASH_ARP_EXTRA_HOSTS — ping/TCP regardless of cycle CIDR rotation."""
-    found: list[DiscoveryHostEntry] = []
-    for ip in ips:
-        try:
-            ipaddress.ip_address(ip)
-        except ValueError:
-            continue
-        if not _host_is_live_sync(ip):
-            logger.debug("extra host probe: %s not reachable", ip)
-            continue
-        found.append(
-            DiscoveryHostEntry(
-                ip=ip,
-                mac=None,
-                hostname=_resolve_hostname(ip),
-                online=True,
-            )
-        )
-        logger.info("extra host probe: %s is live", ip)
     return found
 
 

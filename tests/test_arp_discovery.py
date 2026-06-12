@@ -64,11 +64,15 @@ class ExtraHostsTests(unittest.TestCase):
 
     def test_probe_explicit_hosts_not_filtered_by_cidr(self):
         """Extra hosts outside current /28 must still be probed (mocked unreachable)."""
+        from unittest.mock import patch
+
         original = settings.arp_extra_hosts
         try:
             settings.arp_extra_hosts = "192.168.1.200"
-            # cidr arg is ignored — function probes all extra IPs
-            found = _probe_explicit_hosts(["192.168.1.200"], "192.168.1.144/28")
+            with patch("app.arp_discovery._ping_host_sync", return_value=False), patch(
+                "app.arp_discovery.tcp_port_open_sync", return_value="timeout"
+            ):
+                found = _probe_explicit_hosts(["192.168.1.200"], "192.168.1.144/28")
             self.assertEqual(found, [])
         finally:
             settings.arp_extra_hosts = original

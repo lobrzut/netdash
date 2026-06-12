@@ -1,4 +1,4 @@
-# NetDash na QNAP — import raz, zero edycji YAML (v1.3.124)
+# NetDash na QNAP — import raz, zero edycji YAML (v1.3.125)
 
 > **Container Station nie pozwala edytować compose po deployu.** Użyj **jednego** URL poniżej — wszystko (discovery, Watchtower, auto-update) jest już w pliku.
 
@@ -21,9 +21,8 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 |---------|---------|
 | Obraz NetDash | `ghcr.io/lobrzut/netdash:latest` |
 | Watchtower | co **1 h** (`WATCHTOWER_POLL_INTERVAL=3600`) |
-| Discovery | adaptive (ping → ARP → porty), `network_mode: host` |
-| Sieć | `NETDASH_SCAN_CIDR=192.168.1.0/24` (zmień w **Ustawienia → Skanowanie**, nie w YAML) |
-| Hosty .200/.201 | `NETDASH_ARP_EXTRA_HOSTS` — domyślnie w compose |
+| Discovery | TCP-first (porty 22/80/443/8006/8080…), rotacja /28, `network_mode: host` |
+| Sieć | `NETDASH_SCAN_CIDR=192.168.1.0/24` — **zmień w Ustawienia → Skanowanie** dla dowolnej adresacji |
 | Portal | port **18787**, safe mode, startup defer |
 | Kontenery | `netdash` + `netdash-watchtower` (oba **Running**) |
 
@@ -35,7 +34,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 ### Auto-aktualizacja (Watchtower)
 
-- GitHub Actions publikuje `:latest` + `:1.3.124` przy każdym tagu `v*`
+- GitHub Actions publikuje `:latest` + `:1.3.125` przy każdym tagu `v*`
 - Watchtower co ~1 h sprawdza nowy digest `:latest` na GHCR i **sam** restartuje NetDash
 - Portal pokazuje: *„Aktualizacja automatyczna przez Watchtower (co ~1 h)”* — przycisk „Aktualizuj teraz” nie działa na QNAP (brak docker.sock w kontenerze) i **nie jest potrzebny**
 - Samo-aktualizacja z wnętrza kontenera bez docker.sock jest **niemożliwa** — Watchtower **jest** rozwiązaniem
@@ -78,9 +77,9 @@ Watchtower porównuje **digest tagu z compose**. Przypięty semver `1.3.123` nig
 
 1. **Container Station** → **Create Application** → **Import from URL**
 2. URL z sekcji powyżej → **Start** → `http://192.168.1.150:18787`
-3. Pasek: *„Discovery: ping N → arp +M MAC → … (profil: weak)”*
+3. Pasek: *„Discovery: tcp N → arp +M MAC → X usług (profil: weak)”*
 
-Domyślny compose: `network_mode: host`, adaptive discovery, `NETDASH_SCAN_CIDR=192.168.1.0/24`, `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.201`, `cap_add: NET_RAW, NET_ADMIN`.
+Domyślny compose: `network_mode: host`, TCP-first adaptive discovery, `NETDASH_SCAN_CIDR=192.168.1.0/24`, `cap_add: NET_RAW, NET_ADMIN`. Proxmox i inne usługi wykrywane automatycznie po TCP (np. :8006) — bez ręcznego dodawania.
 
 > **Host mode:** brak `ports:` — portal na `http://<IP-QNAP>:18787` bezpośrednio.
 

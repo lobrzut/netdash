@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.125
+
+- **TCP-first discovery** (`NETDASH_DISCOVERY_MODE=adaptive`): Tier 1 skanuje porty `[22, 80, 443, 8006, 8080, 3000, 5000, 8000, 8443, 9000]` — dowolny otwarty port = host żywy. Automatyczne tworzenie wpisów usług (Proxmox :8006, QNAP :8080 itd.).
+- **Bez hardcoded IP**: wystarczy `NETDASH_SCAN_CIDR` / CIDR w Ustawienia → Skanowanie — działa na dowolnej adresacji.
+- **ARP tylko jako enrichment** (MAC) — nie blokuje wykrywania hostów bez ping/ARP (np. Proxmox bez ICMP).
+- **Profil weak (QNAP)**: rotacja /28 co cykl (~16 chunków /24 = pełna sieć w ~80 min przy 5 min interwale); 8 równoległych TCP, max 16 hostów/chunk.
+- **Usunięto zależność od `NETDASH_ARP_EXTRA_HOSTS`** — opcjonalny bonus, nie wymagany.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.125` + `:latest`.
+
 ## v1.3.124
 
 - **QNAP one-shot deploy**: `docker-compose.full.yml` — jedyny plik do importu; komentarz Import raz, nie edytuj YAML. Obraz `:latest`, Watchtower co 1 h, wszystkie env w środku.

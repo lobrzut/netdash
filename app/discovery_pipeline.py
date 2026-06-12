@@ -1,10 +1,11 @@
-"""Adaptive tiered discovery — ping → ARP → light port probe (profile-aware).
+"""Adaptive tiered discovery — TCP-first → ARP enrichment (profile-aware).
 
 Tier 0: hardware profile (weak / normal / strong)
-Tier 1: ICMP or TCP :80 ping sweep (cheapest, always first)
-Tier 2: arp-scan for MAC enrichment + hosts ping missed (skip if broken)
-Tier 3: light port probe for NEW or stale (>24h) hosts only
-Tier 4: HTTP health checks — independent loop in main.py (unchanged)
+Tier 1: TCP connect sweep on common ports — ANY open port = host live + auto service
+Tier 2: arp-scan / ip neigh for MAC enrichment only (not a discovery gate)
+Tier 3: HTTP health checks — independent loop in main.py (unchanged)
+
+Weak QNAP: rotates /28 chunks — full SCAN_CIDR covered over N cycles (~80 min /24).
 """
 
 from __future__ import annotations
@@ -13,9 +14,8 @@ import asyncio
 import ipaddress
 import logging
 import os
-import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -23,8 +23,6 @@ from sqlalchemy import select
 from app.arp_discovery import (
     _detect_lan_interface,
     _merge_entries,
-    _parse_extra_hosts,
-    _probe_explicit_hosts,
     _resolve_hostname,
     _run_arp_scan_only,
     _run_ip_neigh_fallback,
@@ -34,12 +32,11 @@ from app.database import async_session
 from app.discovery_import import import_discovery_hosts
 from app.models import AppSettings
 from app.scanner import (
+    TCP_DISCOVERY_PRIMARY_PORTS,
     _check_port,
     _identify_service,
-    _ping_host,
     expand_cidrs_for_safe_mode,
     get_local_network,
-    icmp_ping_available,
     parse_cidr,
     resolve_scan_cidrs,
 )
@@ -47,13 +44,10 @@ from app.schemas import DiscoveryHostEntry
 
 logger = logging.getLogger("netdash")
 
-LIGHT_PROBE_PORTS = [80, 443, 8080, 8000, 3000, 5000, 22]
-PORT_STALE_HOURS = 24
 ARP_BROKEN_STREAK = 3
 
 _task: asyncio.Task | None = None
 _known_ips: set[str] = set()
-_port_scanned_at: dict[str, datetime] = {}
 _arp_zero_streak = 0
 _chunk_index = 0
 _profile: str | None = None
@@ -73,6 +67,8 @@ _state: dict[str, Any] = {
     "iface": None,
     "arp_skipped": False,
     "interval_sec": None,
+    "chunk_index": 0,
+    "chunk_total": 0,
 }
 
 
@@ -80,7 +76,7 @@ _state: dict[str, Any] = {
 class ProfileConfig:
     name: str
     interval_sec: int
-    ping_parallel: int
+    tcp_parallel: int
     port_parallel: int
     tier_delay_sec: float
     max_hosts: int
@@ -88,9 +84,9 @@ class ProfileConfig:
 
 
 _PROFILES: dict[str, ProfileConfig] = {
-    "weak": ProfileConfig("weak", 300, 8, 1, 2.0, 128, 28),
-    "normal": ProfileConfig("normal", 180, 16, 2, 1.0, 256, 24),
-    "strong": ProfileConfig("strong", 120, 32, 4, 0.5, 256, 24),
+    "weak": ProfileConfig("weak", 300, 8, 4, 2.0, 16, 28),
+    "normal": ProfileConfig("normal", 180, 16, 8, 1.0, 256, 24),
+    "strong": ProfileConfig("strong", 120, 32, 16, 0.5, 256, 24),
 }
 
 
@@ -137,35 +133,23 @@ def effective_interval(profile: ProfileConfig) -> int:
 
 
 def format_status_line(tiers: dict[str, int], profile: str) -> str:
-    ping_n = tiers.get("ping", 0)
+    tcp_n = tiers.get("tcp", 0)
     arp_mac = tiers.get("arp_mac_added", 0)
-    ports_new = tiers.get("ports_new", 0)
-    parts = [f"ping {ping_n}"]
+    services_n = tiers.get("services", 0)
+    parts = [f"tcp {tcp_n}"]
     if tiers.get("arp_skipped"):
         parts.append("arp wyłączony")
     elif arp_mac:
         parts.append(f"arp +{arp_mac} MAC")
     else:
         parts.append("arp 0 MAC")
-    if ports_new:
-        parts.append(f"{ports_new} nowe porty")
+    if services_n:
+        parts.append(f"{services_n} usług")
+    chunk = tiers.get("chunk")
+    if chunk:
+        parts.append(f"chunk {chunk}")
     parts.append(f"profil: {profile}")
     return " → ".join(parts)
-
-
-def _chunk_for_ip(base_cidr: str, ip: str, prefix: int) -> str | None:
-    """Return the /prefix subnet within base_cidr that contains ip."""
-    try:
-        network = ipaddress.ip_network(base_cidr.strip(), strict=False)
-        addr = ipaddress.ip_address(ip)
-        if addr not in network:
-            return None
-        for chunk in network.subnets(new_prefix=prefix):
-            if addr in chunk:
-                return str(chunk)
-    except ValueError:
-        return None
-    return None
 
 
 def _select_cycle_cidr(cidr: str, profile: ProfileConfig) -> str:
@@ -174,7 +158,7 @@ def _select_cycle_cidr(cidr: str, profile: ProfileConfig) -> str:
 
 
 def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
-    """On weak hosts rotate /28 chunks; always include subnets containing EXTRA_HOSTS."""
+    """Rotate /28 chunks on weak hosts; scan full CIDR on normal/strong."""
     global _chunk_index
     wide = (settings.scan_cidr or cidr).strip()
     try:
@@ -183,12 +167,9 @@ def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
         return [cidr]
 
     if wide_net.prefixlen >= profile.chunk_prefix:
-        cidrs = [str(wide_net)]
-        for ip in _parse_extra_hosts():
-            chunk_str = _chunk_for_ip(wide, ip, profile.chunk_prefix)
-            if chunk_str and chunk_str not in cidrs:
-                cidrs.append(chunk_str)
-        return cidrs
+        _state["chunk_total"] = 1
+        _state["chunk_index"] = 1
+        return [str(wide_net)]
 
     all_chunks = [str(c) for c in wide_net.subnets(new_prefix=profile.chunk_prefix)]
     if not all_chunks:
@@ -196,26 +177,18 @@ def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
 
     selected = all_chunks[_chunk_index % len(all_chunks)]
     _chunk_index += 1
-
-    cidrs: list[str] = [selected]
-    for ip in _parse_extra_hosts():
-        chunk_str = _chunk_for_ip(wide, ip, profile.chunk_prefix)
-        if chunk_str and chunk_str not in cidrs:
-            cidrs.append(chunk_str)
-            logger.info(
-                "Adaptive discovery: extra host %s → include chunk %s",
-                ip,
-                chunk_str,
-            )
+    _state["chunk_total"] = len(all_chunks)
+    _state["chunk_index"] = (_chunk_index - 1) % len(all_chunks) + 1
 
     logger.info(
-        "Adaptive discovery: profile=%s cycle cidrs=%s (rotated %s, from %s)",
+        "Adaptive discovery: profile=%s chunk %s/%s %s (from %s)",
         profile.name,
-        cidrs,
+        _state["chunk_index"],
+        _state["chunk_total"],
         selected,
         wide,
     )
-    return cidrs
+    return [selected]
 
 
 def _should_mark_missing_offline(
@@ -223,56 +196,73 @@ def _should_mark_missing_offline(
     tiers: dict[str, int],
     seen_count: int,
 ) -> bool:
-    """Avoid mass-offline on partial /28 scans or when arp-scan failed."""
-    if tiers.get("arp_skipped"):
-        return False
-    if tiers.get("arp_mac_added", 0) == 0:
-        return False
-    tiny_scan = bool(scanned_cidrs) and all(
-        ipaddress.ip_network(c.strip(), strict=False).prefixlen >= 28 for c in scanned_cidrs
-    )
-    if tiny_scan and seen_count <= 2:
-        return False
-    return True
+    """TCP chunk discovery never mass-offlines — health checker owns service status."""
+    return False
 
 
-async def _tier1_ping_sweep(cidr: str, profile: ProfileConfig) -> set[str]:
-    """ICMP ping with TCP :80 fallback — rate-limited batch."""
-    _state["current_tier"] = "ping"
+async def _tier1_tcp_discovery(
+    cidr: str,
+    profile: ProfileConfig,
+) -> tuple[set[str], dict[str, list[int]], int]:
+    """TCP-first — any open port on common list means host is live; upsert all services."""
+    from app.main import _upsert_service
+
+    _state["current_tier"] = "tcp"
     candidates = parse_cidr(cidr, max_hosts=profile.max_hosts)
     live: set[str] = set()
-    icmp_ok = await icmp_ping_available()
-    sem = asyncio.Semaphore(profile.ping_parallel)
-    batch = profile.ping_parallel
+    open_ports_by_ip: dict[str, list[int]] = {}
+    services_created = 0
+
+    ip_sem = asyncio.Semaphore(profile.tcp_parallel)
+    port_sem = asyncio.Semaphore(profile.port_parallel)
+    batch = profile.tcp_parallel
 
     async def probe_host(ip: str) -> None:
-        async with sem:
-            if icmp_ok and await _ping_host(ip):
-                live.add(ip)
+        nonlocal services_created
+        async with ip_sem:
+            checks = await asyncio.gather(
+                *(_check_port(ip, port, port_sem) for port in TCP_DISCOVERY_PRIMARY_PORTS)
+            )
+            host_ports = [
+                port for port, ok in zip(TCP_DISCOVERY_PRIMARY_PORTS, checks) if ok
+            ]
+            if not host_ports:
                 return
-            if await _check_port(ip, 80, sem):
-                live.add(ip)
+
+            live.add(ip)
+            open_ports_by_ip[ip] = host_ports
+            logger.info("TCP discovery: %s live ports=%s", ip, host_ports)
+
+            for port in host_ports:
+                try:
+                    service = await _identify_service(ip, port)
+                    await _upsert_service(service)
+                    services_created += 1
+                except Exception:
+                    logger.exception("TCP discovery service upsert failed for %s:%s", ip, port)
+
+            await asyncio.sleep(profile.tier_delay_sec * 0.1)
 
     for i in range(0, len(candidates), batch):
         chunk = candidates[i : i + batch]
         await asyncio.gather(*(probe_host(ip) for ip in chunk))
         await asyncio.sleep(profile.tier_delay_sec * 0.25)
 
-    extra = _parse_extra_hosts()
-    if extra:
-        for entry in await asyncio.to_thread(_probe_explicit_hosts, extra):
-            live.add(entry.ip)
+    logger.info(
+        "Tier 1 TCP: %s live host(s), %s service(s) in %s",
+        len(live),
+        services_created,
+        cidr,
+    )
+    return live, open_ports_by_ip, services_created
 
-    logger.info("Tier 1 ping: %s live host(s) in %s", len(live), cidr)
-    return live
 
-
-def _tier2_arp(
+def _tier2_arp_enrich(
     cidr: str,
-    ping_ips: set[str],
+    tcp_ips: set[str],
     profile: ProfileConfig,
 ) -> tuple[list[DiscoveryHostEntry], dict[str, int]]:
-    """arp-scan + ip neigh — skipped when arp-scan returned 0 hosts repeatedly."""
+    """ARP / ip neigh — MAC enrichment only; does not add hosts TCP missed."""
     global _arp_zero_streak
 
     _state["current_tier"] = "arp"
@@ -280,13 +270,16 @@ def _tier2_arp(
     iface = _detect_lan_interface(cidr)
     _state["iface"] = iface
 
+    if not tcp_ips:
+        return [], stats
+
     if _arp_zero_streak >= ARP_BROKEN_STREAK:
         stats["arp_skipped"] = 1
         _state["arp_skipped"] = True
         logger.info("Tier 2 ARP skipped — arp-scan broken (%s zero cycles)", _arp_zero_streak)
         entries = [
             DiscoveryHostEntry(ip=ip, mac=None, hostname=_resolve_hostname(ip), online=True)
-            for ip in sorted(ping_ips)
+            for ip in sorted(tcp_ips)
         ]
         return entries, stats
 
@@ -299,98 +292,30 @@ def _tier2_arp(
     else:
         _arp_zero_streak = 0
 
-    arp_ips = {e.ip for e in arp_entries}
-    ping_only = ping_ips - arp_ips
-
-    ping_entries = [
-        DiscoveryHostEntry(ip=ip, mac=None, hostname=_resolve_hostname(ip), online=True)
-        for ip in sorted(ping_only)
-    ]
-
-    merged = _merge_entries(arp_entries, neigh_entries, ping_entries)
-    merged_map = {e.ip: e for e in merged}
-
-    for ip in ping_ips:
-        if ip not in merged_map:
-            merged_map[ip] = DiscoveryHostEntry(
-                ip=ip, mac=None, hostname=_resolve_hostname(ip), online=True
-            )
-
-    for entry in merged_map.values():
+    mac_by_ip: dict[str, str] = {}
+    hostname_by_ip: dict[str, str | None] = {}
+    for entry in _merge_entries(arp_entries, neigh_entries):
         if entry.mac:
+            mac_by_ip[entry.ip] = entry.mac
+        if entry.hostname:
+            hostname_by_ip[entry.ip] = entry.hostname
+
+    entries: list[DiscoveryHostEntry] = []
+    for ip in sorted(tcp_ips):
+        mac = mac_by_ip.get(ip)
+        hostname = hostname_by_ip.get(ip) or _resolve_hostname(ip)
+        entries.append(DiscoveryHostEntry(ip=ip, mac=mac, hostname=hostname, online=True))
+        if mac:
             stats["arp_mac_added"] += 1
 
-    stats["arp_hosts_added"] = len(merged_map) - len(ping_ips)
-    if stats["arp_hosts_added"] < 0:
-        stats["arp_hosts_added"] = 0
-
     logger.info(
-        "Tier 2 ARP: %s host(s), +%s MAC, +%s from ARP (iface=%s, streak=%s)",
-        len(merged_map),
+        "Tier 2 ARP enrich: %s host(s), +%s MAC (iface=%s, streak=%s)",
+        len(entries),
         stats["arp_mac_added"],
-        stats["arp_hosts_added"],
         iface,
         _arp_zero_streak,
     )
-    return list(merged_map.values()), stats
-
-
-async def _tier3_port_probe(
-    ips: list[str],
-    profile: ProfileConfig,
-) -> int:
-    """Light port probe — sequential on weak, parallel on strong."""
-    from app.main import _upsert_service
-
-    _state["current_tier"] = "ports"
-    if not ips:
-        return 0
-
-    sem = asyncio.Semaphore(profile.port_parallel)
-    created = 0
-    now = datetime.now(timezone.utc)
-
-    for ip in ips:
-        found_port = False
-        for port in LIGHT_PROBE_PORTS:
-            if await _check_port(ip, port, sem):
-                try:
-                    service = await _identify_service(ip, port)
-                    await _upsert_service(service)
-                    created += 1
-                    found_port = True
-                except Exception:
-                    logger.exception("Port probe failed for %s:%s", ip, port)
-                break
-            await asyncio.sleep(profile.tier_delay_sec * 0.2)
-        _port_scanned_at[ip] = now
-        if found_port:
-            await asyncio.sleep(profile.tier_delay_sec)
-        elif profile.port_parallel == 1:
-            await asyncio.sleep(profile.tier_delay_sec * 0.5)
-
-    logger.info("Tier 3 ports: probed %s host(s), %s service(s) updated", len(ips), created)
-    return created
-
-
-def _hosts_needing_port_scan(seen_ips: set[str], new_ips: set[str]) -> list[str]:
-    now = datetime.now(timezone.utc)
-    stale_before = now - timedelta(hours=PORT_STALE_HOURS)
-    targets: list[str] = []
-    for ip in sorted(seen_ips):
-        if ip in new_ips:
-            targets.append(ip)
-            continue
-        last = _port_scanned_at.get(ip)
-        if last is None:
-            targets.append(ip)
-            continue
-        if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
-        if last < stale_before:
-            targets.append(ip)
-    cap = max(1, settings.discovery_port_max_hosts)
-    return targets[:cap]
+    return entries, stats
 
 
 async def _resolve_discovery_cidr() -> str:
@@ -400,7 +325,6 @@ async def _resolve_discovery_cidr() -> str:
         scan_default = app_settings.scan_cidr_default if app_settings else None
     cidrs = resolve_scan_cidrs(None, scan_default)
     base = cidrs[0] if cidrs else get_local_network()
-    # Adaptive discovery rotates /28 itself — keep wide CIDR (e.g. /24), not safe-mode single chunk.
     if settings.scan_safe_mode:
         try:
             net = ipaddress.ip_network(base.strip(), strict=False)
@@ -434,16 +358,23 @@ async def run_discovery_cycle() -> int:
         cycle_cidrs = _select_cycle_cidrs(base_cidr, profile)
         _state["cidr"] = cycle_cidrs[0] if len(cycle_cidrs) == 1 else ", ".join(cycle_cidrs)
 
-        ping_ips: set[str] = set()
+        if _state.get("chunk_total", 0) > 1:
+            tiers["chunk"] = _state.get("chunk_index", 0)
+
+        tcp_ips: set[str] = set()
         merged_map: dict[str, DiscoveryHostEntry] = {}
+        services_created = 0
         arp_skipped_any = False
 
         for cidr in cycle_cidrs:
-            chunk_ping = await _tier1_ping_sweep(cidr, profile)
-            ping_ips |= chunk_ping
+            chunk_live, _open_ports, chunk_services = await _tier1_tcp_discovery(cidr, profile)
+            tcp_ips |= chunk_live
+            services_created += chunk_services
             await asyncio.sleep(profile.tier_delay_sec)
 
-            entries, arp_stats = await asyncio.to_thread(_tier2_arp, cidr, chunk_ping, profile)
+            entries, arp_stats = await asyncio.to_thread(
+                _tier2_arp_enrich, cidr, chunk_live, profile
+            )
             if arp_stats.get("arp_skipped"):
                 arp_skipped_any = True
             for entry in entries:
@@ -460,10 +391,10 @@ async def run_discovery_cycle() -> int:
             await asyncio.sleep(profile.tier_delay_sec)
 
         entries = list(merged_map.values())
-        tiers["ping"] = len(ping_ips)
+        tiers["tcp"] = len(tcp_ips)
         tiers["arp_skipped"] = 1 if arp_skipped_any else 0
         tiers["arp_mac_added"] = sum(1 for e in entries if e.mac)
-        tiers["arp_hosts_added"] = max(0, len(entries) - len(ping_ips))
+        tiers["services"] = services_created
 
         if not entries:
             _state["last_cycle_at"] = datetime.now(timezone.utc)
@@ -473,35 +404,28 @@ async def run_discovery_cycle() -> int:
             _state["last_error"] = None
             _state["current_tier"] = None
             logger.warning(
-                "Adaptive discovery: no hosts in %s (profile=%s)",
+                "Adaptive discovery: no hosts in %s (profile=%s) — next chunk in %ss",
                 _state["cidr"],
                 profile.name,
+                effective_interval(profile),
             )
             return 0
 
         seen_ips = {e.ip for e in entries}
         new_ips = seen_ips - _known_ips
-        _known_ips = seen_ips
+        _known_ips |= seen_ips
 
-        arp_count = len([e for e in entries if e.mac])
         mark_offline = _should_mark_missing_offline(cycle_cidrs, tiers, len(seen_ips))
 
         async with async_session() as db:
             await import_discovery_hosts(
                 db,
                 entries,
-                source="adaptive-discovery",
+                source="tcp-discovery",
                 source_hostname="netdash",
                 mark_missing_offline=mark_offline,
                 offline_scope_cidrs=cycle_cidrs,
             )
-
-        port_targets = _hosts_needing_port_scan(seen_ips, new_ips)
-        if settings.discovery_port_probe and port_targets:
-            ports_new = await _tier3_port_probe(port_targets, profile)
-            tiers["ports_new"] = ports_new
-        else:
-            tiers["ports_new"] = 0
 
         count = len(seen_ips)
         status_line = format_status_line(tiers, profile.name)
@@ -513,13 +437,12 @@ async def run_discovery_cycle() -> int:
         _state["current_tier"] = None
 
         logger.info(
-            "Adaptive discovery done: %s host(s) in %s — %s (arp_macs=%s, new=%s, offline_mark=%s)",
+            "Adaptive discovery done: %s host(s) in %s — %s (new=%s, services=%s)",
             count,
             _state["cidr"],
             status_line,
-            arp_count,
             len(new_ips),
-            mark_offline,
+            services_created,
         )
         return count
     except Exception as exc:
@@ -542,7 +465,7 @@ async def _discovery_loop() -> None:
 
     startup_delay = max(0, settings.discovery_startup_delay)
     logger.info(
-        "Adaptive discovery scheduler started (profile=%s, interval=%ss, first_cycle_in=%ss, cidr=%s)",
+        "TCP-first discovery started (profile=%s, interval=%ss, first_cycle_in=%ss, cidr=%s)",
         profile.name,
         interval,
         startup_delay,
@@ -567,6 +490,7 @@ def get_discovery_pipeline_status() -> dict[str, Any]:
         "enabled": _state.get("enabled", False),
         "running": _state.get("running", False),
         "mode": "adaptive",
+        "discovery_method": "tcp-first",
         "profile": _state.get("profile") or detect_hardware_profile(),
         "current_tier": _state.get("current_tier"),
         "last_cycle_at": _state.get("last_cycle_at"),
@@ -579,7 +503,9 @@ def get_discovery_pipeline_status() -> dict[str, Any]:
         "arp_skipped": _state.get("arp_skipped", False),
         "arp_zero_streak": _arp_zero_streak,
         "interval_sec": _state.get("interval_sec") or effective_interval(get_profile_config()),
-        "extra_hosts": _parse_extra_hosts(),
+        "chunk_index": _state.get("chunk_index"),
+        "chunk_total": _state.get("chunk_total"),
+        "tcp_ports": TCP_DISCOVERY_PRIMARY_PORTS,
     }
 
 
@@ -603,3 +529,9 @@ async def stop_discovery_scheduler() -> None:
             pass
         _task = None
     _state["enabled"] = False
+
+
+# Backward-compat test hooks
+def _hosts_needing_port_scan(seen_ips: set[str], new_ips: set[str]) -> list[str]:
+    return sorted(new_ips)
+
