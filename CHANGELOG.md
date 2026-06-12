@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.121
+
+- **Hotfix: crash on startup** (`ModuleNotFoundError: app.discovery_pipeline`): v1.3.119 tagged `main.py` imports before `discovery_pipeline.py` was committed (fixed in v1.3.120). Users on `:1.3.119` could not start NetDash at all.
+- **Graceful fallback**: if `discovery_pipeline` is missing from the image, app boots anyway and falls back to ARP discovery scheduler; `/api/health` reports `adaptive_discovery.available=false`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.121` — **pull this if you are on 1.3.119**. v1.3.120 should already include the module; upgrade to 1.3.121 for the import guard.
+
 ## v1.3.120
 
 - **Adaptive Tiered Discovery** (`NETDASH_DISCOVERY_MODE=adaptive` — nowy domyślny tryb QNAP): jeden scheduler koordynuje ping → ARP → lekki skan portów. Ping zawsze pierwszy (ICMP lub TCP :80), ARP tylko dla MAC / hostów bez ping, porty tylko dla nowych lub nieaktualnych (>24 h).

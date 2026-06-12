@@ -61,12 +61,36 @@ from app.arp_discovery import (
     start_arp_discovery_scheduler,
     stop_arp_discovery_scheduler,
 )
-from app.discovery_pipeline import (
-    get_discovery_pipeline_status,
-    run_discovery_cycle,
-    start_discovery_scheduler,
-    stop_discovery_scheduler,
-)
+_DISCOVERY_PIPELINE_AVAILABLE = True
+try:
+    from app.discovery_pipeline import (
+        get_discovery_pipeline_status,
+        run_discovery_cycle,
+        start_discovery_scheduler,
+        stop_discovery_scheduler,
+    )
+except ModuleNotFoundError:
+    _DISCOVERY_PIPELINE_AVAILABLE = False
+
+    async def stop_discovery_scheduler() -> None:
+        return None
+
+    async def run_discovery_cycle() -> int:
+        return 0
+
+    def start_discovery_scheduler() -> None:
+        logging.getLogger("netdash").error(
+            "discovery_pipeline module missing from image — adaptive discovery disabled; "
+            "upgrade to ghcr.io/lobrzut/netdash:1.3.121+ or set NETDASH_DISCOVERY_MODE=arp"
+        )
+
+    def get_discovery_pipeline_status() -> dict:
+        return {
+            "enabled": False,
+            "available": False,
+            "mode": "adaptive",
+            "last_error": "discovery_pipeline module missing from image — upgrade to v1.3.121+",
+        }
 from app.wol import normalize_mac, send_magic_packet
 from app.discovery_import import import_discovery_hosts
 from app.schemas import (
@@ -500,7 +524,13 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_deferred_startup_health_check())
     health_task = asyncio.create_task(_health_check_loop())
     if settings.adaptive_discovery_enabled:
-        start_discovery_scheduler()
+        if _DISCOVERY_PIPELINE_AVAILABLE:
+            start_discovery_scheduler()
+        else:
+            logger.warning(
+                "discovery_pipeline missing — falling back to ARP discovery scheduler (upgrade image for adaptive mode)"
+            )
+            start_arp_discovery_scheduler()
     elif settings.arp_discovery_enabled:
         start_arp_discovery_scheduler()
     yield
@@ -1820,6 +1850,11 @@ async def trigger_discovery_cycle(_: User = Depends(get_current_user)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Adaptive discovery nieaktywne — ustaw NETDASH_DISCOVERY_MODE=adaptive",
+        )
+    if not _DISCOVERY_PIPELINE_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="discovery_pipeline module missing from image — upgrade to ghcr.io/lobrzut/netdash:1.3.121+",
         )
     try:
         count = await run_discovery_cycle()
