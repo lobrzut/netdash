@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.74-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.75-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -17,7 +17,7 @@ Na dowolnym **Linuxie z Dockerem** — trzy kroki:
 curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh | bash
 ```
 
-Otwórz **http://&lt;IP-serwera&gt;:18787** → login `admin` + hasło podane przy instalacji.
+Otwórz **http://&lt;IP-serwera&gt;:18787** → login **`admin` / `changeme`** → **zmień hasło** w Ustawienia → Hasło.
 
 > **Port:** domyślnie **18787** (unika kolizji z Readarr **8787**). Zmiana: `NETDASH_PORT` w `.env`. Stare instalacje na 8787: ustaw `NETDASH_PORT=8787` do migracji.
 
@@ -94,14 +94,14 @@ Clone and run on any fresh Linux server (or locally):
 git clone https://github.com/lobrzut/netdash.git
 cd netdash
 cp .env.example .env
-# Edit .env — set NETDASH_SECRET_KEY and NETDASH_DEFAULT_ADMIN_PASSWORD
+# Edit .env — set NETDASH_SECRET_KEY (password defaults to changeme)
 docker compose up -d --build
 ```
 
 Open **http://localhost:18787** (or `http://<server-ip>:18787` on your LAN).
 
-Default login: values from `.env` → `NETDASH_DEFAULT_ADMIN_USER` / `NETDASH_DEFAULT_ADMIN_PASSWORD`.  
-**Change the password** after first login (Settings → Password).
+Default login: **`admin` / `changeme`** (or values from `.env` on first start when the DB has no users).  
+**You must change the password** after first login (Settings → Password).
 
 Full step-by-step guide: **[DEPLOYMENT.md](DEPLOYMENT.md)**
 
@@ -170,7 +170,7 @@ sudo mkdir -p /opt/netdash/data
 cd /opt/netdash
 git clone https://github.com/lobrzut/netdash.git .
 cp .env.example .env
-# Set NETDASH_SECRET_KEY (≥32 random chars) and NETDASH_DEFAULT_ADMIN_PASSWORD
+# Set NETDASH_SECRET_KEY (≥32 random chars); default login admin/changeme — change after deploy
 docker compose up -d --build
 docker compose ps   # expect: healthy
 ```
@@ -205,8 +205,8 @@ sudo systemctl enable --now netdash
 | Variable | Description |
 |----------|-------------|
 | `NETDASH_SECRET_KEY` | JWT key + API vault encryption (**required** in Docker) |
-| `NETDASH_DEFAULT_ADMIN_USER` | Default user (first start only) |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Default password (**required** in Docker) |
+| `NETDASH_DEFAULT_ADMIN_USER` | Default user (first start only, default `admin`) |
+| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Default password (default `changeme` — **change after first login**) |
 | `NETDASH_SCAN_CIDR` | Override scan network (Docker bridge mode) |
 | `NETDASH_BUILD_DATE` | Optional build date (About panel) |
 

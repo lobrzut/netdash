@@ -70,9 +70,12 @@ Na QNAP w `.env` ustaw minimum:
 
 ```env
 NETDASH_SECRET_KEY=<losowy-klucz-min-32-znakow>
-NETDASH_DEFAULT_ADMIN_PASSWORD=<silne-haslo>
+NETDASH_DEFAULT_ADMIN_PASSWORD=changeme
+NETDASH_DEFAULT_ADMIN_USER=admin
 NETDASH_IMAGE_TAG=latest
 ```
+
+> **Bezpieczeństwo:** domyślne logowanie `admin` / `changeme` dotyczy tylko pierwszego startu (pusta baza). Po zalogowaniu **zmień hasło** w Ustawienia → Hasło.
 
 Opcjonalnie sieć skanowania:
 

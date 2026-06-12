@@ -43,8 +43,8 @@ W edycji aplikacji → **Environment** (lub w YAML przed utworzeniem) ustaw:
 | Zmienna | Wartość |
 |---------|---------|
 | `NETDASH_SECRET_KEY` | losowy ciąg ≥32 znaków |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | twoje hasło logowania |
-| `NETDASH_DEFAULT_ADMIN_USER` | `admin` (opcjonalnie) |
+| `NETDASH_DEFAULT_ADMIN_PASSWORD` | `changeme` (domyślnie — **zmień po pierwszym logowaniu**) |
+| `NETDASH_DEFAULT_ADMIN_USER` | `admin` (domyślnie) |
 | `NETDASH_PORT` | `18787` (domyślnie — **nie** 8787 jeśli masz Readarr) |
 | `NETDASH_SCAN_CIDR` | `192.168.1.0/24` (opcjonalnie, gdy skan LAN nie działa) |
 | `NETDASH_PORT` | `18787` (domyślnie; unika Readarr **8787**) |
@@ -55,14 +55,14 @@ Wygeneruj klucz na PC:
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-**Opis ekranu:** pola `NETDASH_SECRET_KEY` i `NETDASH_DEFAULT_ADMIN_PASSWORD` muszą być wypełnione — bez nich kontener się nie uruchomi poprawnie.
+**Opis ekranu:** `NETDASH_SECRET_KEY` musi być losowy (≥32 znaki). Hasło domyślne `changeme` — **obowiązkowo zmień** w Ustawienia → Hasło po pierwszym logowaniu.
 
 ### Krok 4 — start
 
 1. **Start** / **Deploy**
 2. Poczekaj na pobranie obrazu z GHCR (pierwszy raz ~1–2 min)
 3. Otwórz w przeglądarce: `http://<IP-QNAP>:18787`
-4. Zaloguj się → **Ustawienia** → zmień hasło
+4. Zaloguj się (`admin` / `changeme`) → **Ustawienia** → **Hasło** → ustaw własne hasło
 
 ### Krok 5 — skan sieci LAN (jeśli nie działa)
 

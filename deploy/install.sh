@@ -35,8 +35,14 @@ ssh "${SSH_OPTS[@]}" "$REMOTE_HOST" bash -s <<REMOTE
 set -euo pipefail
 cd ${REMOTE_DIR}
 if [[ ! -f .env ]]; then
-  echo "Brak .env na serwerze. Skopiuj .env.example i ustaw NETDASH_SECRET_KEY oraz NETDASH_DEFAULT_ADMIN_PASSWORD." >&2
-  exit 1
+  cp .env.example .env
+  if command -v openssl >/dev/null 2>&1; then
+    SECRET_KEY="$(openssl rand -base64 32 | tr -d '/+=' | head -c 43)"
+  else
+    SECRET_KEY="$(head -c 48 /dev/urandom | base64 | tr -d '/+=' | head -c 43)"
+  fi
+  sed -i "s/^NETDASH_SECRET_KEY=.*/NETDASH_SECRET_KEY=${SECRET_KEY}/" .env
+  echo "→ Utworzono .env (login: admin / changeme — zmień hasło po pierwszym logowaniu)"
 fi
 docker compose pull 2>/dev/null || true
 docker compose build --pull

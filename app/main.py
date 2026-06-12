@@ -10,7 +10,7 @@ import httpx
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
@@ -271,8 +271,8 @@ async def init_db():
         await conn.run_sync(_migrate_db)
 
     async with async_session() as db:
-        result = await db.execute(select(User).where(User.username == settings.default_admin_user))
-        if result.scalar_one_or_none() is None:
+        result = await db.execute(select(func.count()).select_from(User))
+        if (result.scalar_one() or 0) == 0:
             db.add(
                 User(
                     username=settings.default_admin_user,

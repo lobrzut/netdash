@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.75
+
+- **Domyślne logowanie `admin` / `changeme`** — jak w innych homelab stackach; dotyczy tylko **nowych** instalacji bez użytkowników w bazie. Istniejące hasła bez zmian.
+- **Bootstrap** (`init_db`): konto admin tworzone tylko gdy baza nie ma żadnych użytkowników.
+- **install.sh / install.ps1** (docker-simple i deploy): bez pytania o hasło — `changeme` w `.env` lub pomijanie gdy `.env` już istnieje; generowany tylko `NETDASH_SECRET_KEY`.
+- **Dokumentacja**: przypomnienie o **obowiązkowej zmianie hasła** po pierwszym logowaniu (Ustawienia → Hasło).
+
 ## v1.3.74
 
 - **Fix**: składnia `HEALTHCHECK` w Dockerfile (`CMD-SHELL` → `CMD sh -c`) — blokowała build obrazu GHCR.

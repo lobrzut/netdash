@@ -1,6 +1,6 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.74**
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.75**
 
 ## Najprostsze ścieżki (bez git na serwerze)
 
@@ -52,7 +52,7 @@ cp .env.example .env
 nano .env
 # Required:
 #   NETDASH_SECRET_KEY=<random-string-at-least-32-chars>
-#   NETDASH_DEFAULT_ADMIN_PASSWORD=<strong-password>
+# Default login (first start, empty DB): admin / changeme
 
 # 4. Start
 docker compose up -d --build
@@ -61,8 +61,8 @@ curl -s http://127.0.0.1:18787/api/health
 
 # 5. Open in browser
 # http://<server-ip>:18787
-# Login: NETDASH_DEFAULT_ADMIN_USER / NETDASH_DEFAULT_ADMIN_PASSWORD
-# Then change password in Settings → Password
+# Login: admin / changeme (or values from .env on first start)
+# **MUST** change password after first login: Settings → Password
 ```
 
 Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
@@ -93,7 +93,7 @@ Auto-update (opcjonalnie): `docker compose --profile auto-update up -d` lub plik
 2. **Configure** secrets:
    ```bash
    cp .env.example .env
-   nano .env   # NETDASH_SECRET_KEY, NETDASH_DEFAULT_ADMIN_PASSWORD
+   nano .env   # NETDASH_SECRET_KEY (default login admin/changeme — change after deploy)
    ```
 3. **Dockge UI** → ⋮ → **Scan Stacks Folder** → open stack **netdash** → **Deploy**
 4. Open **http://&lt;server-ip&gt;:18787** and change the default password after login.
@@ -132,7 +132,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.74",...}
+curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.75",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```
@@ -189,7 +189,7 @@ On the host (Windows/Linux), NetDash **natively** scans the LAN (auto-detected /
 ```bash
 cd /opt/netdash
 cp .env.example .env
-# Required: NETDASH_SECRET_KEY, NETDASH_DEFAULT_ADMIN_PASSWORD
+# Required: NETDASH_SECRET_KEY (default login admin/changeme — change after first login)
 docker compose up -d --build
 docker compose ps
 ```

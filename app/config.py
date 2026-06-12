@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.74"
+VERSION = "1.3.75"
 DEFAULT_PORT = 18787
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
 GHCR_IMAGE = "ghcr.io/lobrzut/netdash"
@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     http_timeout: float = 3.0
     scan_concurrency: int = 80
     default_admin_user: str = "admin"
-    default_admin_password: str = "CHANGE-ME-set-NETDASH_DEFAULT_ADMIN_PASSWORD"
+    default_admin_password: str = "changeme"
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
     scan_cidr: str | None = None
     # Mask real LAN IP in /api/network (for README screenshots only)

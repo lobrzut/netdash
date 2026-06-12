@@ -29,7 +29,7 @@ Required in `.env`:
 | Variable | Description |
 |----------|-------------|
 | `NETDASH_SECRET_KEY` | Random string, at least 32 characters |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Strong admin password |
+| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Default `changeme` — **change after first login** |
 
 Generate a secret key:
 
@@ -58,7 +58,7 @@ curl -s http://127.0.0.1:18787/api/health
 docker compose -f /opt/stacks/netdash/docker-compose.yml ps
 ```
 
-Open **http://&lt;server-ip&gt;:18787** — login with `NETDASH_DEFAULT_ADMIN_USER` / `NETDASH_DEFAULT_ADMIN_PASSWORD`, then change the password in Settings.
+Open **http://&lt;server-ip&gt;:18787** — login **`admin` / `changeme`**, then **change the password** in Settings → Password.
 
 ## Create stack from Dockge UI (paste compose)
 
