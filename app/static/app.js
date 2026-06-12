@@ -783,7 +783,7 @@ function applyLayout() {
   });
   $('#scan-btn')?.classList.toggle('hidden', !onServices);
   updateFooterNetwork();
-  updateScanConfigWarning(window.__netdashNetwork || null, appSettings, window.__lastScanStatus);
+  updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
 }
 
 function navigateTo(page) {
@@ -888,6 +888,21 @@ const DEFAULT_SETTINGS = {
   host_only_entries: true,
 };
 
+const DEFAULT_NETWORK = Object.freeze({
+  local_ip: '—',
+  local_network: '—',
+  docker_bridge: false,
+  scan_cidr_configured: false,
+  ping_available: null,
+  scan_safe_mode: true,
+  resource_profile: 'safe',
+});
+
+function resolveNetwork(netRes) {
+  if (!netRes || netRes.error) return { ...DEFAULT_NETWORK };
+  return { ...DEFAULT_NETWORK, ...netRes };
+}
+
 async function fetchSettings() {
   try {
     return await api('/api/settings');
@@ -904,9 +919,9 @@ function scanNeedsCidrConfig(netRes, settings) {
 }
 
 function scanNeedsConfirm(netRes) {
-  if (!netRes) return false;
-  if (netRes.scan_safe_mode) return true;
-  return netRes.docker_bridge === true && netRes.ping_available === false;
+  const net = resolveNetwork(netRes);
+  if (net.scan_safe_mode) return true;
+  return net.docker_bridge === true && net.ping_available === false;
 }
 
 function confirmScanStart(netRes) {
@@ -926,14 +941,15 @@ function scanEmptyResultHint(lastScan, netRes) {
 function updateDockerScanWarning(netRes, settings) {
   const el = $('#docker-scan-warning');
   if (!el) return;
-  if (!scanNeedsCidrConfig(netRes, settings)) {
+  const net = resolveNetwork(netRes);
+  if (!scanNeedsCidrConfig(net, settings)) {
     el.classList.add('hidden');
     el.textContent = '';
     return;
   }
   el.textContent = t('settings.dockerScanWarning', {
-    ip: netRes.local_ip,
-    network: netRes.local_network,
+    ip: net.local_ip,
+    network: net.local_network,
   });
   el.classList.remove('hidden');
 }
@@ -961,25 +977,26 @@ function updateScanProfileUI(netRes, settings) {
 function updateScanConfigWarning(netRes, settings, lastScan) {
   const el = $('#scan-config-warning');
   if (!el) return;
+  const net = resolveNetwork(netRes);
   if (currentPage !== 'services' && currentPage !== 'home') {
     el.classList.add('hidden');
     el.textContent = '';
     return;
   }
-  if (scanNeedsCidrConfig(netRes, settings)) {
+  if (scanNeedsCidrConfig(net, settings)) {
     el.textContent = t('scan.configWarning', {
-      ip: netRes.local_ip,
-      network: netRes.local_network,
+      ip: net.local_ip,
+      network: net.local_network,
     });
     el.classList.remove('hidden');
     return;
   }
-  if (netRes.scan_safe_mode || scanNeedsConfirm(netRes)) {
+  if (net.scan_safe_mode || scanNeedsConfirm(net)) {
     el.textContent = t('scan.safeModeWarning');
     el.classList.remove('hidden');
     return;
   }
-  const emptyHint = scanEmptyResultHint(lastScan || window.__lastScanStatus, netRes);
+  const emptyHint = scanEmptyResultHint(lastScan || window.__lastScanStatus, net);
   const fewServices = (services?.length || 0) <= 1;
   if (emptyHint && fewServices && lastScan?.status === 'completed') {
     el.textContent = emptyHint;
@@ -1043,18 +1060,20 @@ async function loadDashboard() {
   await setLanguage(settings.language || 'pl');
   applyTheme();
 
+  const net = resolveNetwork(netRes?.error ? null : netRes);
+  window.__netdashNetwork = net;
   if (netRes?.error) {
     showDashboardError(t('error.partialApi', { errors: errors.join('; ') }));
-  } else {
-    window.__netdashNetwork = netRes;
-    const netLabel = `${netRes.local_ip} · ${netRes.local_network}`;
-    updateFooterNetwork(netLabel);
-    $('#clock-network').textContent = netLabel;
-    $('#local-network-hint').textContent = t('hint.localNetwork', { network: netRes.local_network });
-    $('#cidr-input').placeholder = netRes.local_network;
-    updateDockerScanWarning(netRes, settings);
-    updateScanConfigWarning(netRes, settings, window.__lastScanStatus);
   }
+  const netLabel = net.local_ip !== '—' ? `${net.local_ip} · ${net.local_network}` : '—';
+  updateFooterNetwork(netLabel);
+  $('#clock-network').textContent = netLabel;
+  if (net.local_network !== '—') {
+    $('#local-network-hint').textContent = t('hint.localNetwork', { network: net.local_network });
+    $('#cidr-input').placeholder = net.local_network;
+  }
+  updateDockerScanWarning(net, settings);
+  updateScanConfigWarning(net, settings, window.__lastScanStatus);
 
   $('#full-scan').checked = !!settings.full_scan_default;
   if (settings.scan_cidr_default) {
@@ -3580,9 +3599,9 @@ function fillSettingsForm() {
   $('#settings-author-url').value = appSettings.author_url || '';
   $('#settings-about-project').value = appSettings.about_project || '';
   $('#settings-scan-cidr').value = appSettings.scan_cidr_default || '';
-  updateDockerScanWarning(window.__netdashNetwork || null, appSettings);
-  updateScanConfigWarning(window.__netdashNetwork || null, appSettings, window.__lastScanStatus);
-  updateScanProfileUI(window.__netdashNetwork || null, appSettings);
+  updateDockerScanWarning(window.__netdashNetwork, appSettings);
+  updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
+  updateScanProfileUI(window.__netdashNetwork, appSettings);
   $('#settings-full-scan').checked = !!appSettings.full_scan_default;
   $('#settings-host-ports').value = appSettings.host_scan_ports || '22,445,3389,5900';
   $('#settings-host-only').checked = appSettings.host_only_entries !== false;

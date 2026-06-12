@@ -75,6 +75,19 @@ def is_safe_browser_icon_url(url: str | None) -> bool:
     return True
 
 
+_QNAP_ADMIN_PORTS = frozenset({5000, 5001})
+
+
+def is_qnap_admin_url(url: str | None) -> bool:
+    if not url or not str(url).strip():
+        return False
+    try:
+        port = urlparse(str(url).strip()).port
+    except Exception:
+        return False
+    return port in _QNAP_ADMIN_PORTS
+
+
 def should_strip_login_gated_icon_url(
     icon_url: str | None,
     service_url: str | None,
@@ -84,6 +97,8 @@ def should_strip_login_gated_icon_url(
     """True when icon_url must not be sent to the browser (auth popup risk)."""
     if not icon_url or not str(icon_url).strip():
         return False
+    if is_qnap_admin_url(icon_url) or is_qnap_admin_url(service_url):
+        return True
     if not is_safe_browser_icon_url(icon_url):
         return True
     if not has_login:
