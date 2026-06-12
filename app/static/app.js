@@ -2210,11 +2210,49 @@ function getIconClass(icon) {
   return `icon-${safe}`;
 }
 
+function isPrivateOrLocalHost(hostname) {
+  if (!hostname) return false;
+  const host = hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.lan')) return true;
+  return /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+}
+
+function isSafeBrowserIconUrl(url) {
+  if (!url || !String(url).trim()) return false;
+  const text = String(url).trim();
+  if (text.startsWith('/') || text.startsWith('data:')) return true;
+  try {
+    const parsed = new URL(text, window.location.origin);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'cdn.simpleicons.org') return true;
+    return !isPrivateOrLocalHost(host);
+  } catch {
+    return false;
+  }
+}
+
+function effectiveServiceIconUrl(s) {
+  const url = (s?.icon_url || '').trim();
+  if (!url || !isSafeBrowserIconUrl(url)) return null;
+  if (s?.has_login && s?.url) {
+    try {
+      const icon = new URL(url, window.location.origin);
+      const svc = new URL(s.url, window.location.origin);
+      if (icon.hostname === svc.hostname && (icon.port || '') === (svc.port || '')) return null;
+    } catch {
+      return null;
+    }
+  }
+  return url;
+}
+
 function renderServiceIcon(s) {
-  if (s.icon_url) {
+  const iconUrl = effectiveServiceIconUrl(s);
+  if (iconUrl) {
     const fallback = getIconClass(s.icon);
     return `<div class="service-icon service-icon-brand" data-fallback="${fallback}">
-      <img src="${esc(s.icon_url)}" alt="" loading="lazy" referrerpolicy="no-referrer"
+      <img src="${esc(iconUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer"
         onerror="const p=this.parentElement;p.className='service-icon '+p.dataset.fallback;p.textContent='';" />
     </div>`;
   }
@@ -2618,8 +2656,9 @@ function netdashWatermarkHtml() {
 
 function renderServiceWatermark(s) {
   const preset = serviceIconPreset(s);
-  if (s.icon_url) {
-    return `<div class="service-card-watermark service-card-watermark--img" data-preset="${preset}" aria-hidden="true"><img src="${esc(s.icon_url)}" alt="" loading="eager" decoding="async" referrerpolicy="no-referrer" onerror="const w=this.parentElement;w.classList.remove('service-card-watermark--img');w.classList.add(w.dataset.preset||'icon-globe');this.remove();" /></div>`;
+  const iconUrl = effectiveServiceIconUrl(s);
+  if (iconUrl) {
+    return `<div class="service-card-watermark service-card-watermark--img" data-preset="${preset}" aria-hidden="true"><img src="${esc(iconUrl)}" alt="" loading="eager" decoding="async" referrerpolicy="no-referrer" onerror="const w=this.parentElement;w.classList.remove('service-card-watermark--img');w.classList.add(w.dataset.preset||'icon-globe');this.remove();" /></div>`;
   }
   return watermarkFallbackHtml(s);
 }

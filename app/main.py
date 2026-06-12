@@ -980,6 +980,8 @@ async def identify_service(
 
 @app.get("/api/services", response_model=list[ServiceOut])
 async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    from app.icons import effective_browser_icon_url
+
     result = await db.execute(select(Service).order_by(Service.pinned.desc(), Service.name))
     services = result.scalars().all()
     dirty = False
@@ -990,7 +992,18 @@ async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(ge
             dirty = True
     if dirty:
         await db.commit()
-    return services
+    out: list[ServiceOut] = []
+    for svc in services:
+        row = ServiceOut.model_validate(svc)
+        row.icon_url = effective_browser_icon_url(
+            svc.icon_url,
+            svc.url,
+            has_login=svc.has_login,
+            name=svc.name,
+            description=svc.description,
+        )
+        out.append(row)
+    return out
 
 
 @app.post("/api/services", response_model=ServiceOut)

@@ -2,9 +2,10 @@
 
 ## v1.3.103
 
+- **Fix dialogu „Zaloguj się” (QNAP :5001)**: przeglądarka nie ładuje już faviconów z adresów LAN / login-gated (`<img src>` na karcie serwisu). Niebezpieczne `icon_url` są zastępowane ikoną marki (CDN) lub presetem; health check HTTP pomija serwisy z `has_login` (tylko ping).
 - **Compose (QNAP)**: czysty minimalny YAML — bez `version`, `mem_limit`, `deploy.resources` ani `cpus` (żadnych fałszywych ostrzeżeń IDE/Schema Store). Limit RAM 512 MB: komentarz w compose + **Container Station → Resource → Memory limit** (patrz README).
 - **README (QNAP)**: sekcja limitu RAM tylko przez UI CS; wyjaśnienie żółtych trójkątów IDE vs QNAP.
-- **Obraz**: bez zmian — `ghcr.io/lobrzut/netdash:1.3.102`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.103`.
 
 ## v1.3.102
 

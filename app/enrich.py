@@ -7,7 +7,7 @@ from app.database import async_session
 from app.icons import resolve_brand_icon
 from app.models import Service
 from app.scanner import LOGIN_KNOWN_SERVICES, LOGIN_TITLE_RE, _fallback_service_name, is_http_error_name
-from app.url_utils import sanitize_service_url
+from app.url_utils import sanitize_service_url, should_strip_login_gated_icon_url
 
 LOGIN_NAME_RE = re.compile(
     r"login|sign\s*in|authorization|authenticate|zaloguj|portal|grafana|portainer|"
@@ -85,8 +85,13 @@ async def enrich_all_services() -> int:
             if safe_url and svc.url != safe_url:
                 svc.url = safe_url
                 changed = True
-            icon = resolve_brand_icon(svc.name, svc.description)
-            if icon and svc.icon_url != icon:
+            icon = resolve_brand_icon(svc.name, svc.description, svc.url)
+            if should_strip_login_gated_icon_url(svc.icon_url, svc.url, has_login=svc.has_login):
+                replacement = icon or None
+                if svc.icon_url != replacement:
+                    svc.icon_url = replacement
+                    changed = True
+            elif icon and svc.icon_url != icon:
                 svc.icon_url = icon
                 changed = True
             login = infer_has_login(svc.name, svc.description, svc.url)

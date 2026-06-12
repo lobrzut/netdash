@@ -146,8 +146,40 @@ def extract_favicon_url(page_url: str, body: str) -> str | None:
     return urljoin(base + "/", "favicon.ico")
 
 
-def resolve_icon_url(name: str, title: str | None, page_url: str, body: str) -> str | None:
-    brand = resolve_brand_icon(name, title)
+def effective_browser_icon_url(
+    icon_url: str | None,
+    service_url: str | None,
+    *,
+    has_login: bool = False,
+    name: str | None = None,
+    description: str | None = None,
+) -> str | None:
+    """Icon URL safe for browser <img> — never homelab auth-gated favicons."""
+    from app.url_utils import is_safe_browser_icon_url, should_strip_login_gated_icon_url
+
+    if should_strip_login_gated_icon_url(icon_url, service_url, has_login=has_login):
+        return resolve_brand_icon(name, description, service_url)
+    if icon_url and is_safe_browser_icon_url(icon_url):
+        return icon_url
+    return resolve_brand_icon(name, description, service_url)
+
+
+def resolve_icon_url(
+    name: str,
+    title: str | None,
+    page_url: str,
+    body: str,
+    *,
+    has_login: bool = False,
+    port: int | None = None,
+) -> str | None:
+    brand = resolve_brand_icon(name, title, page_url)
     if brand:
         return brand
+    if has_login:
+        return None
+    if port in (5000, 5001, 8443, 9443):
+        brand = resolve_brand_icon("qnap")
+        if brand:
+            return brand
     return extract_favicon_url(page_url, body)

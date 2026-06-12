@@ -882,7 +882,7 @@ def _parse_probe_response(host: str, port: int, response: httpx.Response) -> Dis
 
     has_login = _detect_has_login(response, body, title, name)
     canonical = _canonical_url(host, port, response)
-    icon_url = resolve_icon_url(name, title, canonical, body)
+    icon_url = resolve_icon_url(name, title, canonical, body, has_login=has_login, port=port)
 
     return DiscoveredService(
         host=host,
