@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.85
+
+- **QNAP skan sieci (fix)**: gdy ICMP ping jest zablokowany (typowe na QNAP Docker), skan automatycznie przechodzi na **TCP discovery** całej podsieci CIDR (porty 80, 443, 22, 445, 8080, …) zamiast zwracać pusty wynik.
+- **API skanu**: `error_message` w `ScanJob` / `/api/scan/{id}` — czytelne błędy (brak CIDR, brak NET_RAW, timeout); walidacja przed startem gdy kontener w sieci Docker bez CIDR.
+- **`/api/network`**: pole `ping_available` — UI wie, czy ping działa.
+- **Ustawienia → Skanowanie**: `scan_cidr_default` wypełniane z `NETDASH_SCAN_CIDR` przy pierwszym starcie.
+- **UI Serwisy**: baner gdy ostatni skan pusty; toast z konkretnym komunikatem; CIDR wstępnie w modalu skanu.
+- **QNAP compose**: obraz `1.3.85`; `docker-compose.bridge.yml` oznaczony jako zalecany gdy host mode nie skanuje LAN.
+
 ## v1.3.84
 
 - **QNAP port nuclear fix**: aplikacja **nigdy** nie binduje **8787** — `resolve_listen_port()` czyta wyłącznie `NETDASH_LISTEN_PORT`; `NETDASH_PORT` jest całkowicie ignorowany. `entrypoint.sh` zawsze ustawia `NETDASH_LISTEN_PORT=18787` i `unset NETDASH_PORT`. Log startowy: `LISTEN_PORT=18787 (8787 blocked)`.

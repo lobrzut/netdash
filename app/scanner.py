@@ -22,6 +22,8 @@ WEB_PORTS = [
 # Desktop / OS-revealing ports scanned in default mode (alongside WEB_PORTS).
 HOST_DISCOVERY_PORTS = [22, 445, 3389, 5900]
 DEFAULT_HOST_SCAN_PORTS = "22,445,3389,5900"
+# Ports probed when ICMP ping is blocked (common on QNAP Docker without usable NET_RAW).
+TCP_DISCOVERY_PORTS = [80, 443, 22, 445, 8080, 5000, 8000, 8443]
 HOST_ONLY_PORT = 0
 
 OS_PORT_HINTS: dict[int, str] = {
@@ -173,6 +175,14 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
 
 ProgressCallback = Callable[[str, int, int], Awaitable[None]]
 ServiceCallback = Callable[["DiscoveredService"], Awaitable[None]]
+
+
+class ScanError(Exception):
+    """User-facing scan failure (permission, missing CIDR, timeout)."""
+
+    def __init__(self, message: str, *, code: str = "scan_failed"):
+        super().__init__(message)
+        self.code = code
 
 
 LOGIN_TITLE_RE = re.compile(
@@ -447,8 +457,19 @@ async def _ping_host(host: str) -> bool:
         return False
 
 
-async def discover_live_hosts(cidr: str, progress_callback: ProgressCallback | None = None) -> list[str]:
-    candidates = parse_cidr(cidr)
+async def icmp_ping_available() -> bool:
+    """False when container cannot use ICMP (QNAP without NET_RAW or ping blocked)."""
+    if platform.system().lower() == "windows":
+        probes = ["127.0.0.1"]
+    else:
+        probes = ["127.0.0.1", "8.8.8.8", "1.1.1.1"]
+    for host in probes:
+        if await _ping_host(host):
+            return True
+    return False
+
+
+def _discovery_extras(cidr: str) -> set[str]:
     local_ip = get_local_ip()
     extra = {"127.0.0.1", local_ip}
     try:
@@ -456,24 +477,82 @@ async def discover_live_hosts(cidr: str, progress_callback: ProgressCallback | N
         extra.add(str(network.network_address + 1))
     except ValueError:
         pass
+    return extra
+
+
+async def discover_live_hosts_tcp(
+    cidr: str,
+    ports: list[int] | None = None,
+    progress_callback: ProgressCallback | None = None,
+) -> set[str]:
+    """Find hosts with at least one open TCP port — fallback when ping is blocked."""
+    probe_ports = ports or TCP_DISCOVERY_PORTS
+    candidates = parse_cidr(cidr)
+    live = _discovery_extras(cidr)
+    total = len(candidates) * len(probe_ports)
+    done = 0
+    sem = asyncio.Semaphore(settings.scan_concurrency)
+
+    async def probe_host(host: str) -> str | None:
+        nonlocal done
+        for port in probe_ports:
+            if await _check_port(host, port, sem):
+                done += 1
+                if progress_callback and done % 40 == 0:
+                    await progress_callback("ping", done, total)
+                return host
+            done += 1
+            if progress_callback and done % 40 == 0:
+                await progress_callback("ping", done, total)
+        return None
+
+    results = await asyncio.gather(*(probe_host(host) for host in candidates))
+    for host in results:
+        if host:
+            live.add(host)
+    if progress_callback:
+        await progress_callback("ping", total, total)
+    return live
+
+
+async def discover_live_hosts(
+    cidr: str,
+    progress_callback: ProgressCallback | None = None,
+    *,
+    tcp_fallback: bool = True,
+) -> list[str]:
+    candidates = parse_cidr(cidr)
+    extra = _discovery_extras(cidr)
+    icmp_ok = await icmp_ping_available()
 
     sem = asyncio.Semaphore(32)
     live: set[str] = set(extra)
     total = len(candidates)
     done = 0
 
-    async def ping_one(host: str):
-        nonlocal done
-        async with sem:
-            if await _ping_host(host):
-                live.add(host)
-        done += 1
-        if progress_callback and done % 20 == 0:
-            await progress_callback("ping", done, total)
+    if icmp_ok:
+        async def ping_one(host: str):
+            nonlocal done
+            async with sem:
+                if await _ping_host(host):
+                    live.add(host)
+            done += 1
+            if progress_callback and done % 20 == 0:
+                await progress_callback("ping", done, total)
 
-    await asyncio.gather(*(ping_one(host) for host in candidates))
-    if progress_callback:
-        await progress_callback("ping", total, total)
+        await asyncio.gather(*(ping_one(host) for host in candidates))
+        if progress_callback:
+            await progress_callback("ping", total, total)
+    elif progress_callback:
+        await progress_callback("ping", 0, total)
+
+    # QNAP / Docker: ping often fails even with correct CIDR — TCP sweep entire subnet.
+    ping_only_hosts = len(live - extra)
+    use_tcp = tcp_fallback and (not icmp_ok or ping_only_hosts <= 1)
+    if use_tcp:
+        tcp_live = await discover_live_hosts_tcp(cidr, progress_callback=progress_callback)
+        live.update(tcp_live)
+
     return sorted(live)
 
 

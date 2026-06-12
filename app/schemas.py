@@ -138,6 +138,7 @@ class ScanStatus(BaseModel):
     progress_phase: str = ""
     progress_current: int = 0
     progress_total: int = 0
+    error_message: str | None = None
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime
@@ -151,6 +152,7 @@ class NetworkInfo(BaseModel):
     local_ip: str
     docker_bridge: bool = False
     scan_cidr_configured: bool = False
+    ping_available: bool = True
 
 
 class AppSettingsOut(BaseModel):

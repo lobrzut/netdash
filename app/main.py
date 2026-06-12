@@ -34,13 +34,16 @@ from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.url_utils import sanitize_service_url
 from app.scanner import (
     DiscoveredService,
+    ScanError,
     _fallback_service_name,
     build_local_host_service,
     format_cidr_list,
     get_local_ip,
     get_local_network,
+    icmp_ping_available,
     is_http_error_name,
     is_likely_docker_bridge,
+    normalize_scan_cidr_list,
     resolve_scan_cidrs,
     parse_host_scan_ports,
     scan_networks,
@@ -138,6 +141,7 @@ def _migrate_db(sync_conn):
             ("progress_phase", "VARCHAR(32) DEFAULT ''"),
             ("progress_current", "INTEGER DEFAULT 0"),
             ("progress_total", "INTEGER DEFAULT 0"),
+            ("error_message", "VARCHAR(512)"),
         ]:
             if name not in columns:
                 sync_conn.execute(text(f"ALTER TABLE scan_jobs ADD COLUMN {name} {ddl}"))
@@ -214,7 +218,11 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
     result = await db.execute(select(AppSettings).limit(1))
     app_settings = result.scalar_one_or_none()
     if app_settings is None:
-        app_settings = AppSettings(about_project=DEFAULT_ABOUT_PROJECT)
+        scan_default = normalize_scan_cidr_list(settings.scan_cidr) if settings.scan_cidr else None
+        app_settings = AppSettings(
+            about_project=DEFAULT_ABOUT_PROJECT,
+            scan_cidr_default=scan_default,
+        )
         db.add(app_settings)
         await db.commit()
         await db.refresh(app_settings)
@@ -237,6 +245,9 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
             pass
         elif layout not in ("classic", "classic-sm", "medium", "compact", "compact-big"):
             app_settings.pinned_card_size = "medium"
+            changed = True
+        if not app_settings.scan_cidr_default and settings.scan_cidr:
+            app_settings.scan_cidr_default = normalize_scan_cidr_list(settings.scan_cidr)
             changed = True
         if changed:
             await db.commit()
@@ -565,12 +576,15 @@ async def network_info(_: User = Depends(get_current_user)):
             local_ip="10.0.0.5",
             docker_bridge=False,
             scan_cidr_configured=True,
+            ping_available=True,
         )
+    ping_ok = await icmp_ping_available()
     return NetworkInfo(
         local_network=get_local_network(),
         local_ip=get_local_ip(),
         docker_bridge=is_likely_docker_bridge(),
         scan_cidr_configured=bool(settings.scan_cidr),
+        ping_available=ping_ok,
     )
 
 
@@ -1192,6 +1206,24 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
             job.found_count = len(discovered)
             job.finished_at = datetime.now(timezone.utc)
             job.progress_phase = "done"
+            job.error_message = None
+            if len(discovered) <= 1 and host_only:
+                hints: list[str] = []
+                if is_likely_docker_bridge():
+                    hints.append(
+                        "Kontener widzi sieć Docker, nie LAN — ustaw NETDASH_SCAN_CIDR "
+                        "(np. 192.168.1.0/24) lub użyj docker-compose.bridge.yml na QNAP."
+                    )
+                if not await icmp_ping_available():
+                    hints.append(
+                        "Ping ICMP zablokowany — skan użył TCP; sprawdź CIDR i cap_add: NET_RAW."
+                    )
+                if not settings.scan_cidr:
+                    hints.append(
+                        "Brak NETDASH_SCAN_CIDR w compose — Ustawienia → Skanowanie → Domyślne sieci (CIDR)."
+                    )
+                if hints:
+                    job.error_message = " ".join(hints)
             await db.commit()
         logger.info(
             "Scan %s completed: %s services across %s",
@@ -1199,12 +1231,46 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False):
             len(discovered),
             format_cidr_list(cidrs),
         )
-    except Exception:
+    except asyncio.TimeoutError:
+        msg = "Skanowanie przekroczyło limit czasu — spróbuj mniejszej podsieci (/24) lub pełnego skanu wyłączonego."
+        logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
+        async with async_session() as db:
+            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+            job = result.scalar_one()
+            job.status = "failed"
+            job.error_message = msg
+            job.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+    except ScanError as exc:
+        logger.warning("Scan %s rejected: %s", job_id, exc)
+        async with async_session() as db:
+            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+            job = result.scalar_one()
+            job.status = "failed"
+            job.error_message = str(exc)
+            job.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+    except PermissionError as exc:
+        msg = (
+            "Brak uprawnień do ping/skanu sieci (NET_RAW). "
+            "Dodaj cap_add: NET_RAW w compose lub użyj docker-compose.bridge.yml na QNAP."
+        )
+        logger.exception("Scan %s permission error for %s", job_id, format_cidr_list(cidrs))
+        async with async_session() as db:
+            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+            job = result.scalar_one()
+            job.status = "failed"
+            job.error_message = msg
+            job.finished_at = datetime.now(timezone.utc)
+            await db.commit()
+    except Exception as exc:
+        msg = f"Skanowanie nie powiodło się: {exc}"
         logger.exception("Scan %s failed for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
             result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
             job = result.scalar_one()
             job.status = "failed"
+            job.error_message = msg[:512]
             job.finished_at = datetime.now(timezone.utc)
             await db.commit()
     finally:
@@ -1225,6 +1291,24 @@ async def start_scan(
         cidrs = resolve_scan_cidrs(data.cidr, app_settings.scan_cidr_default)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if is_likely_docker_bridge() and not settings.scan_cidr and not app_settings.scan_cidr_default:
+        if not (data.cidr and data.cidr.strip()):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Brak CIDR do skanu LAN — kontener jest w sieci Docker (172.x), nie w Twojej LAN. "
+                    "Ustaw NETDASH_SCAN_CIDR=192.168.1.0/24 w Container Station, "
+                    "lub Ustawienia → Skanowanie, lub użyj docker-compose.bridge.yml na QNAP."
+                ),
+            )
+
+    if not cidrs:
+        raise HTTPException(
+            status_code=400,
+            detail="Nie podano sieci do skanowania — ustaw CIDR w Ustawienia → Skanowanie lub NETDASH_SCAN_CIDR.",
+        )
+
     cidr_label = format_cidr_list(cidrs)
     job = ScanJob(cidr=cidr_label, status="pending")
     db.add(job)

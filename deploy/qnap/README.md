@@ -47,7 +47,7 @@ Od **v1.3.80** compose ma **twarde domyślne** (`admin` / `changeme` / sync) —
 | `NETDASH_SCAN_CIDR` | **w compose od v1.3.81** | `192.168.1.0/24` (dostosuj do swojej podsieci) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | opcjonalna | ustaw `false` **po** zmianie hasła w portalu (żeby restart nie przywracał `changeme`) |
 
-> Compose ≥ v1.3.84: obraz `ghcr.io/lobrzut/netdash:1.3.84` w **docker-compose.full.yml**. Port **`NETDASH_LISTEN_PORT=18787`** (nigdy `NETDASH_PORT`), skan LAN z **`NETDASH_SCAN_CIDR=192.168.1.0/24`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
+> Compose ≥ v1.3.85: obraz `ghcr.io/lobrzut/netdash:1.3.85` w **docker-compose.full.yml**. Port **`NETDASH_LISTEN_PORT=18787`** (nigdy `NETDASH_PORT`), skan LAN z **`NETDASH_SCAN_CIDR=192.168.1.0/24`** + TCP fallback gdy ping zablokowany. Gdy host mode nadal nie skanuje → **docker-compose.bridge.yml**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
 
 Opcjonalnie wygeneruj `NETDASH_SECRET_KEY` na PC:
 
@@ -111,7 +111,7 @@ Compose QNAP ma `cap_add: NET_RAW` (wymagane do ping i skanu ARP). Po imporcie c
 docker exec netdash ping -c 1 192.168.1.1
 ```
 
-**Rozwiązanie 3 — tryb bridge (gdy host nie pomaga):**
+**Rozwiązanie 3 — tryb bridge (ZALECANE gdy host nie pomaga, od v1.3.85):**
 
 Zaimportuj alternatywny compose:
 
@@ -119,13 +119,17 @@ Zaimportuj alternatywny compose:
 https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.bridge.yml
 ```
 
+1. **Container Station** → usuń starą aplikację `netdash` (dane w `/share/Container/netdash/data` zostają)
+2. **Create Application** → Import from URL → wklej URL powyżej
+3. Sprawdź `NETDASH_SCAN_CIDR=192.168.1.0/24` (dostosuj do swojej sieci)
+4. **Start** → portal: `http://<IP-QNAP>:18787` → **Serwisy** → **Skanuj sieć**
+
 - Mapowanie portu `18787:18787` (zamiast `network_mode: host`)
 - **`NETDASH_SCAN_CIDR` jest obowiązkowy** — bez niego skan nie ma sensu
-- Portal nadal: `http://<IP-QNAP>:18787`
 
 **Weryfikacja po naprawie:**
 
-1. `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.84"`
+1. `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.85"`
 2. Zaloguj → **Serwisy** → **Skanuj sieć** → zostaw CIDR puste (użyje `NETDASH_SCAN_CIDR`) lub wpisz `192.168.1.0/24`
 3. Po skanie pojawią się karty urządzeń / serwisów
 
