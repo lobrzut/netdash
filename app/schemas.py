@@ -119,6 +119,11 @@ class ServiceOut(BaseModel):
         from_attributes = True
 
 
+class ScanUiAttemptRequest(BaseModel):
+    cidr: str | None = None
+    source: str = Field(default="ui", description="ui-one-click | ui-advanced | ui")
+
+
 class ScanRequest(BaseModel):
     cidr: str | None = Field(
         default=None,

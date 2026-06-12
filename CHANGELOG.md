@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.109
+
+- **NUCLEAR — jeden klik „Skanuj sieć”**: `#scan-btn` i `#empty-scan-btn` od razu wołają `oneClickScan()` → `POST /api/scan` (bez modala CIDR i bez confirm). CIDR: Ustawienia → `scan_cidr_default` → `NETDASH_SCAN_CIDR` (`env_scan_cidr`) → `192.168.1.0/24`. Toast „Skan uruchomiony: {cidr}”, pasek postępu natychmiast.
+- **Opcje skanu…**: link otwiera zaawansowany modal (CIDR + pełny skan + opcjonalny confirm dla power userów).
+- **Logi**: `POST /api/scan/ui-attempt` przy każdej próbie ze UI (`ui-one-click` / `ui-advanced`); usunięty workaround long-press.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.109`.
+
 ## v1.3.108
 
 - **Fix krytyczny — POST /api/scan po „Kontynuuj skan”**: `closeModal('scan-confirm-modal')` wołał `pendingScanStart(false)` zanim promise się rozwiązał (wyścig z handlerem OK / backdrop). Teraz `resolvePendingScanStart(true)` + `closeModal(..., { scanConfirmOk: true })` — confirm nie jest anulowany przy zamykaniu po akceptacji.

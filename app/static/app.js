@@ -3461,21 +3461,30 @@ function parseScanCidrList(text) {
   return text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
 }
 
-function defaultScanCidrValue(netRes, settings) {
+const ONE_CLICK_SCAN_CIDR_FALLBACK = '192.168.1.0/24';
+
+function resolveOneClickScanCidr(settings, netRes) {
   const settingsCidr = settings?.scan_cidr_default?.trim();
-  if (settingsCidr) return parseScanCidrList(settingsCidr)[0] || settingsCidr;
+  if (settingsCidr) {
+    const parsed = parseScanCidrList(settingsCidr)[0] || settingsCidr;
+    if (parsed && !isDockerInternalCidr(parsed)) return parsed;
+  }
   const envCidr = netRes?.env_scan_cidr?.trim();
   if (envCidr) return parseScanCidrList(envCidr)[0] || envCidr;
-  const detected = netRes?.detected_cidrs || [];
-  if (detected.length) return detected[0];
-  const net = resolveNetwork(netRes);
-  if (net.docker_bridge && net.local_network && !isDockerInternalCidr(net.local_network)) {
-    return net.local_network;
-  }
-  if (net.local_network && net.local_network !== '—' && !isDockerInternalCidr(net.local_network)) {
-    return net.local_network;
-  }
-  return null;
+  return ONE_CLICK_SCAN_CIDR_FALLBACK;
+}
+
+function defaultScanCidrValue(netRes, settings) {
+  return resolveOneClickScanCidr(settings, netRes);
+}
+
+function logScanUiAttempt(cidr, source) {
+  return api('/api/scan/ui-attempt', {
+    method: 'POST',
+    body: JSON.stringify({ cidr: cidr || null, source }),
+  }).catch((err) => {
+    console.warn('[NetDash] scan: ui-attempt log failed', err);
+  });
 }
 
 function isDockerInternalCidr(cidr) {
@@ -3626,21 +3635,23 @@ function resumeActiveScan(scans) {
 }
 
 async function startScan(cidr, fullScan = false, opts = {}) {
-  const { skipConfirm = false } = opts;
+  const { skipConfirm = false, suppressStartToast = false } = opts;
   console.log('[NetDash] scan: startScan', { cidr, fullScan, skipConfirm });
   clearScanError();
   const netRes = window.__netdashNetwork;
   let resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
-  if (resolvedCidr && isDockerInternalCidr(resolvedCidr) && netRes?.env_scan_cidr) {
-    resolvedCidr = parseScanCidrList(netRes.env_scan_cidr)[0] || netRes.env_scan_cidr;
-    console.log('[NetDash] scan: CIDR Docker → env', { resolvedCidr });
+  if (resolvedCidr && isDockerInternalCidr(resolvedCidr)) {
+    resolvedCidr = resolveOneClickScanCidr(appSettings, netRes);
+    console.log('[NetDash] scan: CIDR Docker → fallback', { resolvedCidr });
   }
   const networkLabel = resolvedCidr || t('scan.localNetwork');
-  const confirmed = skipConfirm ? true : await confirmScanStart(netRes, networkLabel);
-  if (!confirmed) {
-    console.log('[NetDash] scan: anulowano przed POST');
-    if ($('#scan-modal')?.classList.contains('hidden')) openScanModal();
-    return;
+  if (!skipConfirm) {
+    const confirmed = await confirmScanStart(netRes, networkLabel);
+    if (!confirmed) {
+      console.log('[NetDash] scan: anulowano przed POST');
+      if ($('#scan-modal')?.classList.contains('hidden')) openScanModal();
+      return;
+    }
   }
   if (netRes?.scan_safe_mode && fullScan) {
     fullScan = false;
@@ -3672,8 +3683,21 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   }
 
   console.log('[NetDash] scan: POST ok', { id: job.id });
-  showToast(t('scan.started', { network: networkLabel, id: job.id }), 'info');
+  if (!suppressStartToast) {
+    showToast(t('scan.started', { network: networkLabel, id: job.id }), 'info');
+  }
   attachScanPolling(job);
+}
+
+async function oneClickScan() {
+  const cidr = resolveOneClickScanCidr(appSettings, window.__netdashNetwork);
+  console.log('[NetDash] scan: oneClickScan', { cidr });
+  void logScanUiAttempt(cidr, 'ui-one-click');
+  showToast(t('scan.launched', { cidr }), 'info');
+  $('#scan-bar')?.classList.remove('hidden');
+  const statusEl = $('#scan-status-text');
+  if (statusEl) statusEl.textContent = t('scan.starting', { network: cidr });
+  await startScan(cidr, false, { skipConfirm: true, suppressStartToast: true });
 }
 
 function openScanModal() {
@@ -3691,35 +3715,15 @@ function openScanModal() {
   openModal('scan-modal');
 }
 
-const SCAN_LONG_PRESS_MS = 800;
-
-function bindScanLongPress(btn) {
-  if (!btn) return;
-  let timer = null;
-  const clearTimer = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
-  };
-  const onPress = () => {
-    if (btn.disabled) return;
-    clearTimer();
-    timer = setTimeout(() => {
-      timer = null;
-      const cidr = defaultScanCidrValue(window.__netdashNetwork, appSettings);
-      console.log('[NetDash] scan: long-press — bez modali', { cidr });
-      showToast(t('scan.starting', { network: cidr || t('scan.localNetwork') }), 'info');
-      void startScan(cidr, false, { skipConfirm: true });
-    }, SCAN_LONG_PRESS_MS);
-  };
-  btn.addEventListener('mousedown', onPress);
-  btn.addEventListener('touchstart', onPress, { passive: true });
-  ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach((ev) => {
-    btn.addEventListener(ev, clearTimer);
-  });
-}
-
 function bindScanUi() {
   document.addEventListener('click', (e) => {
+    const optionsBtn = e.target.closest('#scan-options-btn, #empty-scan-options-btn');
+    if (optionsBtn) {
+      e.preventDefault();
+      console.log('[NetDash] scan: opcje skanu', { id: optionsBtn.id });
+      openScanModal();
+      return;
+    }
     const startBtn = e.target.closest('#scan-start');
     if (startBtn) {
       e.preventDefault();
@@ -3731,6 +3735,7 @@ function bindScanUi() {
       const fullScan = $('#full-scan')?.checked ?? false;
       const cidr = resolveScanCidrInput();
       console.log('[NetDash] scan: #scan-start click', { cidr, fullScan });
+      void logScanUiAttempt(cidr, 'ui-advanced');
       void startScan(cidr, fullScan);
       return;
     }
@@ -3741,13 +3746,11 @@ function bindScanUi() {
         console.log('[NetDash] scan: przycisk skanu disabled', { id: quickScanBtn.id });
         return;
       }
-      console.log('[NetDash] scan: przycisk skanu click', { id: quickScanBtn.id });
-      openScanModal();
+      console.log('[NetDash] scan: oneClickScan click', { id: quickScanBtn.id });
+      void oneClickScan();
       return;
     }
   });
-  bindScanLongPress($('#scan-btn'));
-  bindScanLongPress($('#empty-scan-btn'));
   $('#scan-cancel')?.addEventListener('click', () => {
     console.log('[NetDash] scan: anuluj modal CIDR');
     closeModal('scan-modal');

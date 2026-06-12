@@ -500,6 +500,8 @@
   "scan.phase.default": "Skanowanie",
   "scan.localNetwork": "lokalnej sieci",
   "scan.starting": "Rozpoczynanie skanu {network}...",
+  "scan.launched": "Skan uruchomiony: {cidr}",
+  "scan.options": "Opcje skanu…",
   "scan.started": "Skan #{id} uruchomiony — {network}",
   "scan.completed": "Skan zakończony — znaleziono {count} pozycji",
   "scan.foundCount": "znaleziono {count}",

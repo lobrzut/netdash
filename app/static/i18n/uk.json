@@ -497,6 +497,8 @@
   "scan.phase.default": "Сканування",
   "scan.localNetwork": "локальної мережі",
   "scan.starting": "Початок скану {network}...",
+  "scan.launched": "Скан запущено: {cidr}",
+  "scan.options": "Параметри скану…",
   "scan.started": "Скан #{id} запущено — {network}",
   "scan.completed": "Скан завершено — знайдено {count} позицій",
   "scan.foundCount": "знайдено {count}",

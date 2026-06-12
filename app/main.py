@@ -82,6 +82,7 @@ from app.schemas import (
     PowerActionResult,
     ScanRequest,
     ScanStatus,
+    ScanUiAttemptRequest,
     ServiceCreate,
     ServiceIdentifyRequest,
     IconUploadResponse,
@@ -1448,6 +1449,20 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
     finally:
         scan_tasks.pop(job_id, None)
         logger.debug("Scan %s task finished (removed from scan_tasks)", job_id)
+
+
+@app.post("/api/scan/ui-attempt")
+async def log_scan_ui_attempt(
+    data: ScanUiAttemptRequest,
+    _: User = Depends(get_current_user),
+):
+    logger.info(
+        "UI scan attempt source=%s cidr=%s user=%s",
+        data.source,
+        data.cidr,
+        _.username,
+    )
+    return {"ok": True}
 
 
 @app.post("/api/scan", response_model=ScanStatus)
