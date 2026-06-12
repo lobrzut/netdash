@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.113"
+VERSION = "1.3.114"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -125,6 +125,8 @@ class Settings(BaseSettings):
     scan_cidr: str | None = None
     # Disable built-in LAN scan (QNAP dashboard) — use remote discovery agent instead
     scan_disabled: bool = False
+    # local = scan from this host; remote = expect deploy/agent on LAN (auto when scan_disabled)
+    discovery_mode: str = "local"
     # HttpOnly session cookie Secure flag — false for plain HTTP homelab (default).
     cookie_secure: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
@@ -179,6 +181,14 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)
+
+    @field_validator("discovery_mode", mode="before")
+    @classmethod
+    def _discovery_mode(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "local"
+        mode = str(v).strip().lower()
+        return mode if mode in ("local", "remote") else "local"
 
     @field_validator("scan_safe_block_wide", mode="before")
     @classmethod
@@ -256,6 +266,12 @@ class Settings(BaseSettings):
     def resource_profile(self) -> str:
         """Runtime scan intensity: safe (default) or normal (NETDASH_SCAN_SAFE_MODE=false)."""
         return "safe" if self.scan_safe_mode else "normal"
+
+    @property
+    def effective_discovery_mode(self) -> str:
+        if self.scan_disabled:
+            return "remote"
+        return self.discovery_mode
 
     @property
     def health_check_concurrency(self) -> int:

@@ -10,6 +10,12 @@ Lekki agent skanuje LAN na hoście z pełnym dostępem do sieci (np. homelab **1
 ## Szybki start (.201)
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/agent/install.sh | NETDASH_PASSWORD=twoje-haslo bash
+```
+
+Lub ręcznie:
+
+```bash
 cd deploy/agent
 export NETDASH_URL=http://192.168.1.150:18787
 export NETDASH_USER=admin
@@ -33,7 +39,7 @@ docker compose run --rm netdash-agent python3 /agent/netdash-agent.py --once
 | `NETDASH_USER` | `admin` | Login do `/api/auth/login` |
 | `NETDASH_PASSWORD` | — | Hasło |
 | `SCAN_CIDR` | `192.168.1.0/24` | Sieć do skanu |
-| `INTERVAL` | `300` | Sekundy między skanami (`0` lub `--once` = jeden raz) |
+| `INTERVAL` | `600` | Sekundy między skanami (domyślnie co 10 min) |
 | `MARK_MISSING_OFFLINE` | `true` | Oznacz brakujące hosty jako offline |
 | `AGENT_HOSTNAME` | hostname OS | Widoczne w portalu jako źródło importu |
 

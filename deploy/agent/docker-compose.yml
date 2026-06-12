@@ -19,6 +19,6 @@ services:
       NETDASH_PASSWORD: ${NETDASH_PASSWORD:-changeme}
       # NETDASH_TOKEN: optional Bearer JWT (skip login)
       SCAN_CIDR: ${SCAN_CIDR:-192.168.1.0/24}
-      INTERVAL: ${INTERVAL:-300}
+      INTERVAL: ${INTERVAL:-600}
       MARK_MISSING_OFFLINE: ${MARK_MISSING_OFFLINE:-true}
       AGENT_HOSTNAME: ${AGENT_HOSTNAME:-homelab-agent}

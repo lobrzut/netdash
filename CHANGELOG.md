@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.114
+
+- **Discovery bez klikania (QNAP)**: lokalny skan ukryty — stały pasek statusu „Discovery: ostatni import X min temu z homelab (N hostów)” lub „Czekam na agenta…”.
+- **Agent domyślnie co 10 min** (`INTERVAL=600`) — wolno, ale automatycznie; pełny `/24` z `.201`.
+- **Ustawienia → Automatyczne discovery**: tylko status + jednorazowe polecenie install (schowane w `<details>`).
+- **Env**: `NETDASH_DISCOVERY_MODE=remote`, `NETDASH_SCAN_DISABLED=true` w compose QNAP; `discovery_last_import_hosts` w API.
+- **install.sh**: one-liner `curl | bash` dla homelab `.201`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.114`.
+
 ## v1.3.113
 
 - **Compose QNAP**: usunięto `mem_limit`, `memswap_limit`, `cpus` ze wszystkich plików — limity RAM/CPU ustaw ręcznie w Container Station → Resource (512 MB, 50% CPU). Brak fałszywych ostrzeżeń IDE.

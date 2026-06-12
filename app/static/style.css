@@ -2190,6 +2190,56 @@ body.modal-open {
   display: flex;
 }
 
+.discovery-status-bar {
+  padding: 0.5rem 2rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.1);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.discovery-status-bar--ok {
+  color: var(--text);
+  background: rgba(34, 197, 94, 0.08);
+  border-bottom-color: rgba(34, 197, 94, 0.22);
+}
+
+.discovery-status-bar--wait {
+  color: var(--text-muted);
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.discovery-status-card {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.discovery-status-card--ok {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.discovery-status-detail {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.discovery-install-cmd {
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--bg-elevated, rgba(0, 0, 0, 0.2));
+}
+
+.discovery-import-status--ok {
+  color: rgb(34, 197, 94);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(1.4); }

@@ -202,6 +202,7 @@ class NetworkInfo(BaseModel):
     ping_available: bool = True
     scan_safe_mode: bool = True
     scan_disabled: bool = False
+    discovery_mode: str = "local"
     resource_profile: str = "safe"
     detected_cidrs: list[str] = Field(default_factory=list)
     env_scan_cidr: str | None = None
@@ -210,6 +211,7 @@ class NetworkInfo(BaseModel):
     scan_chunk_size: int = 4
     discovery_last_import_at: datetime | None = None
     discovery_last_import_source: str | None = None
+    discovery_last_import_hosts: int | None = None
 
 
 class NetworkDiagnostics(BaseModel):
@@ -266,6 +268,7 @@ class AppSettingsOut(BaseModel):
     stale_remove_days: int = 0
     discovery_last_import_at: datetime | None = None
     discovery_last_import_source: str | None = None
+    discovery_last_import_hosts: int | None = None
 
     class Config:
         from_attributes = True

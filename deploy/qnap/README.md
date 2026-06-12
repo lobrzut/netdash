@@ -1,4 +1,26 @@
-# NetDash na QNAP — 5 minut, bez git
+# NetDash na QNAP — 2 kroki (discovery automatyczne)
+
+Obraz: `ghcr.io/lobrzut/netdash:1.3.114` — **bez skanowania z NAS** (bezpieczeństwo). Pełna sieć `/24` skanuje agent na homelab co ~10 min.
+
+## Krok 1 — NetDash na QNAP (.150)
+
+1. **Container Station** → **Create Application** → **Import from URL**
+2. Wklej: `https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml`
+3. **Pull** obraz `1.3.114` → **Start** → `http://192.168.1.150:18787` (login `admin` / `changeme`)
+
+Portal pokazuje pasek: *„Discovery: czekam na agenta…”* — to normalne przed krokiem 2.
+
+## Krok 2 — agent na homelab (.201), jednorazowo
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/agent/install.sh | NETDASH_PASSWORD=twoje-haslo bash
+```
+
+Po ~10 min pasek zmieni się na np. *„Discovery: ostatni import 3 min temu z homelab-agent (47 hostów)”*. **Nic więcej nie klikasz.**
+
+---
+
+# NetDash na QNAP — pełna dokumentacja
 
 Obraz: `ghcr.io/lobrzut/netdash:latest` — pobierany z GitHub Container Registry. **Nie klonujesz repozytorium na NAS.**
 

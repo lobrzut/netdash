@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.113" />
-  <script src="/static/i18n.js?v=1.3.113"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.114" />
+  <script src="/static/i18n.js?v=1.3.114"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -114,6 +114,9 @@
     <div id="scan-config-warning" class="scan-config-warning hidden" role="alert">
       <span id="scan-config-warning-text" class="scan-config-warning-text"></span>
       <button type="button" id="scan-config-warning-dismiss" class="scan-config-warning-dismiss hidden" data-i18n="scan.bannerDismiss" aria-label="Ukryj">Ukryj</button>
+    </div>
+    <div id="discovery-status-bar" class="discovery-status-bar hidden" role="status">
+      <span id="discovery-status-bar-text"></span>
     </div>
 
     <main class="main">
@@ -250,6 +253,7 @@
             <button class="settings-tab active" data-tab="general" role="tab" aria-selected="true"><span class="settings-tab-icon" aria-hidden="true">⚙️</span><span data-i18n="settings.tab.general">Ogólne</span></button>
             <button class="settings-tab" data-tab="appearance" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">🎨</span><span data-i18n="settings.tab.appearance">Wygląd</span></button>
             <button class="settings-tab" data-tab="language" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">🌐</span><span data-i18n="settings.tab.language">Język</span></button>
+            <button class="settings-tab" data-tab="discovery" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">🤖</span><span data-i18n="settings.tab.discovery">Automatyczne discovery</span></button>
             <button class="settings-tab" data-tab="scan" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">📡</span><span data-i18n="settings.tab.scan">Skanowanie</span></button>
             <button class="settings-tab" data-tab="power" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">⚡</span><span data-i18n="settings.tab.power">Zasilanie</span></button>
             <button class="settings-tab" data-tab="backup" role="tab" aria-selected="false"><span class="settings-tab-icon" aria-hidden="true">💾</span><span data-i18n="settings.tab.backup">Kopia zapasowa</span></button>
@@ -479,6 +483,21 @@
           <p class="about-update-notes" id="about-update-notes" hidden></p>
           <p class="about-update-error hint" id="about-update-error" hidden></p>
         </div>
+      </div>
+      <div class="settings-panel" data-panel="discovery">
+        <details class="settings-accordion" open>
+          <summary data-i18n="settings.tab.discovery">Automatyczne discovery</summary>
+          <div class="settings-accordion-body discovery-auto-body">
+            <div class="discovery-status-card" id="discovery-status-card" role="status">
+              <p class="discovery-status-detail" id="discovery-status-detail"></p>
+            </div>
+            <details class="discovery-install-details">
+              <summary data-i18n="discovery.installHeading">Agent na homelab (.201)</summary>
+              <pre class="discovery-install-cmd" id="discovery-install-cmd"></pre>
+              <button type="button" class="btn btn-secondary btn-sm" id="discovery-copy-cmd" data-i18n="discovery.copyCmd">Kopiuj polecenie</button>
+            </details>
+          </div>
+        </details>
       </div>
       <div class="settings-panel" data-panel="scan">
         <details class="settings-accordion" open>
@@ -1168,6 +1187,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.113"></script>
+  <script src="/static/app.js?v=1.3.114"></script>
 </body>
 </html>

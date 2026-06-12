@@ -203,6 +203,7 @@ async def import_discovery_hosts(
     label = source_hostname or source
     app_settings.discovery_last_import_at = now
     app_settings.discovery_last_import_source = label[:128]
+    app_settings.discovery_last_import_hosts = len(seen_ips)
 
     await db.commit()
 

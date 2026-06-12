@@ -221,6 +221,7 @@ def _migrate_db(sync_conn):
             ("stale_remove_days", "INTEGER DEFAULT 0"),
             ("discovery_last_import_at", "DATETIME"),
             ("discovery_last_import_source", "VARCHAR(128)"),
+            ("discovery_last_import_hosts", "INTEGER"),
         ]
         for name, ddl in settings_migrations:
             if name not in columns:
@@ -538,12 +539,14 @@ async def health(db: AsyncSession = Depends(get_db)):
         "secret_key_stable": settings.secret_key_stable,
         "scan_safe_mode": settings.scan_safe_mode,
         "scan_disabled": settings.scan_disabled,
+        "discovery_mode": settings.effective_discovery_mode,
         "resource_profile": settings.resource_profile,
         "scan_safe_min_prefix": settings.scan_safe_min_prefix,
         "scan_max_hosts": settings.effective_scan_max_hosts,
         "scan_chunk_size": settings.effective_scan_batch_size,
         "discovery_last_import_at": app_settings.discovery_last_import_at,
         "discovery_last_import_source": app_settings.discovery_last_import_source,
+        "discovery_last_import_hosts": app_settings.discovery_last_import_hosts,
     }
 
 
@@ -677,6 +680,7 @@ async def network_info(
         ping_available=ping_ok,
         scan_safe_mode=settings.scan_safe_mode,
         scan_disabled=settings.scan_disabled,
+        discovery_mode=settings.effective_discovery_mode,
         resource_profile=settings.resource_profile,
         detected_cidrs=get_detected_cidrs(app_settings.scan_cidr_default),
         env_scan_cidr=env_cidr,
@@ -685,6 +689,7 @@ async def network_info(
         scan_chunk_size=settings.effective_scan_batch_size,
         discovery_last_import_at=app_settings.discovery_last_import_at,
         discovery_last_import_source=app_settings.discovery_last_import_source,
+        discovery_last_import_hosts=app_settings.discovery_last_import_hosts,
     )
 
 
@@ -700,7 +705,11 @@ async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
     settings_cidr = app_settings.scan_cidr_default or None
     scan_ready = bool(resolved) and (not docker_br or bool(env_cidr or settings_cidr))
     hints: list[str] = []
-    if docker_br:
+    if settings.scan_disabled:
+        hints.append(
+            "Lokalny skan wyłączony — uruchom agenta zdalnego (deploy/agent) na hoście LAN, np. homelab .201."
+        )
+    elif docker_br:
         hints.append(
             "Kontener w sieci Docker (bridge) — wymagany NETDASH_SCAN_CIDR lub CIDR w Ustawienia → Skanowanie."
         )
@@ -1532,7 +1541,10 @@ async def start_scan(
     if settings.scan_disabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Lokalny skan wyłączony — użyj agenta zdalnego (NETDASH_SCAN_DISABLED=true).",
+            detail=(
+                "Skan lokalny wyłączony na NAS. Uruchom agenta na homelab (192.168.1.201) — "
+                "skanuje /24 automatycznie. Patrz Ustawienia → Automatyczne discovery."
+            ),
         )
     if any(not t.done() for t in scan_tasks.values()):
         logger.warning("POST /api/scan rejected: scan already in progress")

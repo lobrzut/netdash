@@ -25,6 +25,7 @@ const SCAN_POLL_MAX_FAILURES = 12;
 const SCAN_SERVICES_REFRESH_MS = 30000;
 const SCAN_SAFE_MIN_PREFIX = 28;
 let healthPollInterval = null;
+let discoveryStatusPollTimer = null;
 let clockInterval = null;
 let revealedKeys = new Set();
 let currentPage = 'home';
@@ -925,49 +926,141 @@ const DEFAULT_NETWORK = Object.freeze({
   scan_chunk_size: 4,
   discovery_last_import_at: null,
   discovery_last_import_source: null,
+  discovery_last_import_hosts: null,
+  discovery_mode: 'local',
 });
 
-function isLocalScanDisabled(netRes) {
+const DISCOVERY_STALE_MS = 20 * 60 * 1000;
+
+function isRemoteDiscovery(netRes) {
   const net = resolveNetwork(netRes);
-  return net.scan_disabled === true;
+  return net.scan_disabled === true || net.discovery_mode === 'remote';
+}
+
+function formatRelativeAgo(when) {
+  if (!when) return '';
+  const ms = Date.now() - when.getTime();
+  if (ms < 45000) return t('discovery.agoJustNow');
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return t('discovery.agoMinutes', { n: mins });
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return t('discovery.agoHours', { n: hours });
+  return when.toLocaleString();
+}
+
+function getDiscoveryMeta(netRes, settings) {
+  const at = settings?.discovery_last_import_at || netRes?.discovery_last_import_at;
+  const source = settings?.discovery_last_import_source || netRes?.discovery_last_import_source;
+  const hosts = settings?.discovery_last_import_hosts ?? netRes?.discovery_last_import_hosts;
+  const when = at ? new Date(at) : null;
+  const validWhen = when && !Number.isNaN(when.getTime()) ? when : null;
+  return { when: validWhen, source, hosts };
+}
+
+function formatDiscoveryStatusLine(netRes, settings) {
+  const { when, source, hosts } = getDiscoveryMeta(netRes, settings);
+  if (!when) return t('discovery.waiting');
+  const ago = formatRelativeAgo(when);
+  const src = source || 'agent';
+  const count = hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : null;
+  if (count != null) {
+    return t('discovery.statusLine', { ago, source: src, count });
+  }
+  return t('discovery.statusLineNoCount', { ago, source: src });
+}
+
+function buildDiscoveryInstallCommand() {
+  return 'curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/agent/install.sh | NETDASH_PASSWORD=twoje-haslo bash';
+}
+
+function updateDiscoveryStatusBar(netRes, settings) {
+  const bar = $('#discovery-status-bar');
+  const textEl = $('#discovery-status-bar-text');
+  if (!bar || !textEl) return;
+  if (!isRemoteDiscovery(netRes)) {
+    bar.classList.add('hidden');
+    bar.classList.remove('discovery-status-bar--ok', 'discovery-status-bar--wait');
+    textEl.textContent = '';
+    return;
+  }
+  const line = formatDiscoveryStatusLine(netRes, settings);
+  const { when } = getDiscoveryMeta(netRes, settings);
+  textEl.textContent = line;
+  bar.classList.remove('hidden');
+  bar.classList.toggle('discovery-status-bar--ok', !!when);
+  bar.classList.toggle('discovery-status-bar--wait', !when);
+}
+
+function updateDiscoverySettingsPanel(netRes, settings) {
+  const detail = $('#discovery-status-detail');
+  const cmd = $('#discovery-install-cmd');
+  const card = $('#discovery-status-card');
+  if (!isRemoteDiscovery(netRes)) return;
+  const line = formatDiscoveryStatusLine(netRes, settings);
+  if (detail) detail.textContent = line;
+  if (cmd) cmd.textContent = buildDiscoveryInstallCommand();
+  if (card) {
+    card.classList.toggle('discovery-status-card--ok', !!getDiscoveryMeta(netRes, settings).when);
+  }
+}
+
+function updateRemoteDiscoveryUI(netRes, settings) {
+  const remote = isRemoteDiscovery(netRes);
+  document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
+  $('#scan-options-btn')?.classList.toggle('hidden', remote);
+  $('#empty-scan-btn')?.classList.toggle('hidden', remote);
+  $('#empty-scan-options-btn')?.classList.toggle('hidden', remote);
+  $('.settings-tab[data-tab="scan"]')?.classList.toggle('hidden', remote);
+  $('#scan-error')?.classList.add('hidden');
+  const emptyHint = $('#empty-hint');
+  if (emptyHint) {
+    emptyHint.textContent = remote
+      ? formatDiscoveryStatusLine(netRes, settings)
+      : t('empty.services.hint');
+  }
+  updateDiscoveryStatusBar(netRes, settings);
+  updateDiscoverySettingsPanel(netRes, settings);
+}
+
+function isLocalScanDisabled(netRes) {
+  return isRemoteDiscovery(netRes);
 }
 
 function updateScanButtonsState(netRes) {
-  const disabled = isLocalScanDisabled(netRes);
-  $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !disabled);
+  const remote = isRemoteDiscovery(netRes);
+  $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !remote);
+  $('#settings-scan-profile-card')?.classList.toggle('hidden', remote);
+  if (remote) {
+    ['#scan-btn', '#empty-scan-btn', '#scan-start', '#scan-options-btn', '#empty-scan-options-btn', '#scan-test-btn'].forEach((sel) => {
+      const el = $(sel);
+      if (!el) return;
+      el.disabled = false;
+      el.classList.remove('scan-disabled');
+    });
+    return;
+  }
   ['#scan-btn', '#empty-scan-btn', '#scan-start', '#scan-options-btn', '#empty-scan-options-btn', '#scan-test-btn'].forEach((sel) => {
     const el = $(sel);
     if (!el) return;
-    el.disabled = disabled;
-    el.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-    if (sel === '#scan-btn' || sel === '#empty-scan-btn') {
-      el.classList.toggle('scan-disabled', disabled);
-    }
+    el.disabled = false;
+    el.setAttribute('aria-disabled', 'false');
+    el.classList.remove('scan-disabled');
   });
-}
-
-function formatDiscoveryImportLabel(netRes, settings) {
-  const at = settings?.discovery_last_import_at || netRes?.discovery_last_import_at;
-  const source = settings?.discovery_last_import_source || netRes?.discovery_last_import_source;
-  if (!at) return '';
-  const when = new Date(at);
-  const timeStr = Number.isNaN(when.getTime()) ? at : when.toLocaleString();
-  return source
-    ? t('discovery.lastImportWithSource', { time: timeStr, source })
-    : t('discovery.lastImport', { time: timeStr });
 }
 
 function updateDiscoveryImportStatus(netRes, settings) {
   const el = $('#settings-discovery-import-status');
   if (!el) return;
-  const text = formatDiscoveryImportLabel(netRes, settings);
-  if (text) {
-    el.textContent = text;
-    el.classList.remove('hidden');
-  } else {
+  if (!isRemoteDiscovery(netRes)) {
     el.textContent = '';
     el.classList.add('hidden');
+    el.classList.remove('discovery-import-status--ok');
+    return;
   }
+  const text = formatDiscoveryStatusLine(netRes, settings);
+  el.textContent = text;
+  el.classList.remove('hidden');
+  el.classList.toggle('discovery-import-status--ok', !!getDiscoveryMeta(netRes, settings).when);
 }
 
 function resolveNetwork(netRes) {
@@ -1101,21 +1194,19 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
   const dismissBtn = $('#scan-config-warning-dismiss');
   if (!el || !textEl) return;
   const net = resolveNetwork(netRes);
+  if (isRemoteDiscovery(netRes)) {
+    el.classList.add('hidden');
+    textEl.textContent = '';
+    dismissBtn?.classList.add('hidden');
+    updateRemoteDiscoveryUI(netRes, settings);
+    return;
+  }
   let message = '';
   let dismissible = false;
   if (currentPage !== 'services' && currentPage !== 'home') {
     el.classList.add('hidden');
     textEl.textContent = '';
     dismissBtn?.classList.add('hidden');
-    return;
-  }
-  if (isLocalScanDisabled(netRes)) {
-    let message = t('discovery.remoteOnlyBanner');
-    const importHint = formatDiscoveryImportLabel(net, settings);
-    if (importHint) message += ` ${importHint}`;
-    textEl.textContent = message;
-    dismissBtn?.classList.add('hidden');
-    el.classList.remove('hidden');
     return;
   }
   if (scanNeedsCidrConfig(net, settings)) {
@@ -1217,6 +1308,7 @@ async function loadDashboard() {
   updateDockerScanWarning(net, settings);
   updateScanButtonsState(net);
   updateDiscoveryImportStatus(net, settings);
+  updateRemoteDiscoveryUI(net, settings);
   updateScanConfigWarning(net, settings, window.__lastScanStatus);
   resumeActiveScan(scansRes);
 
@@ -1231,6 +1323,7 @@ async function loadDashboard() {
   navigateTo(localStorage.getItem('netdash_page') || 'home');
   startClock();
   startHealthPolling();
+  startDiscoveryStatusPolling();
 }
 
 let serviceRefreshInterval = null;
@@ -1251,7 +1344,20 @@ function isTransientFetchError(err) {
     || msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('Load failed');
 }
 
-function startHealthPolling() {
+function startDiscoveryStatusPolling() {
+  if (discoveryStatusPollTimer) clearInterval(discoveryStatusPollTimer);
+  discoveryStatusPollTimer = setInterval(async () => {
+    if (!isRemoteDiscovery(window.__netdashNetwork)) return;
+    try {
+      const [netRes, settings] = await Promise.all([api('/api/network'), fetchSettings()]);
+      window.__netdashNetwork = resolveNetwork(netRes);
+      appSettings = settings;
+      updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+    } catch {
+      updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+    }
+  }, 60000);
+}
   pauseHealthPolling();
   if (appSettings.health_check_enabled === false) return;
   const intervalSec = Math.max(15, Math.min(900, appSettings.health_check_interval || 60));
@@ -3769,18 +3875,15 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   console.log('[NetDash] scan: startScan', { cidr, fullScan, skipConfirm });
   clearScanError();
   const netRes = window.__netdashNetwork;
-  if (isLocalScanDisabled(netRes)) {
-    showScanError(t('discovery.remoteOnlyBanner'));
-    return;
-  }
+  if (isRemoteDiscovery(netRes)) return;
   let resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   if (resolvedCidr && isDockerInternalCidr(resolvedCidr)) {
     resolvedCidr = resolveOneClickScanCidr(appSettings, netRes);
     console.log('[NetDash] scan: CIDR Docker → fallback', { resolvedCidr });
   }
   if (netRes?.scan_safe_mode && isWideScanCidr(resolvedCidr, netRes)) {
-    showScanError(t('scan.error.cidrTooWide', { cidr: resolvedCidr, max: netRes.scan_safe_min_prefix || SCAN_SAFE_MIN_PREFIX }));
-    openScanModal();
+    if (isRemoteDiscovery(netRes)) return;
+    showScanError(t('discovery.useAgentInstead'));
     return;
   }
   const networkLabel = resolvedCidr || t('scan.localNetwork');
@@ -3830,15 +3933,11 @@ async function startScan(cidr, fullScan = false, opts = {}) {
 
 async function oneClickScan() {
   const netRes = window.__netdashNetwork;
-  if (isLocalScanDisabled(netRes)) {
-    showScanError(t('discovery.remoteOnlyBanner'));
-    return;
-  }
+  if (isRemoteDiscovery(netRes)) return;
   const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
   if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
-    showScanError(t('scan.error.cidrTooWide', { cidr, max: netRes.scan_safe_min_prefix || SCAN_SAFE_MIN_PREFIX }));
-    openScanModal();
+    showScanError(t('discovery.useAgentInstead'));
     return;
   }
   void logScanUiAttempt(cidr, 'ui-one-click');
@@ -4237,9 +4336,21 @@ $('#settings-btn').addEventListener('click', () => {
   settingsSnapshot = { ...appSettings };
   renderPowerDevicesList();
   renderAboutPanel();
-  const activeTab = $('.settings-tab.active')?.dataset.tab || 'general';
+  updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+  const activeTab = isRemoteDiscovery(window.__netdashNetwork) ? 'discovery' : ($('.settings-tab.active')?.dataset.tab || 'general');
+  switchSettingsTab(activeTab);
   updateSettingsFooter(activeTab);
   openModal('settings-modal');
+});
+
+$('#discovery-copy-cmd')?.addEventListener('click', async () => {
+  const text = buildDiscoveryInstallCommand();
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(t('discovery.copyCmdDone'), 'success');
+  } catch {
+    showToast(text, 'info');
+  }
 });
 
 $('#settings-backup-export')?.addEventListener('click', exportSettingsBackup);
