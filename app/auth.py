@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
@@ -11,6 +12,7 @@ from app.database import get_db
 from app.models import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger("netdash")
 AUTH_COOKIE_NAME = "netdash_session"
 AUTH_COOKIE_LEGACY = "netdash_token"
 
@@ -45,7 +47,7 @@ def _cookie_secure(request: Request) -> bool:
     return auth_cookie_secure(request)
 
 
-def set_auth_cookie(response, request: Request, token: str) -> None:
+def set_auth_cookie(response, request: Request, token: str, *, username: str | None = None) -> None:
     secure = _cookie_secure(request)
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
@@ -64,6 +66,8 @@ def set_auth_cookie(response, request: Request, token: str) -> None:
         secure=secure,
         samesite="lax",
     )
+    if username:
+        logger.info("Session cookie set for user %s (path=/, secure=%s)", username, secure)
 
 
 def clear_auth_cookie(response, request: Request) -> None:

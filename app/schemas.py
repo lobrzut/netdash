@@ -160,6 +160,18 @@ class NetworkInfo(BaseModel):
     ping_available: bool = True
 
 
+class NetworkDiagnostics(BaseModel):
+    local_network: str
+    local_ip: str
+    docker_bridge: bool
+    ping_available: bool
+    scan_cidr_env: str | None = None
+    scan_cidr_settings: str | None = None
+    resolved_cidrs: list[str] = Field(default_factory=list)
+    scan_ready: bool = False
+    hint: str = ""
+
+
 class AppSettingsOut(BaseModel):
     title: str
     subtitle: str

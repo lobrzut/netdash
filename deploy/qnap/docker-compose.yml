@@ -8,10 +8,11 @@
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:latest
+    image: ghcr.io/lobrzut/netdash:1.3.89
     container_name: netdash
     restart: always
-    network_mode: host
+    ports:
+      - "18787:18787"
     environment:
       # QNAP CS often ignores ${VAR:-default}; literals below work without CS env overrides.
       # NETDASH_SECRET_KEY: optional — entrypoint auto-generates to /app/data/.secret if unset.

@@ -4836,6 +4836,67 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 .power-device-row .on { color: var(--accent-bright); }
 .power-device-row .off { color: var(--text-dim); }
 
+.boot-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+  color: var(--text-dim);
+}
+
+.boot-spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: boot-spin 0.8s linear infinite;
+}
+
+@keyframes boot-spin {
+  to { transform: rotate(360deg); }
+}
+
+.scan-test-row {
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.scan-test-status {
+  flex: 1;
+}
+
+.scan-test-results {
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.scan-test-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.scan-test-table th,
+.scan-test-table td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.scan-test-table th {
+  width: 42%;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
 .arp-scan-row {
   align-items: center;
   gap: 0.75rem;

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.89
+
+- **Fix sesji QNAP (F5)**: ekran „Ładowanie sesji…” do czasu `GET /api/auth/me`; brak odczytu starego tokena z localStorage przy starcie; przy 401 retry cookie-only i `restoreSession()` zamiast natychmiastowego wylogowania.
+- **Serwer**: log `Session cookie set for user X` przy logowaniu i `/api/auth/me`.
+- **QNAP compose domyślnie bridge**: `docker-compose.full.yml` i `docker-compose.yml` używają `ports: 18787:18787` zamiast `network_mode: host` (host nie skanuje LAN na QNAP).
+- **Test skanu**: przycisk **Ustawienia → Skanowanie → Test skanu sieci** + `POST /api/network/scan-test` (ping, CIDR, docker bridge) — wpis w logach kontenera.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.89`.
+
 ## v1.3.88
 
 - **QNAP entrypoint (impossible to miss)**: banner `NetDash entrypoint v1.3.88`, `LISTEN_PORT=18787 (8787 blocked)` w pierwszych liniach logu — łatwa diagnoza starego obrazu GHCR bez entrypoint.

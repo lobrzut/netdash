@@ -71,6 +71,7 @@ from app.schemas import (
     HomerImportResult,
     LoginRequest,
     PasswordChangeRequest,
+    NetworkDiagnostics,
     NetworkInfo,
     NoteCreate,
     NoteOut,
@@ -546,7 +547,7 @@ async def login(
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
     access_token = create_access_token(user.username)
-    set_auth_cookie(response, request, access_token)
+    set_auth_cookie(response, request, access_token, username=user.username)
     return Token(access_token=access_token)
 
 
@@ -559,7 +560,7 @@ async def logout(request: Request, response: Response):
 @app.get("/api/auth/me", response_model=UserMe)
 async def auth_me(request: Request, response: Response, user: User = Depends(get_current_user)):
     access_token = create_access_token(user.username)
-    set_auth_cookie(response, request, access_token)
+    set_auth_cookie(response, request, access_token, username=user.username)
     return UserMe(username=user.username, access_token=access_token)
 
 
@@ -594,6 +595,59 @@ async def network_info(_: User = Depends(get_current_user)):
         scan_cidr_configured=bool(settings.scan_cidr),
         ping_available=ping_ok,
     )
+
+
+async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
+    app_settings = await _get_or_create_settings(db)
+    ping_ok = await icmp_ping_available()
+    docker_br = is_likely_docker_bridge()
+    try:
+        resolved = resolve_scan_cidrs(None, app_settings.scan_cidr_default)
+    except ValueError:
+        resolved = []
+    env_cidr = settings.scan_cidr.strip() if settings.scan_cidr else None
+    settings_cidr = app_settings.scan_cidr_default or None
+    scan_ready = bool(resolved) and (not docker_br or bool(env_cidr or settings_cidr))
+    hints: list[str] = []
+    if docker_br:
+        hints.append(
+            "Kontener w sieci Docker (bridge) — wymagany NETDASH_SCAN_CIDR lub CIDR w Ustawienia → Skanowanie."
+        )
+    if not ping_ok:
+        hints.append("Ping ICMP niedostępny (typowe na QNAP) — skan użyje TCP discovery.")
+    if not resolved:
+        hints.append("Brak CIDR — ustaw NETDASH_SCAN_CIDR w compose lub Domyślne sieci w ustawieniach.")
+    elif scan_ready:
+        hints.append("Skan gotowy — użyj Serwisy → Skanuj sieć.")
+    return NetworkDiagnostics(
+        local_network=get_local_network(),
+        local_ip=get_local_ip(),
+        docker_bridge=docker_br,
+        ping_available=ping_ok,
+        scan_cidr_env=env_cidr,
+        scan_cidr_settings=settings_cidr,
+        resolved_cidrs=resolved,
+        scan_ready=scan_ready,
+        hint=" ".join(hints),
+    )
+
+
+@app.post("/api/network/scan-test", response_model=NetworkDiagnostics)
+async def network_scan_test(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    diag = await _build_network_diagnostics(db)
+    logger.info(
+        "POST /api/network/scan-test user=%s ping=%s docker_bridge=%s cidr_env=%s resolved=%s ready=%s",
+        user.username,
+        diag.ping_available,
+        diag.docker_bridge,
+        diag.scan_cidr_env,
+        diag.resolved_cidrs,
+        diag.scan_ready,
+    )
+    return diag
 
 
 @app.get("/api/settings", response_model=AppSettingsOut)

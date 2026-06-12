@@ -2,7 +2,9 @@ const API = '';
 let appVersion = null;
 let buildDate = null;
 let githubRepo = 'https://github.com/lobrzut/netdash';
-let token = localStorage.getItem('netdash_token');
+let token = null;
+let sessionEstablished = false;
+let authBootComplete = false;
 let services = [];
 let apiKeys = [];
 let notes = [];
@@ -104,9 +106,17 @@ const $$ = (sel) => document.querySelectorAll(sel);
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers });
+  let res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers });
+  if (res.status === 401 && headers.Authorization) {
+    const cookieOnly = { 'Content-Type': 'application/json', ...options.headers };
+    res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers: cookieOnly });
+  }
   if (res.status === 401) {
-    logout();
+    if (authBootComplete && sessionEstablished) {
+      const restored = await restoreSession();
+      if (restored) return api(path, options);
+    }
+    if (authBootComplete) logout();
     throw new Error('Unauthorized');
   }
   if (!res.ok) {
@@ -177,10 +187,7 @@ function clearScanError() {
 
 function handleDashboardLoadError(err) {
   if (err?.message === 'Unauthorized') return;
-  token = null;
-  localStorage.removeItem('netdash_token');
-  showView('login-view');
-  showLoginError(t('error.dashboardLoad', {
+  showDashboardError(t('error.dashboardLoad', {
     detail: err?.message || t('error.unknown'),
     host: location.hostname,
   }));
@@ -612,6 +619,8 @@ async function login(username, password) {
   const data = await res.json();
   token = data.access_token;
   localStorage.setItem('netdash_token', token);
+  sessionEstablished = true;
+  authBootComplete = true;
   showView('dashboard-view');
   await loadDashboard();
 }
@@ -4458,6 +4467,7 @@ async function restoreSession() {
     if (!res.ok) {
       token = null;
       localStorage.removeItem('netdash_token');
+      sessionEstablished = false;
       return false;
     }
     const data = await res.json().catch(() => ({}));
@@ -4465,16 +4475,63 @@ async function restoreSession() {
       token = data.access_token;
       localStorage.setItem('netdash_token', token);
     }
+    sessionEstablished = true;
     return true;
   } catch {
     token = null;
     localStorage.removeItem('netdash_token');
+    sessionEstablished = false;
     return false;
   }
 }
 
+function renderScanTestResults(diag) {
+  const box = $('#scan-test-results');
+  if (!box || !diag) return;
+  const yes = t('common.yes');
+  const no = t('common.no');
+  const cidrs = (diag.resolved_cidrs || []).join(', ') || '—';
+  box.innerHTML = `
+    <table class="scan-test-table">
+      <tr><th>${t('settings.scanTest.ping')}</th><td>${diag.ping_available ? yes : no}</td></tr>
+      <tr><th>${t('settings.scanTest.dockerBridge')}</th><td>${diag.docker_bridge ? yes : no}</td></tr>
+      <tr><th>${t('settings.scanTest.localIp')}</th><td><code>${esc(diag.local_ip || '—')}</code></td></tr>
+      <tr><th>${t('settings.scanTest.localNetwork')}</th><td><code>${esc(diag.local_network || '—')}</code></td></tr>
+      <tr><th>${t('settings.scanTest.cidrEnv')}</th><td><code>${esc(diag.scan_cidr_env || '—')}</code></td></tr>
+      <tr><th>${t('settings.scanTest.cidrSettings')}</th><td><code>${esc(diag.scan_cidr_settings || '—')}</code></td></tr>
+      <tr><th>${t('settings.scanTest.resolvedCidrs')}</th><td><code>${esc(cidrs)}</code></td></tr>
+      <tr><th>${t('settings.scanTest.ready')}</th><td>${diag.scan_ready ? yes : no}</td></tr>
+    </table>
+    ${diag.hint ? `<p class="hint">${esc(diag.hint)}</p>` : ''}
+  `;
+  box.classList.remove('hidden');
+}
+
+$('#scan-test-btn')?.addEventListener('click', async () => {
+  const btn = $('#scan-test-btn');
+  const status = $('#scan-test-status');
+  if (!btn) return;
+  btn.disabled = true;
+  if (status) status.textContent = t('settings.scanTest.running');
+  try {
+    const diag = await api('/api/network/scan-test', { method: 'POST', body: '{}' });
+    renderScanTestResults(diag);
+    if (status) {
+      status.textContent = diag.scan_ready
+        ? t('settings.scanTest.readyOk')
+        : t('settings.scanTest.readyFail');
+    }
+  } catch (err) {
+    if (status) status.textContent = err.message || t('settings.scanTest.failed');
+    $('#scan-test-results')?.classList.add('hidden');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // Init
 (async () => {
+  showView('boot-view');
   await loadLanguage(localStorage.getItem('netdash_lang') || 'pl');
   syncDashboardLayoutSelect();
   applyI18n();
@@ -4490,4 +4547,5 @@ async function restoreSession() {
   } else {
     showView('login-view');
   }
+  authBootComplete = true;
 })();

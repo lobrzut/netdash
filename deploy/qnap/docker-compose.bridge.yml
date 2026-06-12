@@ -1,34 +1,35 @@
-# NetDash — QNAP Container Station (ZALECANY gdy host mode nie skanuje LAN)
-# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.bridge.yml
-#
-# Użyj tego pliku gdy network_mode: host na QNAP nie skanuje urządzeń w LAN (v1.3.85+).
-# NETDASH_SCAN_CIDR jest WYMAGANY — kontener w bridge widzi tylko sieć Docker (172.x).
-# Dostosuj CIDR do swojej podsieci (np. 192.168.1.0/24 dla QNAP 192.168.1.150).
-#
-# Portal: http://<IP-QNAP>:18787
-
-services:
-  netdash:
-    image: ghcr.io/lobrzut/netdash:latest
-    container_name: netdash
-    restart: always
-    ports:
-      - "18787:18787"
-    environment:
-      NETDASH_DEFAULT_ADMIN_USER: admin
-      NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
-      NETDASH_SYNC_ADMIN_PASSWORD: "false"
-      NETDASH_SCAN_CIDR: "192.168.1.0/24"
-      NETDASH_LISTEN_PORT: "18787"
-    volumes:
-      - /share/Container/netdash/data:/app/data
-    cap_add:
-      - NET_RAW
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+# NetDash — QNAP Container Station (ZALECANY — skan LAN na QNAP)
+# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.bridge.yml
+#
+# Na QNAP network_mode: host NIE skanuje urządzeń w LAN — używaj bridge + port 18787:18787.
+# NETDASH_SCAN_CIDR jest WYMAGANY — kontener w bridge widzi tylko sieć Docker (172.x).
+# Dostosuj CIDR do swojej podsieci (np. 192.168.1.0/24 dla QNAP 192.168.1.150).
+#
+# Portal: http://<IP-QNAP>:18787
+
+services:
+  netdash:
+    image: ghcr.io/lobrzut/netdash:1.3.89
+    container_name: netdash
+    restart: always
+    ports:
+      - "18787:18787"
+    environment:
+      NETDASH_DEFAULT_ADMIN_USER: admin
+      NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
+      NETDASH_SYNC_ADMIN_PASSWORD: "false"
+      NETDASH_SCAN_CIDR: "192.168.1.0/24"
+      NETDASH_LISTEN_PORT: "18787"
+    volumes:
+      - /share/Container/netdash/data:/app/data
+    cap_add:
+      - NET_RAW
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
