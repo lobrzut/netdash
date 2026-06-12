@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.116"
+VERSION = "1.3.117"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -125,8 +125,14 @@ class Settings(BaseSettings):
     scan_cidr: str | None = None
     # Disable built-in LAN scan (QNAP dashboard) — use remote discovery agent instead
     scan_disabled: bool = False
-    # local = scan from this host; remote = expect deploy/agent on LAN (auto when scan_disabled)
+    # local = manual TCP scan; arp = background arp-scan (WatchYourLAN-style); remote = deploy/agent
     discovery_mode: str = "local"
+    # Background ARP cycle interval (seconds) when discovery_mode=arp
+    arp_interval: int = 300
+    # Light port probe for newly seen ARP hosts only (one host at a time)
+    arp_probe_new_hosts: bool = True
+    arp_probe_delay: float = 2.0
+    arp_probe_max_hosts: int = 3
     # HttpOnly session cookie Secure flag — false for plain HTTP homelab (default).
     cookie_secure: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
@@ -188,7 +194,23 @@ class Settings(BaseSettings):
         if v is None or (isinstance(v, str) and not v.strip()):
             return "local"
         mode = str(v).strip().lower()
-        return mode if mode in ("local", "remote") else "local"
+        return mode if mode in ("local", "remote", "arp") else "local"
+
+    @field_validator("arp_interval", mode="before")
+    @classmethod
+    def _arp_interval(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 300
+        return max(60, int(v))
+
+    @field_validator("arp_probe_new_hosts", mode="before")
+    @classmethod
+    def _arp_probe_new_hosts(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
 
     @field_validator("scan_safe_block_wide", mode="before")
     @classmethod
@@ -272,6 +294,10 @@ class Settings(BaseSettings):
         if self.scan_disabled:
             return "remote"
         return self.discovery_mode
+
+    @property
+    def arp_discovery_enabled(self) -> bool:
+        return not self.scan_disabled and self.discovery_mode == "arp"
 
     @property
     def health_check_concurrency(self) -> int:

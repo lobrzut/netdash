@@ -212,6 +212,9 @@ class NetworkInfo(BaseModel):
     discovery_last_import_at: datetime | None = None
     discovery_last_import_source: str | None = None
     discovery_last_import_hosts: int | None = None
+    arp_interval_sec: int | None = None
+    arp_last_cycle_at: datetime | None = None
+    arp_last_cycle_hosts: int | None = None
 
 
 class NetworkDiagnostics(BaseModel):

@@ -1,11 +1,13 @@
-# NetDash — agent zdalnego discovery
+# NetDash — opcjonalny agent zdalnego discovery
 
-Lekki agent skanuje LAN na hoście z pełnym dostępem do sieci (np. homelab **192.168.1.201**) i wysyła wyniki do NetDash na QNAP (**192.168.1.150**) przez `POST /api/discovery/import`.
+> **Od v1.3.117:** QNAP z `NETDASH_DISCOVERY_MODE=arp` skanuje LAN **lokalnie** (arp-scan, host network) — agent **nie jest wymagany** gdy NetDash działa na serwerze homelab (NAS).
+
+Lekki agent skanuje LAN na **innym** hoście z pełnym dostępem do sieci i wysyła wyniki do NetDash przez `POST /api/discovery/import`. Przydatny gdy dashboard jest na QNAP w trybie bridge bez host mode, lub discovery ma działać z PC/VM.
 
 ## Wymagania
 
 - Docker z `network_mode: host` (lub uruchom `scripts/netdash-agent.py` bezpośrednio na hoście Linux)
-- NetDash z **v1.3.112+** i `NETDASH_SCAN_DISABLED=true` na dashboardzie (QNAP)
+- NetDash z **v1.3.112+**; tryb `NETDASH_DISCOVERY_MODE=remote` + `NETDASH_SCAN_DISABLED=true` na dashboardzie
 
 ## Szybki start (.201)
 

@@ -2210,6 +2210,20 @@ body.modal-open {
   background: rgba(148, 163, 184, 0.08);
 }
 
+.discovery-status-bar--info {
+  color: var(--text);
+  background: rgba(59, 130, 246, 0.08);
+  border-bottom-color: rgba(59, 130, 246, 0.2);
+}
+
+.discovery-info-banner {
+  color: var(--text-muted);
+  background: rgba(59, 130, 246, 0.06);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
 .discovery-status-card {
   padding: 0.75rem 1rem;
   border-radius: 8px;

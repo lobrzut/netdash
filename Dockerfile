@@ -6,7 +6,7 @@ ENV NETDASH_BUILD_DATE=${NETDASH_BUILD_DATE}
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    iputils-ping iproute2 net-tools curl \
+    iputils-ping iproute2 net-tools curl arp-scan \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

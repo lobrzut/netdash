@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.117
+
+- **ARP discovery on QNAP (WatchYourLAN / Pi.Alert style)**: `NETDASH_DISCOVERY_MODE=arp` — background `arp-scan` every `NETDASH_ARP_INTERVAL` (default 300 s), rate-limited (`--interval=100ms --retry=1`), no TCP sweep during cycle. Optional light port probe for **new** hosts only (one at a time).
+- **QNAP compose**: `network_mode: host` + `cap_add: NET_RAW, NET_ADMIN` — discovery runs on NAS, no separate homelab agent required. Removed default `NETDASH_SCAN_DISABLED=true`.
+- **UI**: status bar „Skan ARP: ostatni cykl X min temu, Y hostów”; one-click TCP scan hidden in ARP mode; advanced scan via „Opcje skanu”. Remote agent optional (collapsed in Settings).
+- **Dockerfile**: `arp-scan` package installed.
+- **API**: `GET /api/discovery/arp-status`, `POST /api/discovery/arp-cycle`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.117`.
+
 ## v1.3.116
 
 - **Fix krytyczny QNAP — wieczne „Ładowanie sesji…” (v1.3.115)**: `finishBoot` → `reconcilePageScrollLock` → `countOpenModals` wołało `$$('.modal').filter(...)` — `querySelectorAll` zwraca `NodeList` bez `.filter` w WebView QNAP → `Uncaught TypeError: $$(...).filter is not a function`, boot padał, spinner zostawał. **`$$` zwraca teraz tablicę** (`[...querySelectorAll]`); `finishBoot` w `try/catch`.

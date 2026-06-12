@@ -1,6 +1,6 @@
-# NetDash na QNAP — szybki start (v1.3.116)
+# NetDash na QNAP — szybki start (v1.3.117)
 
-Obraz: `ghcr.io/lobrzut/netdash:1.3.116` — **bez skanowania z NAS** (bezpieczeństwo). Pełna sieć `/24` skanuje agent na homelab co ~10 min.
+Obraz: `ghcr.io/lobrzut/netdash:1.3.117` — **discovery ARP na NAS** (jak WatchYourLAN / Pi.Alert). Bez agenta na innym hoście.
 
 ## Import z GitHub (zalecane)
 
@@ -10,38 +10,44 @@ Obraz: `ghcr.io/lobrzut/netdash:1.3.116` — **bez skanowania z NAS** (bezpiecze
 https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
 ```
 
-*(Tylko NetDash, bez Watchtower: [`docker-compose.yml`](docker-compose.yml) — ten sam URL w [`compose.url`](compose.url).)*
+## Krok 1 — NetDash na QNAP (.150)
 
-## Upgrade / re-import (wymagany przy v1.3.114 → v1.3.116)
+1. **Container Station** → **Create Application** → **Import from URL**
+2. **Pull** obraz `1.3.117` → **Start** → `http://192.168.1.150:18787`
+3. Pasek: *„Skan ARP: ostatni cykl X min temu, N hostów”* — discovery działa na NAS, **bez agenta .201**
+
+Domyślny compose (v1.3.117): `network_mode: host`, `NETDASH_DISCOVERY_MODE=arp`, `NETDASH_SCAN_CIDR=192.168.1.0/24`, `NETDASH_ARP_INTERVAL=300`, `cap_add: NET_RAW, NET_ADMIN`.
+
+> **Host mode:** brak `ports:` — portal na `http://<IP-QNAP>:18787` bezpośrednio.
+
+## Opcjonalny agent (inny host)
+
+Tylko gdy discovery ma działać z PC/VM, nie z QNAP:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/agent/install.sh | NETDASH_PASSWORD=twoje-haslo bash
+```
+
+---
+
+## Upgrade / re-import (v1.3.116 → v1.3.117)
 
 QNAP Container Station **cache'uje stary obraz** — częściowy update (Pull bez usunięcia aplikacji) daje mieszany obraz i wieczne „Ładowanie sesji…”. **Zawsze pełny re-import:**
 
 1. **Container Station** → aplikacja `netdash` → **Stop**
 2. **Delete Application** → zaznacz **Remove containers** (dane w `/share/Container/netdash/data` zostają)
 3. **Create Application** → **Import from URL** → wklej URL **docker-compose.full.yml** (powyżej)
-4. **Images** → **Pull** → `ghcr.io/lobrzut/netdash:1.3.116` (ręczny pull przed Start)
-5. **Start** → sprawdź logi: `NetDash entrypoint v1.3.116` i `LISTEN_PORT=18787`
-6. Portal: `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.116"`
+4. **Images** → **Pull** → `ghcr.io/lobrzut/netdash:1.3.117` (ręczny pull przed Start)
+5. **Start** → sprawdź logi: `NetDash entrypoint v1.3.117` i `LISTEN_PORT=18787`
+6. Portal: `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.117"`, `"discovery_mode":"arp"`
 
-## Krok 1 — NetDash na QNAP (.150)
+## Krok 2 (legacy — tylko tryb remote)
 
-1. **Container Station** → **Create Application** → **Import from URL**
-2. Wklej: `https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml`
-3. **Pull** obraz `1.3.116` → **Start** → `http://192.168.1.150:18787` (login `admin` / `changeme`)
-
-Portal pokazuje pasek: *„Discovery: czekam na agenta…”* — to normalne przed krokiem 2.
-
-## Krok 2 — agent na homelab (.201), jednorazowo
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/agent/install.sh | NETDASH_PASSWORD=twoje-haslo bash
-```
-
-Po ~10 min pasek zmieni się na np. *„Discovery: ostatni import 3 min temu z homelab-agent (47 hostów)”*. **Nic więcej nie klikasz.**
+Jeśli używasz `NETDASH_DISCOVERY_MODE=remote` + agent na .201 — patrz [`deploy/agent/README.md`](../../deploy/agent/README.md). **Od v1.3.117 domyślnie nie jest potrzebny.**
 
 ---
 
-# NetDash na QNAP — pełna dokumentacja
+# NetDash na QNAP — pełna dokumentacja (legacy sekcje poniżej)
 
 Obraz: `ghcr.io/lobrzut/netdash:latest` — pobierany z GitHub Container Registry. **Nie klonujesz repozytorium na NAS.**
 

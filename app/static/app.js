@@ -1003,13 +1003,25 @@ const DEFAULT_NETWORK = Object.freeze({
   discovery_last_import_source: null,
   discovery_last_import_hosts: null,
   discovery_mode: 'local',
+  arp_interval_sec: null,
+  arp_last_cycle_at: null,
+  arp_last_cycle_hosts: null,
 });
 
 const DISCOVERY_STALE_MS = 20 * 60 * 1000;
 
+function isArpDiscovery(netRes) {
+  const net = resolveNetwork(netRes);
+  return net.discovery_mode === 'arp' && net.scan_disabled !== true;
+}
+
 function isRemoteDiscovery(netRes) {
   const net = resolveNetwork(netRes);
   return net.scan_disabled === true || net.discovery_mode === 'remote';
+}
+
+function isAutoDiscovery(netRes) {
+  return isArpDiscovery(netRes) || isRemoteDiscovery(netRes);
 }
 
 function formatRelativeAgo(when) {
@@ -1032,7 +1044,23 @@ function getDiscoveryMeta(netRes, settings) {
   return { when: validWhen, source, hosts };
 }
 
+function getArpDiscoveryMeta(netRes) {
+  const net = resolveNetwork(netRes);
+  const at = net.arp_last_cycle_at || net.discovery_last_import_at;
+  const when = at ? new Date(at) : null;
+  const validWhen = when && !Number.isNaN(when.getTime()) ? when : null;
+  const hosts = net.arp_last_cycle_hosts ?? net.discovery_last_import_hosts;
+  return { when: validWhen, hosts };
+}
+
 function formatDiscoveryStatusLine(netRes, settings) {
+  if (isArpDiscovery(netRes)) {
+    const { when, hosts } = getArpDiscoveryMeta(netRes);
+    if (!when) return t('discovery.arpWaiting');
+    const ago = formatRelativeAgo(when);
+    const count = hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : 0;
+    return t('discovery.arpStatusLine', { ago, count });
+  }
   const { when, source, hosts } = getDiscoveryMeta(netRes, settings);
   if (!when) return t('discovery.waiting');
   const ago = formatRelativeAgo(when);
@@ -1052,45 +1080,56 @@ function updateDiscoveryStatusBar(netRes, settings) {
   const bar = $('#discovery-status-bar');
   const textEl = $('#discovery-status-bar-text');
   if (!bar || !textEl) return;
-  if (!isRemoteDiscovery(netRes)) {
+  if (!isAutoDiscovery(netRes)) {
     bar.classList.add('hidden');
-    bar.classList.remove('discovery-status-bar--ok', 'discovery-status-bar--wait');
+    bar.classList.remove('discovery-status-bar--ok', 'discovery-status-bar--wait', 'discovery-status-bar--info');
     textEl.textContent = '';
     return;
   }
   const line = formatDiscoveryStatusLine(netRes, settings);
-  const { when } = getDiscoveryMeta(netRes, settings);
+  const when = isArpDiscovery(netRes)
+    ? getArpDiscoveryMeta(netRes).when
+    : getDiscoveryMeta(netRes, settings).when;
   textEl.textContent = line;
   bar.classList.remove('hidden');
   bar.classList.toggle('discovery-status-bar--ok', !!when);
   bar.classList.toggle('discovery-status-bar--wait', !when);
+  bar.classList.toggle('discovery-status-bar--info', isArpDiscovery(netRes));
 }
 
 function updateDiscoverySettingsPanel(netRes, settings) {
   const detail = $('#discovery-status-detail');
   const cmd = $('#discovery-install-cmd');
   const card = $('#discovery-status-card');
-  if (!isRemoteDiscovery(netRes)) return;
+  const arpIntro = $('#discovery-arp-intro');
+  if (!isAutoDiscovery(netRes)) return;
   const line = formatDiscoveryStatusLine(netRes, settings);
   if (detail) detail.textContent = line;
   if (cmd) cmd.textContent = buildDiscoveryInstallCommand();
+  if (arpIntro) arpIntro.classList.toggle('hidden', !isArpDiscovery(netRes));
   if (card) {
-    card.classList.toggle('discovery-status-card--ok', !!getDiscoveryMeta(netRes, settings).when);
+    const when = isArpDiscovery(netRes)
+      ? getArpDiscoveryMeta(netRes).when
+      : getDiscoveryMeta(netRes, settings).when;
+    card.classList.toggle('discovery-status-card--ok', !!when);
   }
 }
 
 function updateRemoteDiscoveryUI(netRes, settings) {
   try {
     const remote = isRemoteDiscovery(netRes);
+    const arp = isArpDiscovery(netRes);
+    const auto = isAutoDiscovery(netRes);
     document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
+    $('#scan-btn')?.classList.toggle('hidden', auto);
+    $('#empty-scan-btn')?.classList.toggle('hidden', auto);
     $('#scan-options-btn')?.classList.toggle('hidden', remote);
-    $('#empty-scan-btn')?.classList.toggle('hidden', remote);
-    $('#empty-scan-options-btn')?.classList.toggle('hidden', remote);
+    $('#empty-scan-options-btn')?.classList.toggle('hidden', auto);
     $('.settings-tab[data-tab="scan"]')?.classList.toggle('hidden', remote);
     $('#scan-error')?.classList.add('hidden');
     const emptyHint = $('#empty-hint');
     if (emptyHint) {
-      emptyHint.textContent = remote
+      emptyHint.textContent = auto
         ? formatDiscoveryStatusLine(netRes, settings)
         : t('empty.services.hint');
     }
@@ -1107,7 +1146,9 @@ function isLocalScanDisabled(netRes) {
 
 function updateScanButtonsState(netRes) {
   const remote = isRemoteDiscovery(netRes);
+  const arp = isArpDiscovery(netRes);
   $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !remote);
+  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp);
   $('#settings-scan-profile-card')?.classList.toggle('hidden', remote);
   if (remote) {
     ['#scan-btn', '#empty-scan-btn', '#scan-start', '#scan-options-btn', '#empty-scan-options-btn', '#scan-test-btn'].forEach((sel) => {
@@ -1130,7 +1171,7 @@ function updateScanButtonsState(netRes) {
 function updateDiscoveryImportStatus(netRes, settings) {
   const el = $('#settings-discovery-import-status');
   if (!el) return;
-  if (!isRemoteDiscovery(netRes)) {
+  if (!isAutoDiscovery(netRes)) {
     el.textContent = '';
     el.classList.add('hidden');
     el.classList.remove('discovery-import-status--ok');
@@ -1139,7 +1180,10 @@ function updateDiscoveryImportStatus(netRes, settings) {
   const text = formatDiscoveryStatusLine(netRes, settings);
   el.textContent = text;
   el.classList.remove('hidden');
-  el.classList.toggle('discovery-import-status--ok', !!getDiscoveryMeta(netRes, settings).when);
+  const when = isArpDiscovery(netRes)
+    ? getArpDiscoveryMeta(netRes).when
+    : getDiscoveryMeta(netRes, settings).when;
+  el.classList.toggle('discovery-import-status--ok', !!when);
 }
 
 function resolveNetwork(netRes) {
@@ -1426,7 +1470,7 @@ function isTransientFetchError(err) {
 function startDiscoveryStatusPolling() {
   if (discoveryStatusPollTimer) clearInterval(discoveryStatusPollTimer);
   discoveryStatusPollTimer = setInterval(async () => {
-    if (!isRemoteDiscovery(window.__netdashNetwork)) return;
+    if (!isAutoDiscovery(window.__netdashNetwork)) return;
     try {
       const [netRes, settings] = await Promise.all([api('/api/network'), fetchSettings()]);
       window.__netdashNetwork = resolveNetwork(netRes);
@@ -3961,6 +4005,7 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   clearScanError();
   const netRes = window.__netdashNetwork;
   if (isRemoteDiscovery(netRes)) return;
+  if (isArpDiscovery(netRes) && !opts.advanced) return;
   let resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   if (resolvedCidr && isDockerInternalCidr(resolvedCidr)) {
     resolvedCidr = resolveOneClickScanCidr(appSettings, netRes);
@@ -4018,7 +4063,7 @@ async function startScan(cidr, fullScan = false, opts = {}) {
 
 async function oneClickScan() {
   const netRes = window.__netdashNetwork;
-  if (isRemoteDiscovery(netRes)) return;
+  if (isAutoDiscovery(netRes)) return;
   const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
   if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
@@ -4065,7 +4110,7 @@ function bindScanUi() {
       const cidr = resolveScanCidrInput();
       console.log('[NetDash] scan: #scan-start click', { cidr, fullScan });
       void logScanUiAttempt(cidr, 'ui-advanced');
-      void startScan(cidr, fullScan);
+      void startScan(cidr, fullScan, { advanced: true });
       return;
     }
     const quickScanBtn = e.target.closest('#scan-btn, #empty-scan-btn');

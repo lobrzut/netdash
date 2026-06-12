@@ -55,6 +55,12 @@ from app.scanner import (
     suggest_service_identity,
 )
 from app.arp_scan import lookup_mac_for_ip, scan_arp_network
+from app.arp_discovery import (
+    get_arp_discovery_status,
+    run_arp_discovery_cycle,
+    start_arp_discovery_scheduler,
+    stop_arp_discovery_scheduler,
+)
 from app.wol import normalize_mac, send_magic_packet
 from app.discovery_import import import_discovery_hosts
 from app.schemas import (
@@ -487,7 +493,10 @@ async def lifespan(app: FastAPI):
     await init_db()
     asyncio.create_task(_deferred_startup_health_check())
     health_task = asyncio.create_task(_health_check_loop())
+    if settings.arp_discovery_enabled:
+        start_arp_discovery_scheduler()
     yield
+    await stop_arp_discovery_scheduler()
     if health_task:
         health_task.cancel()
         try:
@@ -547,6 +556,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "discovery_last_import_at": app_settings.discovery_last_import_at,
         "discovery_last_import_source": app_settings.discovery_last_import_source,
         "discovery_last_import_hosts": app_settings.discovery_last_import_hosts,
+        "arp_discovery": get_arp_discovery_status() if settings.arp_discovery_enabled else None,
     }
 
 
@@ -690,6 +700,17 @@ async def network_info(
         discovery_last_import_at=app_settings.discovery_last_import_at,
         discovery_last_import_source=app_settings.discovery_last_import_source,
         discovery_last_import_hosts=app_settings.discovery_last_import_hosts,
+        arp_interval_sec=settings.arp_interval if settings.arp_discovery_enabled else None,
+        arp_last_cycle_at=(
+            get_arp_discovery_status().get("last_cycle_at")
+            if settings.arp_discovery_enabled
+            else None
+        ),
+        arp_last_cycle_hosts=(
+            get_arp_discovery_status().get("last_cycle_hosts")
+            if settings.arp_discovery_enabled
+            else None
+        ),
     )
 
 
@@ -705,9 +726,21 @@ async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
     settings_cidr = app_settings.scan_cidr_default or None
     scan_ready = bool(resolved) and (not docker_br or bool(env_cidr or settings_cidr))
     hints: list[str] = []
-    if settings.scan_disabled:
+    if settings.arp_discovery_enabled:
+        arp = get_arp_discovery_status()
+        if arp.get("last_cycle_at"):
+            hints.append(
+                f"Skan ARP aktywny — ostatni cykl wykrył {arp.get('last_cycle_hosts', 0)} hostów. "
+                "Pełny skan TCP tylko w Opcje skanu (zaawansowane)."
+            )
+        else:
+            hints.append(
+                "Skan ARP aktywny — pierwszy cykl w toku (jak WatchYourLAN / Pi.Alert). "
+                "Wymaga network_mode: host i cap_add: NET_RAW."
+            )
+    elif settings.scan_disabled:
         hints.append(
-            "Lokalny skan wyłączony — uruchom agenta zdalnego (deploy/agent) na hoście LAN, np. homelab .201."
+            "Lokalny skan wyłączony — opcjonalny agent zdalny (deploy/agent) na innym hoście LAN."
         )
     elif docker_br:
         hints.append(
@@ -1752,6 +1785,26 @@ async def sleep_service(
             raise HTTPException(status_code=500, detail=f"Nie udało się wysłać pakietu SOL: {exc}") from exc
 
     return PowerActionResult(ok=sent, action="sleep", message=f"Wysłano pakiet Sleep-on-LAN do {mac}")
+
+
+@app.post("/api/discovery/arp-cycle")
+async def trigger_arp_discovery_cycle(_: User = Depends(get_current_user)):
+    """Manual trigger for background ARP cycle (admin/debug)."""
+    if not settings.arp_discovery_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ARP discovery nieaktywne — ustaw NETDASH_DISCOVERY_MODE=arp",
+        )
+    try:
+        count = await run_arp_discovery_cycle()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"ok": True, "hosts": count, **get_arp_discovery_status()}
+
+
+@app.get("/api/discovery/arp-status")
+async def arp_discovery_status(_: User = Depends(get_current_user)):
+    return get_arp_discovery_status()
 
 
 @app.post("/api/network/arp-scan", response_model=list[ArpDeviceOut])
