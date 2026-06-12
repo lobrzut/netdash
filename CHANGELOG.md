@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.98
+
+- **Compose (QNAP)**: `yaml-language-server` schema override + `.vscode/settings.json` — walidacja względem compose-spec (pola Compose 2.4). `cpus` zastąpione przez `cpu_quota`/`cpu_period` (= 1 rdzeń) — zero fałszywych ostrzeżeń IDE; limity nadal działają na QNAP CS.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.98`.
+
 ## v1.3.97
 
 - **Compose**: QNAP — `version: "2.4"` + `mem_limit`/`cpus` (bez `deploy`; CS ignoruje deploy, schemat 2.4 bez ostrzeżeń IDE). Pozostałe compose — tylko `deploy.resources.limits` (Compose v2+).
