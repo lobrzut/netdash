@@ -72,7 +72,7 @@ Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 Filozofia projektu: **działa na słabym sprzęcie**. Wszystkie oficjalne pliki compose ustawiają:
 
 - `NETDASH_SCAN_SAFE_MODE=true` (domyślnie też w kodzie aplikacji)
-- `mem_limit: 512m`, `cpus: 1.0`
+- `mem_limit: 512m`, `cpu_count: 1` (+ `deploy.resources.limits` w Compose v2/v3)
 
 | Zmienna | Zalecenie na słabym hoście |
 |---------|----------------------------|

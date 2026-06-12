@@ -15,7 +15,12 @@ services:
     restart: always
     # Słaby sprzęt homelab: limit CPU/RAM — przy potrzebie węższy CIDR (/28).
     mem_limit: 512m
-    cpus: 1.0
+    cpu_count: 1
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
     network_mode: host
     env_file: .env
     environment:

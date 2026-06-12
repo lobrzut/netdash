@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.96
+
+- **Compose**: poprawka limitów zasobów — `cpus: 1.0` (niezgodne ze schematem Compose v3) zastąpione przez `cpu_count: 1` + `deploy.resources.limits` (Docker Compose v2/v3); `mem_limit: 512m` zostaje dla QNAP Container Station / Dockge / docker run.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.96`.
+
 ## v1.3.95
 
 - **Filozofia projektu**: słaby sprzęt homelab (RPi, stary PC, N100, NAS, QNAP) — nie tylko QNAP. Safe mode i limity zasobów są domyślne **w całym projekcie**.
