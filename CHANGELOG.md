@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.102
+
+- **Compose (QNAP)**: własny schemat IDE `deploy/qnap/qnap-compose.schema.json` (Compose 2.4: `mem_limit`, `cpus`, `cpu_quota`/`cpu_period` bez ostrzeżeń yaml-language-server). Schemastore `docker-compose.json` celuje w v3+ i nie zna `mem_limit` na poziomie serwisu.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.102`.
+
 ## v1.3.101
 
 - **Compose (QNAP)**: usunięto `cpus` (schemastore `docker-compose.json` nadal flaguje to pole mimo Compose 2.4). Zostaje `mem_limit: 512m`; opcjonalny limit CPU ręcznie w Container Station UI.

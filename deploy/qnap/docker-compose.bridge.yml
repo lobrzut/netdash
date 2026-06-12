@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://json.schemastore.org/docker-compose.json
+# yaml-language-server: $schema=./qnap-compose.schema.json
 # NetDash — QNAP Container Station (ZALECANY — skan LAN na QNAP)
 
 # Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.bridge.yml
@@ -16,7 +16,7 @@
 # Portal: http://<IP-QNAP>:18787
 #
 # version 2.4: QNAP Container Station nie stosuje deploy.resources — mem_limit na poziomie serwisu.
-# schemat IDE: json.schemastore.org/docker-compose.json (bez cpus — zero ostrzeżeń yaml-language-server)
+# schemat IDE: deploy/qnap/qnap-compose.schema.json (Compose 2.4 — mem_limit/cpus bez ostrzeżeń)
 
 version: "2.4"
 
@@ -24,7 +24,7 @@ services:
 
   netdash:
 
-    image: ghcr.io/lobrzut/netdash:1.3.101
+    image: ghcr.io/lobrzut/netdash:1.3.102
 
     container_name: netdash
 

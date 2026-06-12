@@ -1,5 +1,6 @@
-{
-  "yaml.schemas": {
-    "https://json.schemastore.org/docker-compose.json": "deploy/qnap/*.yml"
-  }
-}
+{
+  "yaml.validate": true,
+  "yaml.schemas": {
+    "deploy/qnap/qnap-compose.schema.json": "deploy/qnap/*.yml"
+  }
+}
