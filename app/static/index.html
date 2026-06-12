@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.115" />
-  <script src="/static/i18n.js?v=1.3.115"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.116" />
+  <script src="/static/i18n.js?v=1.3.116"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -1187,6 +1187,39 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.115"></script>
+  <script>
+    (function () {
+      var BOOT_MAX_MS = 5000;
+      var AUTH_MS = 3000;
+      var done = false;
+      window.__netdashBootDone = function () { done = true; };
+      function showLoginFallback() {
+        if (done) return;
+        try {
+          document.querySelectorAll('.view').forEach(function (v) { v.classList.add('hidden'); });
+          var login = document.getElementById('login-view');
+          if (login) login.classList.remove('hidden');
+          console.error('[NetDash boot-inline] forcing login after ' + BOOT_MAX_MS + 'ms (app.js parse error or hung before boot)');
+        } catch (e) { /* ignore */ }
+      }
+      setTimeout(showLoginFallback, BOOT_MAX_MS);
+      function probeAuth() {
+        var headers = {};
+        try {
+          var tok = localStorage.getItem('netdash_token');
+          if (tok) headers.Authorization = 'Bearer ' + tok;
+        } catch (e) { /* ignore */ }
+        var ctrl = new AbortController();
+        setTimeout(function () { ctrl.abort(); }, AUTH_MS);
+        fetch('/api/auth/me', { credentials: 'include', headers: headers, signal: ctrl.signal }).catch(function () {});
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', probeAuth);
+      } else {
+        probeAuth();
+      }
+    })();
+  </script>
+  <script src="/static/app.js?v=1.3.116"></script>
 </body>
 </html>

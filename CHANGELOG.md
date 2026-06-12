@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.116
+
+- **Fix krytyczny QNAP — wieczne „Ładowanie sesji…” (v1.3.115)**: `finishBoot` → `reconcilePageScrollLock` → `countOpenModals` wołało `$$('.modal').filter(...)` — `querySelectorAll` zwraca `NodeList` bez `.filter` w WebView QNAP → `Uncaught TypeError: $$(...).filter is not a function`, boot padał, spinner zostawał. **`$$` zwraca teraz tablicę** (`[...querySelectorAll]`); `finishBoot` w `try/catch`.
+- **Boot**: uruchamia się na początku `app.js` (watchdog nie blokowany przez późniejsze event listenery). Inline `<script>` w `index.html`: 5 s fallback → login; wczesny probe `GET /api/auth/me` (3 s).
+- **`/api/auth/me` timeout**: 3 s; watchdog bootu: 5 s.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.116`.
+
 ## v1.3.115
 
 - **Fix krytyczny QNAP — wieczne „Ładowanie sesji…”**: regresja v1.3.114 — błąd składni w `app.js` (uszkodzona funkcja `startHealthPolling`) powodował crash całego JS przy parsowaniu; **zero** żądań `GET /api/auth/me` w logach serwera. Przywrócono `startHealthPolling`, watchdog 5 s na boot.

@@ -1,5 +1,6 @@
 const API = '';
-const AUTH_ME_TIMEOUT_MS = 5000;
+const AUTH_ME_TIMEOUT_MS = 3000;
+const BOOT_WATCHDOG_MS = 5000;
 const BOOT_HEALTH_TIMEOUT_MS = 5000;
 let appVersion = null;
 let buildDate = null;
@@ -114,7 +115,7 @@ function categoryAccentColor(category) {
   }
   return CATEGORY_ACCENTS[Math.abs(hash) % CATEGORY_ACCENTS.length];
 }
-const $$ = (sel) => document.querySelectorAll(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
   const controller = new AbortController();
@@ -174,8 +175,82 @@ async function api(path, options = {}) {
 
 function showView(id) {
   $$('.view').forEach((v) => v.classList.add('hidden'));
-  $(`#${id}`).classList.remove('hidden');
+  const view = $(`#${id}`);
+  if (view) view.classList.remove('hidden');
 }
+
+function finishBoot(sessionOk) {
+  try {
+    authBootComplete = true;
+    if (typeof window.__netdashBootDone === 'function') window.__netdashBootDone();
+    reconcilePageScrollLock();
+    if (sessionOk) {
+      showView('dashboard-view');
+      loadDashboard().catch(handleDashboardLoadError);
+    } else {
+      showView('login-view');
+    }
+    if ($('#boot-view')?.classList.contains('hidden') === false) {
+      console.error('[NetDash boot] boot-view still visible after finishBoot — forcing login');
+      showView('login-view');
+    }
+  } catch (err) {
+    console.error('[NetDash boot] finishBoot failed:', err?.message || err);
+    authBootComplete = true;
+    if (typeof window.__netdashBootDone === 'function') window.__netdashBootDone();
+    try {
+      showView('login-view');
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+// Boot runs immediately (hoisted deps) — must not wait for event bindings below.
+(function startNetDashBoot() {
+  showView('boot-view');
+  let bootFinished = false;
+  const bootWatchdog = setTimeout(() => {
+    if (bootFinished) return;
+    console.error('[NetDash boot] 5s watchdog — forcing login (check console for JS errors if /api/auth/me missing in server logs)');
+    finishBoot(false);
+  }, BOOT_WATCHDOG_MS);
+
+  (async () => {
+    try {
+      const sessionPromise = restoreSession().catch((err) => {
+        console.error('[NetDash boot] restoreSession failed:', err?.message || err);
+        return false;
+      });
+      const langPromise = loadLanguage(localStorage.getItem('netdash_lang') || 'pl').catch((err) => {
+        console.error('[NetDash boot] loadLanguage failed:', err?.message || err);
+      });
+      const [sessionOk] = await Promise.all([
+        sessionPromise,
+        langPromise,
+        checkServerHealth(),
+      ]);
+      syncDashboardLayoutSelect();
+      applyI18n();
+      ['edit', 'add'].forEach((prefix) => {
+        try {
+          refreshIconPickerTabs(prefix);
+          refreshIconPickerGrid(prefix);
+        } catch (err) {
+          console.warn('[NetDash boot] icon picker init:', err?.message || err);
+        }
+      });
+      finishBoot(sessionOk);
+    } catch (err) {
+      console.error('[NetDash boot] fatal:', err?.message || err);
+      finishBoot(false);
+    } finally {
+      bootFinished = true;
+      clearTimeout(bootWatchdog);
+      if (!authBootComplete) finishBoot(false);
+    }
+  })();
+})();
 
 async function logout() {
   token = null;
@@ -5152,8 +5227,12 @@ $('#power-link-save').addEventListener('click', async () => {
   fillSettingsForm();
 });
 
-initServiceIconPickers();
-setupSettingsFaviconUpload();
+try {
+  initServiceIconPickers();
+  setupSettingsFaviconUpload();
+} catch (err) {
+  console.warn('[NetDash] icon picker / favicon init:', err?.message || err);
+}
 
 document.addEventListener('visibilitychange', reconcilePageScrollLock);
 window.addEventListener('pageshow', (event) => {
@@ -5214,7 +5293,7 @@ async function restoreSession() {
     }
     return finish(res);
   } catch (err) {
-    const reason = err?.name === 'AbortError' ? 'timeout (5s)' : (err?.message || 'unknown');
+    const reason = err?.name === 'AbortError' ? 'timeout (3s)' : (err?.message || 'unknown');
     console.warn('[NetDash] /api/auth/me failed:', reason);
     if (stored) {
       try {
@@ -5275,61 +5354,3 @@ $('#scan-test-btn')?.addEventListener('click', async () => {
   }
 });
 
-function finishBoot(sessionOk) {
-  authBootComplete = true;
-  reconcilePageScrollLock();
-  if (sessionOk) {
-    showView('dashboard-view');
-    loadDashboard().catch(handleDashboardLoadError);
-  } else {
-    showView('login-view');
-  }
-  if ($('#boot-view')?.classList.contains('hidden') === false) {
-    console.error('[NetDash boot] boot-view still visible after finishBoot — forcing login');
-    showView('login-view');
-  }
-}
-
-// Init — auth/me must run within 5s; watchdog guarantees login form if JS hangs
-(async () => {
-  showView('boot-view');
-  let bootFinished = false;
-  const bootWatchdog = setTimeout(() => {
-    if (bootFinished) return;
-    console.error('[NetDash boot] 5s watchdog — forcing login (check console for JS errors if /api/auth/me missing in server logs)');
-    finishBoot(false);
-  }, AUTH_ME_TIMEOUT_MS);
-
-  try {
-    const sessionPromise = restoreSession().catch((err) => {
-      console.error('[NetDash boot] restoreSession failed:', err?.message || err);
-      return false;
-    });
-    const langPromise = loadLanguage(localStorage.getItem('netdash_lang') || 'pl').catch((err) => {
-      console.error('[NetDash boot] loadLanguage failed:', err?.message || err);
-    });
-    const [sessionOk] = await Promise.all([
-      sessionPromise,
-      langPromise,
-      checkServerHealth(),
-    ]);
-    syncDashboardLayoutSelect();
-    applyI18n();
-    ['edit', 'add'].forEach((prefix) => {
-      try {
-        refreshIconPickerTabs(prefix);
-        refreshIconPickerGrid(prefix);
-      } catch (err) {
-        console.warn('[NetDash boot] icon picker init:', err?.message || err);
-      }
-    });
-    finishBoot(sessionOk);
-  } catch (err) {
-    console.error('[NetDash boot] fatal:', err?.message || err);
-    finishBoot(false);
-  } finally {
-    bootFinished = true;
-    clearTimeout(bootWatchdog);
-    if (!authBootComplete) finishBoot(false);
-  }
-})();
