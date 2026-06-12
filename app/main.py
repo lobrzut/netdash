@@ -557,8 +557,10 @@ async def logout(request: Request, response: Response):
 
 
 @app.get("/api/auth/me", response_model=UserMe)
-async def auth_me(user: User = Depends(get_current_user)):
-    return UserMe(username=user.username)
+async def auth_me(request: Request, response: Response, user: User = Depends(get_current_user)):
+    access_token = create_access_token(user.username)
+    set_auth_cookie(response, request, access_token)
+    return UserMe(username=user.username, access_token=access_token)
 
 
 @app.patch("/api/auth/password", status_code=status.HTTP_204_NO_CONTENT)
@@ -1289,6 +1291,7 @@ async def start_scan(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    logger.info("POST /api/scan body=%s", data.model_dump())
     if any(not t.done() for t in scan_tasks.values()):
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
 

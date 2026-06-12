@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.87
+
+- **Fix skanu QNAP (UI)**: przycisk „Skanuj sieć” widoczny na Pulpicie i w pustym stanie Serwisów; delegacja zdarzeń `#scan-start` — zawsze wysyła `POST /api/scan`; czerwony baner `#scan-error` gdy start skanu się nie powiedzie.
+- **Sesja**: `GET /api/auth/me` zwraca `access_token` i odświeża cookie — po F5 brak ponownego `POST /api/auth/login`.
+- **Serwer**: log `POST /api/scan body=...` przy każdym starcie skanu; `resolve_scan_cidrs` preferuje `NETDASH_SCAN_CIDR` gdy brak CIDR w UI.
+- **QNAP compose**: obraz `1.3.87`.
+
 ## v1.3.86
 
 - **Fix sesji QNAP (odświeżanie)**: cookie `netdash_session` (`HttpOnly`, `Path=/`, `SameSite=Lax`, `Secure=false` na HTTP); nowy endpoint `GET /api/auth/me` — frontend sprawdza sesję przed ekranem logowania (bez ponownego `POST /api/auth/login` po F5).

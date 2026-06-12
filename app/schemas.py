@@ -22,6 +22,7 @@ class PasswordChangeRequest(BaseModel):
 
 class UserMe(BaseModel):
     username: str
+    access_token: str | None = None
 
 
 class ServiceCreate(BaseModel):

@@ -157,6 +157,24 @@ function showDashboardError(message) {
   el.classList.remove('hidden');
 }
 
+function showScanError(message) {
+  if (!message) return;
+  const el = $('#scan-error');
+  if (el) {
+    el.textContent = message;
+    el.classList.remove('hidden');
+  }
+  showToast(message, 'error');
+}
+
+function clearScanError() {
+  const el = $('#scan-error');
+  if (el) {
+    el.classList.add('hidden');
+    el.textContent = '';
+  }
+}
+
 function handleDashboardLoadError(err) {
   if (err?.message === 'Unauthorized') return;
   token = null;
@@ -719,11 +737,12 @@ function applyLayout() {
   const onServices = currentPage === 'services';
   const servicesSlot = document.querySelector('.header-actions-services');
   if (servicesSlot) {
-    servicesSlot.setAttribute('aria-hidden', onServices ? 'false' : 'true');
+    servicesSlot.setAttribute('aria-hidden', 'false');
   }
   document.querySelectorAll('.header-services-only').forEach((el) => {
-    el.tabIndex = onServices ? 0 : -1;
+    el.tabIndex = 0;
   });
+  $('#scan-btn')?.classList.toggle('hidden', !onServices);
   updateFooterNetwork();
   updateScanConfigWarning(window.__netdashNetwork || null, appSettings, window.__lastScanStatus);
 }
@@ -872,7 +891,7 @@ function updateDockerScanWarning(netRes, settings) {
 function updateScanConfigWarning(netRes, settings, lastScan) {
   const el = $('#scan-config-warning');
   if (!el) return;
-  if (currentPage !== 'services') {
+  if (currentPage !== 'services' && currentPage !== 'home') {
     el.classList.add('hidden');
     el.textContent = '';
     return;
@@ -1532,6 +1551,7 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
   const hint = $('#empty-hint');
   const icon = empty?.querySelector('.empty-icon');
   const clearBtn = $('#empty-clear-search');
+  const scanBtn = $('#empty-scan-btn');
   const q = serviceSearch.trim();
 
   empty.classList.remove('hidden');
@@ -1542,6 +1562,7 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
     hint.textContent = t('empty.services.hint');
     hint.classList.remove('hidden');
     clearBtn?.classList.add('hidden');
+    scanBtn?.classList.remove('hidden');
     return;
   }
 
@@ -1554,11 +1575,13 @@ function updateServicesEmptyState(hiddenByFilter = 0) {
       hint.innerHTML += `<br><span class="empty-filter-note">${esc(t('empty.services.searchHidden', { count: hiddenByFilter }))}</span>`;
     }
     clearBtn?.classList.remove('hidden');
+    scanBtn?.classList.add('hidden');
     return;
   }
 
   icon?.classList.remove('empty-icon--search');
   clearBtn?.classList.add('hidden');
+  scanBtn?.classList.add('hidden');
   title.textContent = t('empty.services.filter');
   if (accessFilter === 'wol') {
     const missingMac = services.filter((s) => !s.mac_address).length;
@@ -3233,22 +3256,43 @@ function formatScanStatus(status) {
   return `${phase} · ${network}`;
 }
 
+function resolveScanCidrInput() {
+  const inputVal = $('#cidr-input')?.value?.trim();
+  if (inputVal) return inputVal;
+  const settingsCidr = appSettings?.scan_cidr_default?.trim();
+  if (settingsCidr) return settingsCidr;
+  const net = window.__netdashNetwork;
+  if (net?.local_network && !net?.docker_bridge) return net.local_network;
+  return null;
+}
+
+function setScanControlsDisabled(disabled) {
+  ['#scan-btn', '#scan-btn-home', '#empty-scan-btn', '#scan-start'].forEach((sel) => {
+    const el = $(sel);
+    if (el) el.disabled = disabled;
+  });
+}
+
 async function startScan(cidr, fullScan = false) {
+  clearScanError();
+  const resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   closeModal('scan-modal');
-  $('#scan-bar').classList.remove('hidden');
-  $('#scan-btn').disabled = true;
-  $('#scan-status-text').textContent = t('scan.starting', { network: cidr || t('scan.localNetwork') });
+  $('#scan-bar')?.classList.remove('hidden');
+  setScanControlsDisabled(true);
+  const networkLabel = resolvedCidr || t('scan.localNetwork');
+  const statusEl = $('#scan-status-text');
+  if (statusEl) statusEl.textContent = t('scan.starting', { network: networkLabel });
 
   let job;
   try {
     job = await api('/api/scan', {
       method: 'POST',
-      body: JSON.stringify({ cidr: cidr || null, full_scan: fullScan }),
+      body: JSON.stringify({ cidr: resolvedCidr || null, full_scan: !!fullScan }),
     });
   } catch (err) {
-    $('#scan-bar').classList.add('hidden');
-    $('#scan-btn').disabled = false;
-    showToast(err.message || t('alert.scanStart'), 'error');
+    $('#scan-bar')?.classList.add('hidden');
+    setScanControlsDisabled(false);
+    showScanError(err.message || t('alert.scanStart'));
     return;
   }
 
@@ -3264,29 +3308,60 @@ async function startScan(cidr, fullScan = false) {
 
       if (status.status === 'completed') {
         clearInterval(scanPollInterval);
-        $('#scan-bar').classList.add('hidden');
-        $('#scan-btn').disabled = false;
-        $('#scan-status-text').textContent = '';
+        $('#scan-bar')?.classList.add('hidden');
+        setScanControlsDisabled(false);
+        if (statusEl) statusEl.textContent = '';
         window.__lastScanStatus = status;
         await loadDashboard();
         if (status.found_count <= 1) {
           const hint = status.error_message
             || scanEmptyResultHint(status, window.__netdashNetwork)
             || t('scan.noResults');
-          showToast(hint, 'info');
+          if (status.error_message) showScanError(hint);
+          else showToast(hint, 'info');
         }
       } else if (status.status === 'failed') {
         clearInterval(scanPollInterval);
-        $('#scan-bar').classList.add('hidden');
-        $('#scan-btn').disabled = false;
-        showToast(status.error_message || t('scan.failed'), 'error');
+        $('#scan-bar')?.classList.add('hidden');
+        setScanControlsDisabled(false);
+        showScanError(status.error_message || t('scan.failed'));
       }
-    } catch {
+    } catch (err) {
       clearInterval(scanPollInterval);
-      $('#scan-bar').classList.add('hidden');
-      $('#scan-btn').disabled = false;
+      $('#scan-bar')?.classList.add('hidden');
+      setScanControlsDisabled(false);
+      showScanError(err?.message || t('scan.failed'));
     }
   }, 1500);
+}
+
+function openScanModal() {
+  const cidrInput = $('#cidr-input');
+  if (cidrInput && !cidrInput.value.trim() && appSettings?.scan_cidr_default) {
+    cidrInput.value = appSettings.scan_cidr_default;
+  }
+  openModal('scan-modal');
+}
+
+function bindScanUi() {
+  document.addEventListener('click', (e) => {
+    const startBtn = e.target.closest('#scan-start');
+    if (startBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (startBtn.disabled) return;
+      const fullScan = $('#full-scan')?.checked ?? false;
+      void startScan(resolveScanCidrInput(), fullScan);
+      return;
+    }
+    const openBtn = e.target.closest('#scan-btn, #scan-btn-home, #empty-scan-btn');
+    if (openBtn) {
+      e.preventDefault();
+      if (openBtn.disabled) return;
+      openScanModal();
+    }
+  });
+  $('#scan-cancel')?.addEventListener('click', () => closeModal('scan-modal'));
 }
 
 // Events
@@ -3312,7 +3387,7 @@ $('#logout-btn').addEventListener('click', logout);
 $('#nav-home-btn')?.addEventListener('click', () => navigateTo('home'));
 $('#nav-services-btn')?.addEventListener('click', () => navigateTo('services'));
 $('#goto-services-btn')?.addEventListener('click', () => navigateTo('services'));
-$('#scan-btn').addEventListener('click', () => openModal('scan-modal'));
+bindScanUi();
 $('#add-btn').addEventListener('click', () => openAddServiceModal());
 const debouncedRenderServices = debounce(renderServices, 200);
 
@@ -4193,13 +4268,6 @@ $$('.modal-backdrop').forEach((b) => {
   });
 });
 
-$('#scan-cancel').addEventListener('click', () => closeModal('scan-modal'));
-$('#scan-start').addEventListener('click', () => {
-  const cidr = $('#cidr-input').value.trim();
-  const fullScan = $('#full-scan').checked;
-  startScan(cidr || null, fullScan);
-});
-
 $('#add-cancel').addEventListener('click', () => closeModal('add-modal'));
 $('#edit-cancel').addEventListener('click', () => closeModal('edit-modal'));
 $('#edit-identify')?.addEventListener('click', () => identifyServiceEdit());
@@ -4391,6 +4459,11 @@ async function restoreSession() {
       token = null;
       localStorage.removeItem('netdash_token');
       return false;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (data.access_token) {
+      token = data.access_token;
+      localStorage.setItem('netdash_token', token);
     }
     return true;
   } catch {

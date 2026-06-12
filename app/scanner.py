@@ -333,6 +333,9 @@ def resolve_scan_cidrs(
         return parse_scan_cidrs(cidr)
     if scan_cidr_default and scan_cidr_default.strip():
         return parse_scan_cidrs(scan_cidr_default)
+    # QNAP host/bridge: prefer NETDASH_SCAN_CIDR over auto-detected Docker /24.
+    if settings.scan_cidr and settings.scan_cidr.strip():
+        return parse_scan_cidrs(settings.scan_cidr)
     return [get_local_network()]
 
 

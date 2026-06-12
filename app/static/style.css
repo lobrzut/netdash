@@ -1909,9 +1909,20 @@ body.modal-open {
   flex: 0 0 auto;
 }
 
-#dashboard-view[data-page="home"] .header-actions-services {
+#dashboard-view[data-page="home"] .header-actions-services #add-btn {
   visibility: hidden;
   pointer-events: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+#dashboard-view[data-page="home"] .header-actions-services {
+  visibility: visible;
+  pointer-events: auto;
+  min-width: auto;
 }
 
 #dashboard-view[data-page="services"] .header-actions-services {
@@ -2053,6 +2064,33 @@ body.modal-open {
   color: var(--text-muted);
   background: rgba(234, 179, 8, 0.08);
   border-bottom: 1px solid rgba(234, 179, 8, 0.22);
+}
+
+.scan-error {
+  padding: 0.75rem 2rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.12);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.scan-error:not(.hidden) {
+  display: block;
+}
+
+.home-scan-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+#dashboard-view[data-page="services"] .home-scan-row {
+  display: none;
+}
+
+.btn-scan-home {
+  gap: 0.5rem;
 }
 
 .scan-config-warning:not(.hidden) {
