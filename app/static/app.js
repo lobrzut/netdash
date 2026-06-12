@@ -29,6 +29,9 @@ const SERVICE_ICON_PRESETS = [
   'film', 'photo', 'doc', 'wifi', 'ci', 'nginx', 'apache', 'python', 'windows', 'caddy', 'traefik',
 ];
 const RECENT_ICONS_KEY = 'netdash_recent_icons';
+const SCAN_CONFIRM_SKIP_KEY = 'netdash_scan_confirm_skip';
+const SCAN_SAFE_BANNER_DISMISS_KEY = 'netdash_scan_safe_banner_dismiss';
+const SCAN_CIDR_CUSTOM = '__custom__';
 const MAX_RECENT_ICONS = 8;
 const SERVICE_ICON_GROUPS = [
   { id: 'all', labelKey: 'modal.edit.iconGroup.all' },
@@ -896,6 +899,8 @@ const DEFAULT_NETWORK = Object.freeze({
   ping_available: null,
   scan_safe_mode: true,
   resource_profile: 'safe',
+  detected_cidrs: [],
+  env_scan_cidr: null,
 });
 
 function resolveNetwork(netRes) {
@@ -920,13 +925,31 @@ function scanNeedsCidrConfig(netRes, settings) {
 
 function scanNeedsConfirm(netRes) {
   const net = resolveNetwork(netRes);
+  if (localStorage.getItem(SCAN_CONFIRM_SKIP_KEY) === '1') return false;
   if (net.scan_safe_mode) return true;
   return net.docker_bridge === true && net.ping_available === false;
 }
 
-function confirmScanStart(netRes) {
-  if (!scanNeedsConfirm(netRes)) return true;
-  return window.confirm(t('scan.confirmLowResource'));
+function isScanSafeBannerDismissed() {
+  return localStorage.getItem(SCAN_SAFE_BANNER_DISMISS_KEY) === '1';
+}
+
+let pendingScanStart = null;
+
+function confirmScanStart(netRes, cidrLabel) {
+  if (!scanNeedsConfirm(netRes)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    pendingScanStart = resolve;
+    const cidrEl = $('#scan-confirm-cidr');
+    if (cidrEl) {
+      cidrEl.textContent = cidrLabel
+        ? t('modal.scan.selectedCidr', { cidr: cidrLabel })
+        : '';
+    }
+    const skipEl = $('#scan-confirm-skip');
+    if (skipEl) skipEl.checked = false;
+    openModal('scan-confirm-modal');
+  });
 }
 
 function scanEmptyResultHint(lastScan, netRes) {
@@ -976,35 +999,43 @@ function updateScanProfileUI(netRes, settings) {
 
 function updateScanConfigWarning(netRes, settings, lastScan) {
   const el = $('#scan-config-warning');
-  if (!el) return;
+  const textEl = $('#scan-config-warning-text');
+  const dismissBtn = $('#scan-config-warning-dismiss');
+  if (!el || !textEl) return;
   const net = resolveNetwork(netRes);
+  let message = '';
+  let dismissible = false;
   if (currentPage !== 'services' && currentPage !== 'home') {
     el.classList.add('hidden');
-    el.textContent = '';
+    textEl.textContent = '';
+    dismissBtn?.classList.add('hidden');
     return;
   }
   if (scanNeedsCidrConfig(net, settings)) {
-    el.textContent = t('scan.configWarning', {
+    message = t('scan.configWarning', {
       ip: net.local_ip,
       network: net.local_network,
     });
-    el.classList.remove('hidden');
+  } else if ((net.scan_safe_mode || scanNeedsConfirm(net)) && !isScanSafeBannerDismissed()) {
+    message = t('scan.safeModeWarning');
+    dismissible = true;
+  } else {
+    const emptyHint = scanEmptyResultHint(lastScan || window.__lastScanStatus, net);
+    const fewServices = (services?.length || 0) <= 1;
+    if (emptyHint && fewServices && lastScan?.status === 'completed') {
+      message = emptyHint;
+    }
+  }
+  if (!message) {
+    el.classList.add('hidden');
+    textEl.textContent = '';
+    dismissBtn?.classList.add('hidden');
     return;
   }
-  if (net.scan_safe_mode || scanNeedsConfirm(net)) {
-    el.textContent = t('scan.safeModeWarning');
-    el.classList.remove('hidden');
-    return;
-  }
-  const emptyHint = scanEmptyResultHint(lastScan || window.__lastScanStatus, net);
-  const fewServices = (services?.length || 0) <= 1;
-  if (emptyHint && fewServices && lastScan?.status === 'completed') {
-    el.textContent = emptyHint;
-    el.classList.remove('hidden');
-    return;
-  }
-  el.classList.add('hidden');
-  el.textContent = '';
+  textEl.textContent = message;
+  if (dismissible) dismissBtn?.classList.remove('hidden');
+  else dismissBtn?.classList.add('hidden');
+  el.classList.remove('hidden');
 }
 
 function normalizeService(s) {
@@ -3357,6 +3388,10 @@ function closeModal(id) {
   const el = $(`#${id}`);
   if (!el || el.classList.contains('hidden')) return;
   if (id === 'update-modal') stopUpdatePolling();
+  if (id === 'scan-confirm-modal' && pendingScanStart) {
+    pendingScanStart(false);
+    pendingScanStart = null;
+  }
   el.classList.add('hidden');
   try {
     closeIconPopover();
@@ -3389,14 +3424,82 @@ function formatScanStatus(status) {
   return `${phase} · ${network}`;
 }
 
+function parseScanCidrList(text) {
+  if (!text) return [];
+  return text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
+}
+
+function defaultScanCidrValue(netRes, settings) {
+  const settingsCidr = settings?.scan_cidr_default?.trim();
+  if (settingsCidr) return parseScanCidrList(settingsCidr)[0] || settingsCidr;
+  const detected = netRes?.detected_cidrs || [];
+  if (detected.length) return detected[0];
+  const net = resolveNetwork(netRes);
+  if (net.local_network && net.local_network !== '—') return net.local_network;
+  return null;
+}
+
+function cidrOptionLabel(cidr, netRes, settings) {
+  const envCidrs = parseScanCidrList(netRes?.env_scan_cidr);
+  if (envCidrs.includes(cidr)) return t('modal.scan.cidrEnv', { cidr });
+  const settingsCidrs = parseScanCidrList(settings?.scan_cidr_default);
+  if (settingsCidrs.includes(cidr)) return t('modal.scan.cidrSettings', { cidr });
+  return t('modal.scan.cidrDetected', { cidr });
+}
+
+function populateScanCidrSelect(netRes, settings) {
+  const select = $('#scan-cidr-select');
+  if (!select) return;
+  const seen = new Set();
+  const options = [];
+  (netRes?.detected_cidrs || []).forEach((cidr) => {
+    if (!seen.has(cidr)) {
+      seen.add(cidr);
+      options.push({ value: cidr, label: cidrOptionLabel(cidr, netRes, settings) });
+    }
+  });
+  const defaultVal = defaultScanCidrValue(netRes, settings);
+  select.innerHTML = '';
+  options.forEach((opt) => {
+    const el = document.createElement('option');
+    el.value = opt.value;
+    el.textContent = opt.label;
+    select.appendChild(el);
+  });
+  const customOpt = document.createElement('option');
+  customOpt.value = SCAN_CIDR_CUSTOM;
+  customOpt.textContent = t('modal.scan.cidrCustomOption');
+  select.appendChild(customOpt);
+  if (defaultVal && seen.has(defaultVal)) select.value = defaultVal;
+  else if (options.length) select.value = options[0].value;
+  else select.value = SCAN_CIDR_CUSTOM;
+  syncScanCidrCustomVisibility();
+}
+
+function syncScanCidrCustomVisibility() {
+  const select = $('#scan-cidr-select');
+  const customWrap = $('#scan-cidr-custom-wrap');
+  const isCustom = select?.value === SCAN_CIDR_CUSTOM;
+  customWrap?.classList.toggle('hidden', !isCustom);
+}
+
+function updateScanCidrPreview() {
+  const preview = $('#scan-cidr-preview');
+  if (!preview) return;
+  const cidr = resolveScanCidrInput();
+  preview.textContent = cidr
+    ? t('modal.scan.selectedCidr', { cidr })
+    : t('modal.scan.selectedCidrAuto');
+}
+
 function resolveScanCidrInput() {
+  const select = $('#scan-cidr-select');
+  if (select && select.value !== SCAN_CIDR_CUSTOM) {
+    return select.value?.trim() || null;
+  }
   const inputVal = $('#cidr-input')?.value?.trim();
   if (inputVal) return inputVal;
-  const settingsCidr = appSettings?.scan_cidr_default?.trim();
-  if (settingsCidr) return settingsCidr;
-  const net = window.__netdashNetwork;
-  if (net?.local_network && !net?.docker_bridge) return net.local_network;
-  return null;
+  return defaultScanCidrValue(window.__netdashNetwork, appSettings);
 }
 
 function setScanControlsDisabled(disabled) {
@@ -3409,16 +3512,17 @@ function setScanControlsDisabled(disabled) {
 async function startScan(cidr, fullScan = false) {
   clearScanError();
   const netRes = window.__netdashNetwork;
-  if (!confirmScanStart(netRes)) return;
+  const resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
+  const networkLabel = resolvedCidr || t('scan.localNetwork');
+  const confirmed = await confirmScanStart(netRes, networkLabel);
+  if (!confirmed) return;
   if (netRes?.scan_safe_mode && fullScan) {
     fullScan = false;
     showToast(t('scan.safeModeFullScanDisabled'), 'info');
   }
-  const resolvedCidr = (cidr && String(cidr).trim()) || resolveScanCidrInput();
   closeModal('scan-modal');
   $('#scan-bar')?.classList.remove('hidden');
   setScanControlsDisabled(true);
-  const networkLabel = resolvedCidr || t('scan.localNetwork');
   const statusEl = $('#scan-status-text');
   if (statusEl) statusEl.textContent = t('scan.starting', { network: networkLabel });
 
@@ -3475,10 +3579,16 @@ async function startScan(cidr, fullScan = false) {
 }
 
 function openScanModal() {
+  const net = window.__netdashNetwork;
+  populateScanCidrSelect(net, appSettings);
   const cidrInput = $('#cidr-input');
-  if (cidrInput && !cidrInput.value.trim() && appSettings?.scan_cidr_default) {
-    cidrInput.value = appSettings.scan_cidr_default;
+  if (cidrInput) {
+    cidrInput.value = appSettings?.scan_cidr_default?.trim()
+      || net?.local_network
+      || '';
   }
+  $('#full-scan').checked = !!appSettings?.full_scan_default;
+  updateScanCidrPreview();
   openModal('scan-modal');
 }
 
@@ -3497,12 +3607,37 @@ function bindScanUi() {
     if (quickScanBtn) {
       e.preventDefault();
       if (quickScanBtn.disabled) return;
-      const fullScan = appSettings?.full_scan_default ?? $('#full-scan')?.checked ?? false;
-      void startScan(resolveScanCidrInput(), fullScan);
+      openScanModal();
       return;
     }
   });
   $('#scan-cancel')?.addEventListener('click', () => closeModal('scan-modal'));
+  $('#scan-cidr-select')?.addEventListener('change', () => {
+    syncScanCidrCustomVisibility();
+    updateScanCidrPreview();
+  });
+  $('#cidr-input')?.addEventListener('input', updateScanCidrPreview);
+  $('#scan-confirm-cancel')?.addEventListener('click', () => {
+    closeModal('scan-confirm-modal');
+    if (pendingScanStart) {
+      pendingScanStart(false);
+      pendingScanStart = null;
+    }
+  });
+  $('#scan-confirm-ok')?.addEventListener('click', () => {
+    if ($('#scan-confirm-skip')?.checked) {
+      localStorage.setItem(SCAN_CONFIRM_SKIP_KEY, '1');
+    }
+    closeModal('scan-confirm-modal');
+    if (pendingScanStart) {
+      pendingScanStart(true);
+      pendingScanStart = null;
+    }
+  });
+  $('#scan-config-warning-dismiss')?.addEventListener('click', () => {
+    localStorage.setItem(SCAN_SAFE_BANNER_DISMISS_KEY, '1');
+    updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
+  });
 }
 
 // Events

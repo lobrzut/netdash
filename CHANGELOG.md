@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.104
+
+- **Skan sieci — wybór CIDR**: przycisk „Skanuj sieć” otwiera modal z listą wykrytych sieci (`/api/network` → `detected_cidrs`: /24, /28, NETDASH_SCAN_CIDR, ustawienia), podglądem wyboru i opcją „Własny wpis”.
+- **Potwierdzenie skanu**: zamiast natywnego `confirm()` — modal w aplikacji z checkboxem „Nie pokazuj ponownie” (`localStorage: netdash_scan_confirm_skip`).
+- **Baner trybu bezpiecznego**: przycisk „Ukryj” (`localStorage: netdash_scan_safe_banner_dismiss`) — nie pokazuje się przy każdym wejściu na Serwisy.
+- **Ustawienia → Skanowanie**: domyślne CIDR z pól ustawień jest domyślnym wyborem w modalu skanu.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.104`.
+
 ## v1.3.103
 
 - **Fix krytyczny UI (`scan_safe_mode`)**: Pulpit i Serwisy nie crashują gdy `/api/network` zawiedzie — domyślny profil `scan_safe_mode=true`, bezpieczne wartości sieci; koniec czerwonego banera „Cannot read properties of null”.

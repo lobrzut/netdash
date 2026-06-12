@@ -108,7 +108,10 @@
       <span id="scan-status-text" data-i18n="scan.running">Skanowanie sieci...</span>
     </div>
     <div id="scan-error" class="scan-error hidden" role="alert"></div>
-    <div id="scan-config-warning" class="scan-config-warning hidden" role="alert"></div>
+    <div id="scan-config-warning" class="scan-config-warning hidden" role="alert">
+      <span id="scan-config-warning-text" class="scan-config-warning-text"></span>
+      <button type="button" id="scan-config-warning-dismiss" class="scan-config-warning-dismiss hidden" data-i18n="scan.bannerDismiss" aria-label="Ukryj">Ukryj</button>
+    </div>
 
     <main class="main">
       <section id="page-home" class="app-page">
@@ -758,16 +761,21 @@ sol --udp-port 9
   </div>
 
   <!-- Scan Modal -->
-  <div id="scan-modal" class="modal hidden">
+  <div id="scan-modal" class="modal hidden" role="dialog" aria-labelledby="scan-modal-title" aria-modal="true">
     <div class="modal-backdrop"></div>
     <div class="modal-content modal-form">
-      <h2 data-i18n="modal.scan.title">Skanowanie sieci</h2>
-      <p class="modal-desc" data-i18n="modal.scan.desc">Podaj jedną lub więcej sieci (CIDR) — każda w nowej linii lub oddzielona przecinkiem. Zostaw puste, aby skanować lokalną sieć.</p>
+      <h2 id="scan-modal-title" data-i18n="modal.scan.title">Skanowanie sieci</h2>
+      <p class="modal-desc" data-i18n="modal.scan.desc">Wybierz sieć (CIDR) do skanowania lub wpisz własną. Na słabym NAS użyj mniejszej maski, np. /28.</p>
       <div class="field">
-        <label for="cidr-input" data-i18n="modal.scan.cidr">Sieci (CIDR)</label>
-        <textarea id="cidr-input" rows="3" data-i18n-placeholder="modal.scan.cidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.0.0/24"></textarea>
+        <label for="scan-cidr-select" data-i18n="modal.scan.cidrSelect">Sieć do skanowania</label>
+        <select id="scan-cidr-select" class="scan-cidr-select"></select>
+      </div>
+      <div class="field hidden" id="scan-cidr-custom-wrap">
+        <label for="cidr-input" data-i18n="modal.scan.cidrCustom">Własne sieci (CIDR)</label>
+        <textarea id="cidr-input" rows="3" data-i18n-placeholder="modal.scan.cidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.0.0/28"></textarea>
         <span class="hint" id="local-network-hint"></span>
       </div>
+      <p class="scan-cidr-preview" id="scan-cidr-preview" aria-live="polite"></p>
       <label class="checkbox-row">
         <input type="checkbox" id="full-scan" />
         <span data-i18n="modal.scan.fullLong">Pełny skan (wszystkie porty — wolniejszy, więcej wyników)</span>
@@ -775,6 +783,24 @@ sol --udp-port 9
       <div class="modal-actions">
         <button class="btn btn-ghost" id="scan-cancel" data-i18n="modal.cancel">Anuluj</button>
         <button type="button" class="btn btn-accent" id="scan-start" data-i18n="modal.scan.start">Rozpocznij skan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan confirm modal (replaces native confirm) -->
+  <div id="scan-confirm-modal" class="modal hidden" role="dialog" aria-labelledby="scan-confirm-title" aria-modal="true">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-form">
+      <h2 id="scan-confirm-title" data-i18n="scan.confirmTitle">Potwierdź skan sieci</h2>
+      <p class="modal-desc" data-i18n="scan.confirmLowResource">Skan sieci obciąża CPU i sieć (szczególnie bez ping ICMP — skan TCP). Kontynuować? Na słabym sprzęcie użyj mniejszego CIDR (/28) lub skanuj poza godzinami szczytu.</p>
+      <p class="scan-cidr-preview" id="scan-confirm-cidr"></p>
+      <label class="checkbox-row">
+        <input type="checkbox" id="scan-confirm-skip" />
+        <span data-i18n="scan.confirmSkip">Nie pokazuj ponownie</span>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="scan-confirm-cancel" data-i18n="modal.cancel">Anuluj</button>
+        <button type="button" class="btn btn-accent" id="scan-confirm-ok" data-i18n="scan.confirmOk">Kontynuuj skan</button>
       </div>
     </div>
   </div>
@@ -1136,6 +1162,6 @@ sol --udp-port 9
   </div>
 
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
-  <script src="/static/app.js?v=1.3.103"></script>
+  <script src="/static/app.js?v=1.3.104"></script>
 </body>
 </html>

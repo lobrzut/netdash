@@ -40,6 +40,7 @@ from app.scanner import (
     _fallback_service_name,
     build_local_host_service,
     format_cidr_list,
+    get_detected_cidrs,
     get_local_ip,
     get_local_network,
     icmp_ping_available,
@@ -627,7 +628,10 @@ async def change_password(
 
 
 @app.get("/api/network", response_model=NetworkInfo)
-async def network_info(_: User = Depends(get_current_user)):
+async def network_info(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
     if settings.demo_mode:
         return NetworkInfo(
             local_network="10.0.0.0/24",
@@ -637,16 +641,22 @@ async def network_info(_: User = Depends(get_current_user)):
             ping_available=True,
             scan_safe_mode=settings.scan_safe_mode,
             resource_profile=settings.resource_profile,
+            detected_cidrs=["10.0.0.0/24", "10.0.0.0/28"],
+            env_scan_cidr=None,
         )
+    app_settings = await _get_or_create_settings(db)
     ping_ok = await icmp_ping_available()
+    env_cidr = settings.scan_cidr.strip() if settings.scan_cidr else None
     return NetworkInfo(
         local_network=get_local_network(),
         local_ip=get_local_ip(),
         docker_bridge=is_likely_docker_bridge(),
-        scan_cidr_configured=bool(settings.scan_cidr),
+        scan_cidr_configured=bool(env_cidr or app_settings.scan_cidr_default),
         ping_available=ping_ok,
         scan_safe_mode=settings.scan_safe_mode,
         resource_profile=settings.resource_profile,
+        detected_cidrs=get_detected_cidrs(app_settings.scan_cidr_default),
+        env_scan_cidr=env_cidr,
     )
 
 

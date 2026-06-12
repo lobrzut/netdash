@@ -160,6 +160,8 @@ class NetworkInfo(BaseModel):
     ping_available: bool = True
     scan_safe_mode: bool = True
     resource_profile: str = "safe"
+    detected_cidrs: list[str] = Field(default_factory=list)
+    env_scan_cidr: str | None = None
 
 
 class NetworkDiagnostics(BaseModel):

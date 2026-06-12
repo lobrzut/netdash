@@ -297,6 +297,34 @@ def get_local_network() -> str:
         return "192.168.1.0/24"
 
 
+def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
+    """CIDR options for scan UI: auto /24+/28, env NETDASH_SCAN_CIDR, settings default."""
+    cidrs: list[str] = []
+    seen: set[str] = set()
+
+    def add(text: str | None) -> None:
+        if not text or not text.strip():
+            return
+        for cidr in parse_scan_cidrs(text):
+            if cidr not in seen:
+                seen.add(cidr)
+                cidrs.append(cidr)
+
+    try:
+        local_ip = get_local_ip()
+        add(str(ipaddress.ip_network(f"{local_ip}/24", strict=False)))
+        add(str(ipaddress.ip_network(f"{local_ip}/28", strict=False)))
+    except (OSError, ValueError):
+        pass
+    if settings.scan_cidr:
+        add(settings.scan_cidr)
+    if scan_cidr_default:
+        add(scan_cidr_default)
+    if not cidrs:
+        add("192.168.1.0/24")
+    return cidrs
+
+
 def parse_scan_cidrs(text: str) -> list[str]:
     """Parse comma/newline/semicolon separated CIDR list."""
     if not text or not text.strip():
