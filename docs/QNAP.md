@@ -72,10 +72,11 @@ Na QNAP w `.env` ustaw minimum:
 NETDASH_SECRET_KEY=<losowy-klucz-min-32-znakow>
 NETDASH_DEFAULT_ADMIN_PASSWORD=changeme
 NETDASH_DEFAULT_ADMIN_USER=admin
+NETDASH_SYNC_ADMIN_PASSWORD=true
 NETDASH_IMAGE_TAG=latest
 ```
 
-> **Bezpieczeństwo:** domyślne logowanie `admin` / `changeme` dotyczy tylko pierwszego startu (pusta baza). Po zalogowaniu **zmień hasło** w Ustawienia → Hasło.
+> **Homelab:** przy `NETDASH_SYNC_ADMIN_PASSWORD=true` (domyślnie) hasło admina jest synchronizowane z env przy każdym starcie kontenera — `admin`/`changeme` działa po deployu także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`, żeby restart nie przywracał `changeme`.
 
 Opcjonalnie sieć skanowania:
 

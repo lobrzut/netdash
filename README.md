@@ -100,7 +100,7 @@ docker compose up -d --build
 
 Open **http://localhost:18787** (or `http://<server-ip>:18787` on your LAN).
 
-Default login: **`admin` / `changeme`** (or values from `.env` on first start when the DB has no users).  
+Default login: **`admin` / `changeme`** (synced from env on container start when `NETDASH_SYNC_ADMIN_PASSWORD=true`).  
 **You must change the password** after first login (Settings → Password).
 
 Full step-by-step guide: **[DEPLOYMENT.md](DEPLOYMENT.md)**
@@ -205,8 +205,9 @@ sudo systemctl enable --now netdash
 | Variable | Description |
 |----------|-------------|
 | `NETDASH_SECRET_KEY` | JWT key + API vault encryption (**required** in Docker) |
-| `NETDASH_DEFAULT_ADMIN_USER` | Default user (first start only, default `admin`) |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Default password (default `changeme` — **change after first login**) |
+| `NETDASH_DEFAULT_ADMIN_USER` | Admin username (default `admin`) |
+| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Admin password in env (default `changeme` — **change after first login**) |
+| `NETDASH_SYNC_ADMIN_PASSWORD` | Sync admin password from env on every start (default `true`; set `false` after changing password in UI) |
 | `NETDASH_SCAN_CIDR` | Override scan network (Docker bridge mode) |
 | `NETDASH_BUILD_DATE` | Optional build date (About panel) |
 

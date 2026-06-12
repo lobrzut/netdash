@@ -17,6 +17,9 @@ services:
     env_file: .env
     environment:
       NETDASH_LISTEN_PORT: "18787"
+      NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:-changeme}
+      NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
+      NETDASH_SYNC_ADMIN_PASSWORD: ${NETDASH_SYNC_ADMIN_PASSWORD:-true}
     volumes:
       - ./data:/app/data
     cap_add:

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import re
 import uuid
 from contextlib import asynccontextmanager
@@ -265,6 +266,36 @@ async def _sanitize_stored_urls() -> None:
             await db.commit()
 
 
+async def _sync_admin_password_from_env(db: AsyncSession) -> None:
+    """Homelab post-deploy login: ensure admin exists and password matches env on start."""
+    if not settings.sync_admin_password:
+        return
+    if "NETDASH_DEFAULT_ADMIN_PASSWORD" not in os.environ:
+        return
+    password = settings.default_admin_password.strip()
+    if not password:
+        return
+    username = settings.default_admin_user
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if user is None:
+        db.add(User(username=username, password_hash=hash_password(password)))
+        await db.commit()
+        logger.info(
+            "Admin user %r created; password from NETDASH_DEFAULT_ADMIN_PASSWORD "
+            "(change in Settings after login)",
+            username,
+        )
+        return
+    if verify_password(password, user.password_hash):
+        return
+    user.password_hash = hash_password(password)
+    await db.commit()
+    logger.info(
+        "Admin password synced from NETDASH_DEFAULT_ADMIN_PASSWORD (change in Settings after login)",
+    )
+
+
 async def _maybe_reset_admin_password(db: AsyncSession) -> None:
     """One-time homelab recovery: NETDASH_RESET_ADMIN_PASSWORD on next start (remove env after)."""
     new_password = (settings.reset_admin_password or "").strip()
@@ -292,6 +323,7 @@ async def init_db():
         await conn.run_sync(_migrate_db)
 
     async with async_session() as db:
+        await _sync_admin_password_from_env(db)
         result = await db.execute(select(func.count()).select_from(User))
         if (result.scalar_one() or 0) == 0:
             db.add(

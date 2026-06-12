@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.79
+
+- **Post-deploy login (homelab)**: przy starcie kontenera, gdy `NETDASH_DEFAULT_ADMIN_PASSWORD` jest w env i `NETDASH_SYNC_ADMIN_PASSWORD=true` (domyślnie), aplikacja tworzy użytkownika admin (jeśli brak) i **synchronizuje hash hasła** z env — działa `admin`/`changeme` po każdym deployu, także ze starym wolumenem SQLite.
+- **Compose**: `NETDASH_DEFAULT_ADMIN_PASSWORD:-changeme`, `NETDASH_SYNC_ADMIN_PASSWORD:-true` w QNAP, docker-simple i głównym compose; obraz QNAP `1.3.79`.
+- **Dokumentacja QNAP**: sync vs ręczna zmiana hasła; `NETDASH_SYNC_ADMIN_PASSWORD=false` po ustawieniu własnego hasła.
+
 ## v1.3.78
 
 - **Reset hasła admina (QNAP / homelab)**: `NETDASH_RESET_ADMIN_PASSWORD` — jednorazowy reset przy starcie (bcrypt, log ostrzeżenia; usuń zmienną po zalogowaniu). Skrypt `scripts/reset-admin-password.py` w obrazie Docker (`docker exec`) lub offline na `netdash.db`.

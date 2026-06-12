@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.78"
+VERSION = "1.3.79"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     scan_concurrency: int = 80
     default_admin_user: str = "admin"
     default_admin_password: str = "changeme"
+    # Sync admin password from NETDASH_DEFAULT_ADMIN_PASSWORD on every container start (homelab default)
+    sync_admin_password: bool = True
     # One-time recovery on startup — remove env after login (see deploy/qnap/README.md)
     reset_admin_password: str | None = None
     # Override auto-detected /24 when running in Docker bridge (e.g. 192.168.1.0/24)
