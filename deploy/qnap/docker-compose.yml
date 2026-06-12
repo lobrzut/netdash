@@ -1,58 +1,64 @@
-# NetDash — QNAP Container Station (GHCR only, bez git)
-# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml
-#
-# Folder danych: /share/Container/netdash/data
-# Portal: http://<IP-QNAP>:18787  (NETDASH_LISTEN_PORT; never 8787 — Readarr)
-#
-# Auto-update: patrz README.md (profil auto-update lub docker-compose.autoupdate.yml)
-
-services:
-  netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.109
-    container_name: netdash
-    restart: always
-    # Limit RAM 512 MB: Container Station → netdash → Resource → Memory limit (patrz deploy/qnap/README.md)
-    ports:
-      - "18787:18787"
-    environment:
-      # QNAP CS often ignores ${VAR:-default}; literals below work without CS env overrides.
-      # NETDASH_SECRET_KEY: optional — entrypoint auto-generates to /app/data/.secret if unset.
-      NETDASH_DEFAULT_ADMIN_USER: admin
-      NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
-      NETDASH_SYNC_ADMIN_PASSWORD: "false"
-      # QNAP CS ignores ${VAR:-default} — literal CIDR required for LAN scan.
-      NETDASH_SCAN_CIDR: "192.168.1.0/24"
-      # Gentler scan: low parallelism, common ports only, batch delays (prevents NAS crash).
-      NETDASH_SCAN_SAFE_MODE: "true"
-      NETDASH_COOKIE_SECURE: "false"
-      # One-time override (optional): NETDASH_RESET_ADMIN_PASSWORD — remove after login
-      # NETDASH_RESET_ADMIN_PASSWORD: ${NETDASH_RESET_ADMIN_PASSWORD:-}
-      # NETDASH_LISTEN_PORT — app ignores stale CS NETDASH_PORT=8787 (entrypoint unsets it).
-      NETDASH_LISTEN_PORT: "18787"
-    volumes:
-      - /share/Container/netdash/data:/app/data
-    cap_add:
-      - NET_RAW
-    labels:
-      com.centurylinklabs.watchtower.enable: "true"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  watchtower:
-    image: containrrr/watchtower:1.7.1
-    container_name: netdash-watchtower
-    restart: unless-stopped
-    profiles:
-      - auto-update
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_INCLUDE_RESTARTING: "true"
-      WATCHTOWER_ROLLING_RESTART: "true"
+# NetDash — QNAP Container Station (GHCR only, bez git)
+# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.yml
+#
+# Folder danych: /share/Container/netdash/data
+# Portal: http://<IP-QNAP>:18787  (NETDASH_LISTEN_PORT; never 8787 — Readarr)
+#
+# !!! KRYTYCZNE — LIMIT RAM !!!
+# Bez limitu pamięci skan /24 może OOM-crashować CAŁY QNAP (nie tylko kontener NetDash).
+# Ustaw mem_limit poniżej LUB Container Station → netdash → Resource → Memory limit 768 MB–1 GB.
+#
+# Auto-update: patrz README.md (profil auto-update lub docker-compose.autoupdate.yml)
+
+services:
+  netdash:
+    image: ghcr.io/lobrzut/netdash:1.3.110
+    container_name: netdash
+    restart: always
+    mem_limit: 768m
+    memswap_limit: 768m
+    ports:
+      - "18787:18787"
+    environment:
+      # QNAP CS often ignores ${VAR:-default}; literals below work without CS env overrides.
+      # NETDASH_SECRET_KEY: optional — entrypoint auto-generates to /app/data/.secret if unset.
+      NETDASH_DEFAULT_ADMIN_USER: admin
+      NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
+      NETDASH_SYNC_ADMIN_PASSWORD: "false"
+      # Prefer /28 around your NAS IP (e.g. .144/28 for QNAP at 192.168.1.150). Full /24 only with RAM limit.
+      NETDASH_SCAN_CIDR: "192.168.1.144/28"
+      # Gentler scan: low parallelism, /28 chunks, batch delays (prevents NAS OOM).
+      NETDASH_SCAN_SAFE_MODE: "true"
+      NETDASH_COOKIE_SECURE: "false"
+      # One-time override (optional): NETDASH_RESET_ADMIN_PASSWORD — remove after login
+      # NETDASH_RESET_ADMIN_PASSWORD: ${NETDASH_RESET_ADMIN_PASSWORD:-}
+      # NETDASH_LISTEN_PORT — app ignores stale CS NETDASH_PORT=8787 (entrypoint unsets it).
+      NETDASH_LISTEN_PORT: "18787"
+    volumes:
+      - /share/Container/netdash/data:/app/data
+    cap_add:
+      - NET_RAW
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  watchtower:
+    image: containrrr/watchtower:1.7.1
+    container_name: netdash-watchtower
+    restart: unless-stopped
+    profiles:
+      - auto-update
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+

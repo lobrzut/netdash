@@ -16,7 +16,13 @@ let availabilityFilter = 'all';
 let networkFilter = 'all';
 let serviceSearch = '';
 let appSettings = {};
-let scanPollInterval = null;
+let scanPollTimer = null;
+let scanPollFailures = 0;
+let lastScanServicesRefresh = 0;
+const SCAN_POLL_BASE_MS = 3000;
+const SCAN_POLL_MAX_MS = 15000;
+const SCAN_POLL_MAX_FAILURES = 10;
+const SCAN_SERVICES_REFRESH_MS = 12000;
 let healthPollInterval = null;
 let clockInterval = null;
 let revealedKeys = new Set();
@@ -179,7 +185,7 @@ async function logout() {
     /* ignore */
   }
   showView('login-view');
-  if (scanPollInterval) clearInterval(scanPollInterval);
+  if (scanPollTimer) clearTimeout(scanPollTimer);
   if (healthPollInterval) clearInterval(healthPollInterval);
 }
 
@@ -1093,7 +1099,8 @@ function refreshServiceViews() {
 }
 
 async function loadDashboard() {
-  showDashboardError('');
+  const scanActive = !!scanPollTimer;
+  if (!scanActive) showDashboardError('');
   const [svcRes, netRes, keysRes, notesRes, settings, scansRes] = await Promise.all([
     api('/api/services').catch((e) => ({ error: e })),
     api('/api/network').catch((e) => ({ error: e })),
@@ -1108,7 +1115,7 @@ async function loadDashboard() {
   if (netRes?.error) errors.push(`${t('error.api.network')}: ${netRes.error.message}`);
   if (keysRes?.error) errors.push(`${t('error.api.keys')}: ${keysRes.error.message}`);
   if (notesRes?.error) errors.push(`${t('error.api.notes')}: ${notesRes.error.message}`);
-  if (errors.length === 4) throw new Error(errors.join('; '));
+  if (errors.length === 4 && !scanActive) throw new Error(errors.join('; '));
 
   services = (svcRes?.error ? [] : svcRes).map(normalizeService);
   apiKeys = keysRes?.error ? [] : keysRes;
@@ -1121,7 +1128,7 @@ async function loadDashboard() {
 
   const net = resolveNetwork(netRes?.error ? null : netRes);
   window.__netdashNetwork = net;
-  if (netRes?.error) {
+  if (netRes?.error && !scanActive && errors.length) {
     showDashboardError(t('error.partialApi', { errors: errors.join('; ') }));
   }
   const netLabel = net.local_ip !== '—' ? `${net.local_ip} · ${net.local_network}` : '—';
@@ -1150,9 +1157,24 @@ async function loadDashboard() {
 
 let serviceRefreshInterval = null;
 
-function startHealthPolling() {
+function pauseHealthPolling() {
   if (healthPollInterval) clearInterval(healthPollInterval);
   if (serviceRefreshInterval) clearInterval(serviceRefreshInterval);
+  healthPollInterval = null;
+  serviceRefreshInterval = null;
+}
+
+function isTransientFetchError(err) {
+  const msg = err?.message || '';
+  if (err?.name === 'AbortError') return true;
+  const timeout = t('error.requestTimeout');
+  const net = t('error.networkFetch', { host: location.hostname });
+  return msg === timeout || msg === net
+    || msg === 'Failed to fetch' || msg.includes('NetworkError') || msg.includes('Load failed');
+}
+
+function startHealthPolling() {
+  pauseHealthPolling();
   if (appSettings.health_check_enabled === false) return;
   const intervalSec = Math.max(15, Math.min(900, appSettings.health_check_interval || 60));
   const interval = intervalSec * 1000;
@@ -3461,7 +3483,7 @@ function parseScanCidrList(text) {
   return text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
 }
 
-const ONE_CLICK_SCAN_CIDR_FALLBACK = '192.168.1.0/24';
+const ONE_CLICK_SCAN_CIDR_FALLBACK = '192.168.1.144/28';
 
 function resolveOneClickScanCidr(settings, netRes) {
   const settingsCidr = settings?.scan_cidr_default?.trim();
@@ -3576,8 +3598,13 @@ async function pollScanProgress(jobId) {
     if (statusEl) statusEl.textContent = formatScanStatus(status);
 
     if (status.status === 'running' && status.found_count > 0) {
-      await loadDashboard();
+      const now = Date.now();
+      if (now - lastScanServicesRefresh >= SCAN_SERVICES_REFRESH_MS) {
+        lastScanServicesRefresh = now;
+        await loadServices().catch(() => {});
+      }
     }
+    scanPollFailures = 0;
 
     if (status.status === 'completed') {
       stopScanPolling();
@@ -3602,34 +3629,59 @@ async function pollScanProgress(jobId) {
     }
     return false;
   } catch (err) {
+    scanPollFailures += 1;
+    if (scanPollFailures < SCAN_POLL_MAX_FAILURES && isTransientFetchError(err)) {
+      if (statusEl) {
+        statusEl.textContent = t('scan.error.pollRetry', {
+          n: scanPollFailures,
+          max: SCAN_POLL_MAX_FAILURES,
+        });
+      }
+      return false;
+    }
     stopScanPolling();
-    showScanError(formatScanStartError(err) || t('scan.error.pollFailed'));
+    showScanError(t('scan.error.pollFailed'));
     return true;
   }
 }
 
-function stopScanPolling() {
-  if (scanPollInterval) clearInterval(scanPollInterval);
-  scanPollInterval = null;
-  $('#scan-bar')?.classList.add('hidden');
+function stopScanPolling(opts = {}) {
+  const { keepBar = false, resumeHealth = true } = opts;
+  if (scanPollTimer) clearTimeout(scanPollTimer);
+  scanPollTimer = null;
+  scanPollFailures = 0;
+  if (!keepBar) $('#scan-bar')?.classList.add('hidden');
   setScanControlsDisabled(false);
+  if (resumeHealth) startHealthPolling();
+}
+
+function scheduleScanPoll(jobId) {
+  if (scanPollTimer) clearTimeout(scanPollTimer);
+  const delay = Math.min(
+    SCAN_POLL_MAX_MS,
+    Math.round(SCAN_POLL_BASE_MS * (1.4 ** scanPollFailures)),
+  );
+  scanPollTimer = setTimeout(async () => {
+    const done = await pollScanProgress(jobId);
+    if (!done) scheduleScanPoll(jobId);
+  }, delay);
 }
 
 function attachScanPolling(job) {
   if (!job?.id) return;
-  if (scanPollInterval) clearInterval(scanPollInterval);
+  stopScanPolling({ keepBar: true, resumeHealth: false });
+  scanPollFailures = 0;
+  lastScanServicesRefresh = 0;
+  pauseHealthPolling();
   $('#scan-bar')?.classList.remove('hidden');
   setScanControlsDisabled(true);
   const statusEl = $('#scan-status-text');
   if (statusEl) statusEl.textContent = formatScanStatus(job);
-  void pollScanProgress(job.id);
-  scanPollInterval = setInterval(() => {
-    void pollScanProgress(job.id);
-  }, 1500);
+  scheduleScanPoll(job.id);
 }
 
 function resumeActiveScan(scans) {
-  if (!Array.isArray(scans) || scanPollInterval) return;
+  if (!Array.isArray(scans) || scanPollTimer) return;
   const active = scans.find((s) => s.status === 'running' || s.status === 'pending');
   if (active) attachScanPolling(active);
 }

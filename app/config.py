@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.109"
+VERSION = "1.3.110"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -100,13 +100,18 @@ class Settings(BaseSettings):
     scan_concurrency: int = 80
     # Weak homelab hardware (RPi, old PC, NAS, N100): gentler scan — ON by default everywhere
     scan_safe_mode: bool = True
-    scan_safe_concurrency: int = 8
-    scan_safe_max_hosts: int = 64
+    scan_safe_concurrency: int = 4
+    scan_safe_max_hosts: int = 32
     scan_max_hosts: int = 256
-    scan_batch_delay: float = 0.08
-    scan_batch_size: int = 16
+    scan_batch_delay: float = 0.15
+    scan_batch_size: int = 8
     scan_max_duration: float = 600.0
-    scan_safe_max_duration: float = 300.0
+    scan_safe_max_duration: float = 240.0
+    # Safe mode: never scan wider than /28 per chunk; max 2 chunks per /24 request.
+    scan_safe_max_prefix: int = 28
+    scan_safe_max_subnets: int = 2
+    # Optional anchor IP for safe-mode chunk selection (e.g. 192.168.1.150 on QNAP).
+    scan_safe_anchor: str | None = None
     default_admin_user: str = "admin"
     default_admin_password: str = "changeme"
     # Sync admin password from NETDASH_DEFAULT_ADMIN_PASSWORD on every container start (homelab default)
@@ -221,7 +226,11 @@ class Settings(BaseSettings):
 
     @property
     def health_check_concurrency(self) -> int:
-        return 6 if self.scan_safe_mode else 10
+        return 4 if self.scan_safe_mode else 10
+
+    @property
+    def scan_identify_concurrency(self) -> int:
+        return 3 if self.scan_safe_mode else 20
 
 
 settings = Settings()

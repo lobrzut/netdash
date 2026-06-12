@@ -421,6 +421,81 @@ def resolve_scan_cidr(
     return format_cidr_list(resolve_scan_cidrs(cidr, scan_cidr_default))
 
 
+def _safe_mode_anchor_ip(network: ipaddress.IPv4Network | ipaddress.IPv6Network) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+    """Pick anchor inside network for safe-mode /28 chunk selection (DHCP-heavy range)."""
+    if settings.scan_safe_anchor:
+        try:
+            ip = ipaddress.ip_address(settings.scan_safe_anchor.strip())
+            if ip in network:
+                return ip
+        except ValueError:
+            pass
+    local_ip = get_local_ip()
+    try:
+        ip = ipaddress.ip_address(local_ip)
+        if ip in network:
+            return ip
+    except ValueError:
+        pass
+    # Typical homelab DHCP block (.100–.200): bias toward .144 in a /24.
+    try:
+        offset = min(144, max(1, int(network.num_addresses) - 16))
+        candidate = network.network_address + offset
+        if candidate in network:
+            return candidate
+    except (ValueError, TypeError):
+        pass
+    return network.network_address + 1
+
+
+def safe_mode_scan_cidrs(cidr: str) -> list[str]:
+    """Split a wide CIDR into ≤N small subnets for safe mode (limits RAM on NAS)."""
+    if not settings.scan_safe_mode:
+        return [cidr]
+    network = ipaddress.ip_network(cidr.strip(), strict=False)
+    max_pfx = settings.scan_safe_max_prefix
+    if network.prefixlen >= max_pfx:
+        return [str(network)]
+    chunks = list(network.subnets(new_prefix=max_pfx))
+    if not chunks:
+        return [str(network)]
+    anchor = _safe_mode_anchor_ip(network)
+    primary_idx = 0
+    for i, chunk in enumerate(chunks):
+        if anchor in chunk:
+            primary_idx = i
+            break
+    max_chunks = max(1, settings.scan_safe_max_subnets)
+    half = max_chunks // 2
+    start = max(0, primary_idx - half)
+    end = min(len(chunks), start + max_chunks)
+    start = max(0, end - max_chunks)
+    selected = [str(chunks[i]) for i in range(start, end)]
+    if len(selected) < len(chunks):
+        logger.info(
+            "Safe mode: narrowed %s to %s (anchor=%s, max_subnets=%s)",
+            cidr,
+            format_cidr_list(selected),
+            anchor,
+            max_chunks,
+        )
+    return selected
+
+
+def expand_cidrs_for_safe_mode(cidrs: list[str]) -> list[str]:
+    """Expand each CIDR into safe-mode chunks; dedupe preserving order."""
+    if not settings.scan_safe_mode:
+        return cidrs
+    expanded: list[str] = []
+    seen: set[str] = set()
+    for cidr in cidrs:
+        for sub in safe_mode_scan_cidrs(cidr):
+            if sub not in seen:
+                seen.add(sub)
+                expanded.append(sub)
+    return expanded
+
+
 def parse_host_scan_ports(ports_str: str | None) -> list[int]:
     if not ports_str:
         return list(HOST_DISCOVERY_PORTS)
@@ -1182,7 +1257,7 @@ async def scan_network(
     if progress_callback:
         await progress_callback("ports", total, total)
 
-    identify_sem = asyncio.Semaphore(8 if settings.scan_safe_mode else 20)
+    identify_sem = asyncio.Semaphore(settings.scan_identify_concurrency)
     unique: dict[tuple[str, int], DiscoveredService] = {}
 
     async def identify(host: str, port: int):
@@ -1232,7 +1307,10 @@ async def scan_networks(
     service_callback: ServiceCallback | None = None,
 ) -> list[DiscoveredService]:
     unique: dict[tuple[str, int], DiscoveredService] = {}
-    for cidr in cidrs:
+    scan_cidrs = expand_cidrs_for_safe_mode(cidrs)
+    for idx, cidr in enumerate(scan_cidrs):
+        if idx > 0 and settings.scan_safe_mode:
+            await asyncio.sleep(settings.scan_batch_delay * 4)
         discovered = await scan_network(
             cidr,
             full_scan=full_scan,

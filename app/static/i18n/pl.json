@@ -428,6 +428,7 @@
   "scan.error.sessionExpired": "Sesja wygasła — zaloguj się ponownie i uruchom skan.",
   "scan.error.server": "Serwer odrzucił skan (błąd {status}). Sprawdź logi kontenera.",
   "scan.error.pollFailed": "Utracono połączenie ze skanem — sprawdź logi kontenera i uruchom skan ponownie.",
+  "scan.error.pollRetry": "Skan w toku — serwer nie odpowiada (próba {n}/{max}). Czekam na kontener…",
   "app.titleSuffix": "Network Dashboard",
   "error.unknown": "nieznany błąd",
   "error.serverHealth": "Serwer nie odpowiada poprawnie",

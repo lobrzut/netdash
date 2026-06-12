@@ -140,33 +140,38 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 **Baner ostrzeżenia:** Na zakładce Serwisy, gdy kontener jest w sieci Docker bez CIDR, NetDash pokazuje żółty komunikat z instrukcją — ustaw CIDR i zrestartuj.
 
-### Skan wywalił cały QNAP (v1.3.94+)
+### Skan wywalił cały QNAP (OOM — potwierdzone)
 
-Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesiątki portów × wysoka równoległość TCP, szczególnie gdy ping ICMP jest zablokowany).
+Skan `/24` **bez limitu RAM** na kontenerze może zużyć całą pamięć QNAP i **zawiesić cały NAS** (nie tylko NetDash). Objawy: czerwony baner „Brak połączenia z NetDash” w trakcie skanu (~60–70% postępu), stare statystyki w UI, QNAP nie odpowiada.
 
-**Od v1.3.94+** safe mode i limity zasobów są domyślne **w całym projekcie NetDash** (każdy deploy, nie tylko QNAP): `NETDASH_SCAN_SAFE_MODE=true`, limit RAM **512 MB**. Na słabym sprzęcie użyj węższego CIDR (`/28`).
+**Od v1.3.110** compose QNAP ma `mem_limit: 768m` i domyślne CIDR `/28`. Safe mode jest agresywniejszy (4 równoległe połączenia, max 2×/28 na żądanie /24).
 
-### Limit RAM (512 MB) — Container Station UI
-
-Compose QNAP jest **minimalny** (bez `version`, bez `mem_limit`, bez `deploy.resources`) — przechodzi walidację YAML w IDE i import w CS bez fałszywych ostrzeżeń. **Limit RAM ustaw raz ręcznie** (na słabym NAS to pewniejsze niż pole w YAML):
+### Limit RAM — OBOWIĄZKOWY na QNAP
 
 1. **Container Station** → aplikacja `netdash` → edycja kontenera `netdash`
 2. Zakładka **Resource** (Zasoby)
-3. **Memory limit** → **512 MB** → zapisz i zrestartuj kontener
+3. **Memory limit** → **768 MB** (słabszy NAS: 512 MB; większy: 1 GB) → zapisz
+4. **CPU limit** (opcjonalnie): 50–100%
+5. Zrestartuj kontener
 
-Opcjonalny limit CPU: ta sama zakładka **Resource** → **CPU limit**.
+Compose z GitHub (v1.3.110+) ma już `mem_limit: 768m` — po re-imporcie sprawdź w CS, czy limit się zastosował.
 
-> Żółte trójkąty w VS Code/Cursor przy polach limitów w compose to **walidator schematu IDE**, nie błąd QNAP — compose na GitHub celowo nie zawiera limitów zasobów.
-
-| Parametr (safe mode) | Wartość |
-|----------------------|---------|
-| Równoległość | 8 połączeń |
-| Porty (szybki skan) | 9 web + 2 host (zamiast ~50) |
-| Max hostów | 64 |
-| Timeout skanu | 300 s |
+| Parametr (safe mode v1.3.110) | Wartość |
+|-------------------------------|---------|
+| Równoległość | 4 połączenia |
+| Max hostów / chunk | 32 |
+| Skan /24 w safe mode | max 2× `/28` (okolica .144 w /24) |
+| Timeout skanu | 240 s |
 | Pełny skan | wyłączony |
+| UI polling | 3 s + backoff, bez pełnego reload dashboardu |
 
-**Odzyskiwanie po crashu:** wyłącz zasilanie QNAP na 30 s → włącz → Container Station → upewnij się, że NetDash ma obraz **1.3.97+** → Pull → Restart → skanuj tylko z **Serwisy** (nie Pulpit).
+**Odzyskiwanie po crashu QNAP:**
+
+1. Wyłącz zasilanie QNAP (przycisk zasilania lub odłącz) na **30–60 s**
+2. Włącz — poczekaj aż QTS wstanie (5–10 min)
+3. **Container Station** → NetDash → **Pull** obraz `1.3.110` → ustaw **Memory limit 768 MB** → **Restart**
+4. Ustaw `NETDASH_SCAN_CIDR` na `/28` wokół IP NAS (np. `192.168.1.144/28` dla `.150`)
+5. Skan tylko z **Serwisy** → **Skanuj sieć** (nie pełny /24 bez RAM limit)
 
 ---
 

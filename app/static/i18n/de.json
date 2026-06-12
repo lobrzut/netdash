@@ -429,6 +429,7 @@
   "scan.error.sessionExpired": "Sitzung abgelaufen — erneut anmelden und Scan starten.",
   "scan.error.server": "Server hat den Scan abgelehnt (Fehler {status}). Container-Logs prüfen.",
   "scan.error.pollFailed": "Verbindung zum Scan verloren — Container-Logs prüfen und erneut versuchen.",
+  "scan.error.pollRetry": "Scan läuft — Server antwortet nicht (Versuch {n}/{max}). Warte auf Container…",
   "app.titleSuffix": "Netzwerk-Dashboard",
   "error.unknown": "unbekannter Fehler",
   "error.serverHealth": "Server antwortet nicht korrekt",

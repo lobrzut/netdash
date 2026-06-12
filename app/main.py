@@ -35,6 +35,7 @@ from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.url_utils import sanitize_service_url
 from app.scanner import (
+    expand_cidrs_for_safe_mode,
     DiscoveredService,
     ScanError,
     _fallback_service_name,
@@ -435,6 +436,10 @@ async def _cancel_stale_scan_jobs() -> None:
         logger.info("Marked %s stale scan job(s) as failed after restart", len(jobs))
 
 
+def _scan_in_progress() -> bool:
+    return any(not t.done() for t in scan_tasks.values())
+
+
 async def _health_check_loop():
     interval = 60
     while True:
@@ -443,7 +448,7 @@ async def _health_check_loop():
                 settings_row = await _get_or_create_settings(db)
                 interval = max(15, min(900, settings_row.health_check_interval or 60))
                 enabled = settings_row.health_check_enabled
-            if enabled:
+            if enabled and not _scan_in_progress():
                 async with async_session() as db:
                     count = await check_all_services(db)
                     logger.info("Health check completed for %s services", count)
@@ -1365,7 +1370,8 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
             local_key = await _upsert_service(build_local_host_service())
             seen_keys.add(local_key)
         await _finalize_scan(seen_keys)
-        await enrich_mac_addresses()
+        if not settings.scan_safe_mode:
+            await enrich_mac_addresses()
         await enrich_all_services()
         async with async_session() as db:
             result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
@@ -1487,6 +1493,8 @@ async def start_scan(
         quick_scan = settings.scan_safe_mode or docker_br
     if full_scan:
         quick_scan = False
+    if settings.scan_safe_mode:
+        quick_scan = True
 
     app_settings = await _get_or_create_settings(db)
     try:
@@ -1512,7 +1520,12 @@ async def start_scan(
             detail="Nie podano sieci do skanowania — ustaw CIDR w Ustawienia → Skanowanie lub NETDASH_SCAN_CIDR.",
         )
 
-    cidr_label = format_cidr_list(cidrs)
+    requested_label = format_cidr_list(cidrs)
+    scan_cidrs = expand_cidrs_for_safe_mode(cidrs)
+    cidr_label = format_cidr_list(scan_cidrs)
+    safe_narrowed = settings.scan_safe_mode and cidr_label != requested_label
+    if safe_narrowed:
+        logger.info("Safe mode narrowed scan CIDR %s → %s", requested_label, cidr_label)
     ping_ok = await icmp_ping_available()
     if ping_ok:
         logger.info(
@@ -1537,16 +1550,24 @@ async def start_scan(
         )
 
     job = ScanJob(cidr=cidr_label, status="pending")
+    job_notes: list[str] = []
     if not ping_ok:
-        job.error_message = (
+        job_notes.append(
             "Ping ICMP niedostępny na tym hoście (typowe w Dockerze) — skan użyje TCP. "
             "Upewnij się, że NETDASH_SCAN_CIDR jest poprawny i compose ma cap_add: NET_RAW."
         )
+    if safe_narrowed:
+        job_notes.append(
+            f"Tryb bezpieczny: skan ograniczony z {requested_label} do {cidr_label}. "
+            "Ustaw węższy CIDR (/28) lub limit RAM 768 MB+ przed pełnym /24."
+        )
+    if job_notes:
+        job.error_message = " ".join(job_notes)
     db.add(job)
     await db.commit()
     await db.refresh(job)
 
-    task = asyncio.create_task(_run_scan(job.id, cidrs, full_scan, quick_scan))
+    task = asyncio.create_task(_run_scan(job.id, scan_cidrs, full_scan, quick_scan))
 
     def _log_scan_task_result(t: asyncio.Task) -> None:
         scan_tasks.pop(job.id, None)

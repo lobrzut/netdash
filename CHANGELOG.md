@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.110
+
+- **Fix krytyczny QNAP OOM**: bez limitu RAM skan `/24` może crashować cały NAS. Compose QNAP: `mem_limit: 768m`, domyślne CIDR `192.168.1.144/28`, ostrzeżenia w README.
+- **Safe mode agresywniejszy**: równoległość 4, batch 8, max 32 hosty, identify 3, timeout 240 s; `/24` → max 2× `/28` (kotwica DHCP ~.144); wymuszony `quick_scan`.
+- **Backend**: health-check w tle wstrzymany podczas skanu; pominięcie ARP enrich po skanie w safe mode.
+- **UI skanu**: polling 3 s + backoff (do 10 prób), `loadServices()` zamiast `loadDashboard()`, brak czerwonego banera połączenia przy chwilowej utracie kontenera; health polling wstrzymany w trakcie skanu.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.110`.
+
 ## v1.3.109
 
 - **NUCLEAR — jeden klik „Skanuj sieć”**: `#scan-btn` i `#empty-scan-btn` od razu wołają `oneClickScan()` → `POST /api/scan` (bez modala CIDR i bez confirm). CIDR: Ustawienia → `scan_cidr_default` → `NETDASH_SCAN_CIDR` (`env_scan_cidr`) → `192.168.1.0/24`. Toast „Skan uruchomiony: {cidr}”, pasek postępu natychmiast.
