@@ -133,6 +133,54 @@ Skopiuj do `/share/Container/netdash/` przez File Station, potem **Import** → 
 
 ---
 
+## Rozwiązywanie problemów (QNAP / Container Station)
+
+### Crash loop: `Errno 98` / „Address already in use” na porcie 8787
+
+**Przyczyna:** port **8787** jest zajęty (często **Readarr** na tym samym QNAP). Stary compose lub ręczny import mógł uruchomić NetDash na 8787 — kontener startuje, pada, Container Station go restartuje w kółko.
+
+**Naprawa (kolejność):**
+
+1. **Container Station** → **Applications** — zostaw **jedną** aplikację `netdash`. Usuń duplikaty (np. `netdash-1`, drugi import tego samego compose).
+2. **Containers** — zatrzymaj i usuń **wszystkie** kontenery o nazwie `netdash` (zostaw Readarr w spokoju).
+3. Edytuj aplikację → **Environment**:
+   - ustaw `NETDASH_PORT=18787` (lub usuń zmienną — domyślnie 18787 w obrazie ≥1.3.73),
+   - **usuń** `NETDASH_PORT=8787` jeśli było.
+4. **Pull** najnowszy obraz `ghcr.io/lobrzut/netdash:latest` → **Start**.
+5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,...}`.
+
+Jeśli nadal błąd — przez SSH na QNAP:
+
+```bash
+# kto trzyma port (Readarr vs stary NetDash)
+ss -tlnp | grep -E '8787|18787'
+docker ps -a --filter name=netdash
+docker rm -f netdash   # tylko gdy CS nie usuwa
+```
+
+### Duplikat aplikacji w Container Station
+
+Import compose **dwa razy** tworzy dwie aplikacje z tym samym `container_name: netdash` — druga instancja nie wstanie lub będzie walczyć o port.
+
+- Zostaw **jedną** aplikację.
+- **Delete Application** przy duplikacie (opcjonalnie: zaznacz „Remove containers”).
+- Ponowny import: jeden URL compose, nazwa `netdash`.
+
+### Stary obraz GHCR (wciąż nasłuchuje na 8787)
+
+Compose z `NETDASH_PORT` działa dopiero z obrazem **≥ v1.3.73**. W CS: **Stop** → **Pull** → **Start**. W logach kontenera powinno być `Uvicorn running on http://0.0.0.0:18787`.
+
+### Jedna instancja — podsumowanie
+
+| Element | Ile |
+|---------|-----|
+| Aplikacja CS `netdash` | **1** |
+| Kontener `netdash` | **1** |
+| Port hosta | **18787** (nie 8787 przy Readarr) |
+| Watchtower | 0 lub 1 (`netdash-watchtower`) |
+
+---
+
 ## Więcej szczegółów
 
 - Pełny przewodnik (Watchtower, docker.sock, GitHub Actions): [`docs/QNAP.md`](../../docs/QNAP.md)
