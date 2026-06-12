@@ -2079,20 +2079,6 @@ body.modal-open {
   display: block;
 }
 
-.home-scan-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.75rem;
-}
-
-#dashboard-view[data-page="services"] .home-scan-row {
-  display: none;
-}
-
-.btn-scan-home {
-  gap: 0.5rem;
-}
-
 .scan-config-warning:not(.hidden) {
   display: block;
 }

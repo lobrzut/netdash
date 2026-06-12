@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.92
+
+- **Skan (UI)**: usunięty przycisk „Skanuj sieć” z Pulpitu (`#scan-btn-home`); skan jednym kliknięciem tylko na zakładce Serwisy (`#scan-btn`, `#empty-scan-btn`) — `POST /api/scan` + pasek postępu.
+- **Fix**: nagłówek Serwisów otwierał modal zamiast startować skan (regresja v1.3.91).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.92`.
+
 ## v1.3.91
 
 - **Fix sesji QNAP (F5) — root cause**: v1.3.89+ nie czytał tokena z localStorage przy starcie, a cookie `netdash_session` czasem nie wraca na HTTP — boot teraz próbuje cookie, potem Bearer z localStorage; `/api/auth/me` odświeża cookie przy sukcesie.

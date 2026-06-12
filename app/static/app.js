@@ -3288,7 +3288,7 @@ function resolveScanCidrInput() {
 }
 
 function setScanControlsDisabled(disabled) {
-  ['#scan-btn', '#scan-btn-home', '#empty-scan-btn', '#scan-start'].forEach((sel) => {
+  ['#scan-btn', '#empty-scan-btn', '#scan-start'].forEach((sel) => {
     const el = $(sel);
     if (el) el.disabled = disabled;
   });
@@ -3375,19 +3375,13 @@ function bindScanUi() {
       void startScan(resolveScanCidrInput(), fullScan);
       return;
     }
-    const quickScanBtn = e.target.closest('#scan-btn-home, #empty-scan-btn');
+    const quickScanBtn = e.target.closest('#scan-btn, #empty-scan-btn');
     if (quickScanBtn) {
       e.preventDefault();
       if (quickScanBtn.disabled) return;
       const fullScan = appSettings?.full_scan_default ?? $('#full-scan')?.checked ?? false;
       void startScan(resolveScanCidrInput(), fullScan);
       return;
-    }
-    const openBtn = e.target.closest('#scan-btn');
-    if (openBtn) {
-      e.preventDefault();
-      if (openBtn.disabled) return;
-      openScanModal();
     }
   });
   $('#scan-cancel')?.addEventListener('click', () => closeModal('scan-modal'));
