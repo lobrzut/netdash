@@ -581,6 +581,12 @@ async def index():
     )
 
 
+def _watchtower_poll_hours() -> int | None:
+    if not settings.watchtower_enabled:
+        return None
+    return max(1, round(settings.watchtower_poll_interval / 3600))
+
+
 @app.get("/api/health")
 async def health(db: AsyncSession = Depends(get_db)):
     app_settings = await _get_or_create_settings(db)
@@ -591,6 +597,8 @@ async def health(db: AsyncSession = Depends(get_db)):
         "github": GITHUB_REPO,
         "ghcr_image": GHCR_IMAGE,
         "update_apply_available": update_apply_available(),
+        "watchtower_enabled": settings.watchtower_enabled,
+        "watchtower_poll_hours": _watchtower_poll_hours(),
         "admin_ready": await _admin_ready(db),
         "admin_user": settings.default_admin_user,
         "sync_admin_password": settings.sync_admin_password,
@@ -621,6 +629,8 @@ async def check_updates(_: User = Depends(get_current_user)):
         current_version=current,
         github_repo=GITHUB_REPO,
         update_apply_available=update_apply_available(),
+        watchtower_enabled=settings.watchtower_enabled,
+        watchtower_poll_hours=_watchtower_poll_hours(),
     )
     try:
         release = await fetch_latest_release()

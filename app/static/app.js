@@ -351,6 +351,8 @@ function authorInitials(name) {
 
 let lastUpdateCheck = null;
 let updateApplyAvailable = false;
+let watchtowerEnabled = false;
+let watchtowerPollHours = 1;
 let updateInProgress = false;
 let updatePollTimer = null;
 const UPDATE_POLL_MS = 2500;
@@ -434,12 +436,21 @@ function renderUpdateCheckUI(data) {
   }
 
   const canApply = data.update_apply_available || updateApplyAvailable;
+  if (data.watchtower_enabled) {
+    watchtowerEnabled = true;
+    if (data.watchtower_poll_hours) watchtowerPollHours = data.watchtower_poll_hours;
+  }
   if (applyBtn && data.update_available) {
     applyBtn.hidden = false;
     applyBtn.disabled = updateInProgress;
   }
   if (applyHintEl && data.update_available && !canApply) {
     applyHintEl.hidden = false;
+    if (watchtowerEnabled) {
+      applyHintEl.textContent = t('about.updates.applyWatchtower', { hours: watchtowerPollHours });
+    } else {
+      applyHintEl.textContent = t('about.updates.applyUnavailable');
+    }
   }
 }
 
@@ -476,6 +487,7 @@ function showUpdateView(viewId) {
     confirm: 'about.updates.modal.confirmTitle',
     progress: 'about.updates.modal.progressTitle',
     manual: 'about.updates.modal.manualTitle',
+    watchtower: 'about.updates.modal.watchtowerTitle',
     result: 'about.updates.modal.resultTitle',
   };
   const titleEl = $('#update-modal-title');
@@ -546,6 +558,22 @@ function startUpdateHealthPoll(startVersion, targetVersion, onSuccess, onFailure
   }, UPDATE_POLL_MS);
 }
 
+function openUpdateWatchtowerModal() {
+  const target = lastUpdateCheck?.latest_version;
+  const introEl = $('#update-view-watchtower .update-watchtower-primary');
+  if (introEl) {
+    introEl.textContent = t('about.updates.modal.watchtowerIntro', { hours: watchtowerPollHours });
+  }
+  const verEl = $('#update-watchtower-version');
+  if (verEl) {
+    verEl.textContent = target
+      ? t('about.updates.modal.targetVersion', { version: formatVersion(target) })
+      : '';
+  }
+  showUpdateView('watchtower');
+  openModal('update-modal');
+}
+
 function openUpdateManualModal() {
   const target = lastUpdateCheck?.latest_version;
   const verEl = $('#update-manual-version');
@@ -580,9 +608,9 @@ function showUpdateResult(success, message, showReload = false) {
 }
 
 async function recheckUpdateFromModal() {
-  const recheckBtn = $('#update-manual-recheck');
+  const recheckBtn = $('#update-manual-recheck') || $('#update-watchtower-recheck');
   if (recheckBtn) recheckBtn.disabled = true;
-  const verEl = $('#update-manual-version');
+  const verEl = $('#update-manual-version') || $('#update-watchtower-version');
   if (verEl) verEl.textContent = t('about.updates.modal.checkingVersion');
   try {
     const data = await checkForUpdates({ silent: true });
@@ -609,6 +637,10 @@ async function checkForUpdates({ silent = false } = {}) {
     const data = await api('/api/updates/check');
     lastUpdateCheck = data;
     updateApplyAvailable = Boolean(data.update_apply_available);
+    if (data.watchtower_enabled) {
+      watchtowerEnabled = true;
+      if (data.watchtower_poll_hours) watchtowerPollHours = data.watchtower_poll_hours;
+    }
     renderUpdateCheckUI(data);
     if (!silent) {
       if (data.error) showToast(data.error, 'error');
@@ -634,7 +666,8 @@ async function applyNetDashUpdate() {
     if (!lastUpdateCheck?.update_available) return;
   }
   if (!isUpdateApplyAvailable()) {
-    openUpdateManualModal();
+    if (watchtowerEnabled) openUpdateWatchtowerModal();
+    else openUpdateManualModal();
     return;
   }
   openUpdateConfirmModal();
@@ -718,6 +751,10 @@ async function checkServerHealth() {
     buildDate = data.build_date || null;
     if (data.github) githubRepo = data.github;
     if (data.update_apply_available) updateApplyAvailable = true;
+    if (data.watchtower_enabled) {
+      watchtowerEnabled = true;
+      if (data.watchtower_poll_hours) watchtowerPollHours = data.watchtower_poll_hours;
+    }
     applyVersionDisplay();
     $('#login-error').classList.add('hidden');
     return data;
@@ -4202,6 +4239,8 @@ $('#update-confirm-cancel')?.addEventListener('click', () => closeModal('update-
 $('#update-confirm-ok')?.addEventListener('click', () => executeNetDashUpdate());
 $('#update-manual-close')?.addEventListener('click', () => closeModal('update-modal'));
 $('#update-manual-recheck')?.addEventListener('click', () => recheckUpdateFromModal());
+$('#update-watchtower-close')?.addEventListener('click', () => closeModal('update-modal'));
+$('#update-watchtower-recheck')?.addEventListener('click', () => recheckUpdateFromModal());
 $('#update-result-close')?.addEventListener('click', () => closeModal('update-modal'));
 $('#update-result-reload')?.addEventListener('click', () => location.reload());
 $('#logout-btn').addEventListener('click', logout);

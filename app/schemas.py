@@ -498,6 +498,8 @@ class UpdateCheckOut(BaseModel):
     published_at: str | None = None
     github_repo: str
     update_apply_available: bool = False
+    watchtower_enabled: bool = False
+    watchtower_poll_hours: int | None = None
     error: str | None = None
 
 

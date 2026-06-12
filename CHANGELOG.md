@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.124
+
+- **QNAP one-shot deploy**: `docker-compose.full.yml` — jedyny plik do importu; komentarz Import raz, nie edytuj YAML. Obraz `:latest`, Watchtower co 1 h, wszystkie env w środku.
+- **Portal — modal aktualizacji**: przy `NETDASH_WATCHTOWER_ENABLED=true` komunikat Aktualizacja automatyczna przez Watchtower (co ~1 h); instrukcja ręczna schowana w details.
+- **README QNAP**: uproszczony do 3 kroków (import URL, start, gotowe); CIDR zmieniasz w Ustawienia → Skanowanie (SQLite), nie w compose.
+- **CI**: bez zmian — workflow publikuje `:latest` oraz `:VERSION` przy każdym tagu `v*`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.124`.
+
 ## v1.3.123
 
 - **Fix wolny start QNAP (153+ serwisów)**: `init_db()` nie blokuje już startu na `enrich_mac_addresses()` / `enrich_all_services()` (ping/ARP dla każdego hosta) — portal gotowy w kilka sekund, enrich w tle.

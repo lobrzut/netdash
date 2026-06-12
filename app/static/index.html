@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.123" />
-  <script src="/static/i18n.js?v=1.3.123"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.124" />
+  <script src="/static/i18n.js?v=1.3.124"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -764,6 +764,19 @@ sol --udp-port 9
         <p id="update-progress-status" class="hint" data-i18n="about.updates.modal.checkingVersion">Sprawdzam wersję…</p>
       </div>
 
+      <div id="update-view-watchtower" class="update-view hidden">
+        <p class="modal-desc update-watchtower-primary" data-i18n="about.updates.modal.watchtowerIntro">Aktualizacja automatyczna przez Watchtower (co ~1 h). Nie musisz robić Pull ani edytować YAML.</p>
+        <p id="update-watchtower-version" class="hint"></p>
+        <details class="update-watchtower-fallback">
+          <summary data-i18n="about.updates.modal.watchtowerFallbackSummary">Ręczna aktualizacja (gdy Watchtower wyłączony)</summary>
+          <p class="hint" data-i18n="about.updates.modal.watchtowerFallbackBody">Container Station → Pull obrazu → Restart kontenera. Aktualizacja z portalu wymaga docker.sock — na QNAP niedostępne.</p>
+        </details>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="update-watchtower-close" data-i18n="modal.close">Zamknij</button>
+          <button type="button" class="btn btn-accent" id="update-watchtower-recheck" data-i18n="about.updates.modal.recheckBtn">Sprawdź ponownie</button>
+        </div>
+      </div>
+
       <div id="update-view-manual" class="update-view hidden">
         <p class="modal-desc" data-i18n="about.updates.modal.manualIntro">Aktualizacja z portalu wymaga docker.sock na hoście. Na QNAP zaktualizuj obraz ręcznie:</p>
         <ol class="update-manual-steps">
@@ -1223,6 +1236,6 @@ sol --udp-port 9
       }
     })();
   </script>
-  <script src="/static/app.js?v=1.3.123"></script>
+  <script src="/static/app.js?v=1.3.124"></script>
 </body>
 </html>

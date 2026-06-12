@@ -1,12 +1,17 @@
 # NetDash + Watchtower — QNAP Container Station
-# Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
+# Import raz — auto-update przez Watchtower. NIE edytuj YAML na QNAP (CS nie pozwala).
+# Jedyny plik do importu: wszystkie env, discovery, Watchtower — gotowe od pierwszego Start.
 #
-# Discovery: Adaptive tiered (ping → ARP → light ports) — network_mode: host.
-# Limity RAM/CPU — ustaw ręcznie w Container Station → Resource (512 MB, 50% CPU).
+# Import URL:
+#   https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
+#
+# Po imporcie: Start → http://<IP-QNAP>:18787 → admin/changeme → Ustawienia (CIDR, hasło).
+# Aktualizacje: Watchtower co 1 h pobiera :latest z GHCR i restartuje NetDash.
+# Obraz :latest (nie semver) — Watchtower porównuje digest tagu; pin 1.3.x nie auto-aktualizuje.
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.123
+    image: ghcr.io/lobrzut/netdash:latest
     container_name: netdash
     restart: always
     network_mode: host
@@ -21,11 +26,12 @@ services:
       NETDASH_ARP_EXTRA_HOSTS: "192.168.1.200,192.168.1.201"
       NETDASH_SCAN_SAFE_MODE: "true"
       NETDASH_DISCOVERY_PORT_PROBE: "true"
-      # Portal ready in ~5s; health + discovery run in background after boot
       NETDASH_STARTUP_HEALTH_DEFER: "true"
       NETDASH_DISCOVERY_STARTUP_DELAY: "60"
       NETDASH_COOKIE_SECURE: "false"
       NETDASH_LISTEN_PORT: "18787"
+      NETDASH_WATCHTOWER_ENABLED: "true"
+      NETDASH_WATCHTOWER_POLL_INTERVAL: "3600"
     volumes:
       - /share/Container/netdash/data:/app/data
     cap_add:
@@ -38,7 +44,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      # Portal responds in ~5-10s; 90s grace for slow QNAP + deferred health/discovery
       start_period: 90s
 
   watchtower:
@@ -48,7 +53,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      WATCHTOWER_POLL_INTERVAL: "86400"
+      WATCHTOWER_POLL_INTERVAL: "3600"
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_INCLUDE_RESTARTING: "true"

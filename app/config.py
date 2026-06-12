@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.123"
+VERSION = "1.3.124"
 DEFAULT_LISTEN_PORT = 18787
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -165,6 +165,9 @@ class Settings(BaseSettings):
     docker_image_tag: str = "latest"
     container_name: str = "netdash"
     docker_socket: str = "/var/run/docker.sock"
+    # QNAP compose.full.yml sets this so the portal can show Watchtower auto-update status
+    watchtower_enabled: bool = False
+    watchtower_poll_interval: int = 3600
 
     class Config:
         env_prefix = "NETDASH_"

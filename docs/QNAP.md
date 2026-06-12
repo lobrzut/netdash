@@ -28,7 +28,7 @@ flowchart LR
 |---------|------|
 | **GitHub Actions** | Po tagu `v*` buduje obraz i publikuje na GHCR |
 | **GHCR** | Gotowy obraz — bez `git` na QNAP |
-| **Watchtower** (`docker-compose.full.yml` lub profil `auto-update`) | Co 24 h pobiera `:latest` z GHCR i restartuje NetDash (tylko z etykietą) |
+| **Watchtower** (`docker-compose.full.yml` lub profil `auto-update`) | Co 1 h pobiera `:latest` z GHCR i restartuje NetDash (tylko z etykietą) |
 | **Portal NetDash** | Ustawienia → O projekcie → **Sprawdź aktualizacje** (GitHub API) |
 | **Aktualizuj teraz** (opcjonalnie) | Wymaga montowania `docker.sock` — tylko dla zaawansowanych |
 
@@ -128,9 +128,9 @@ Import URL:
 https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
 ```
 
-Dwa kontenery: `netdash` + `netdash-watchtower`. Obraz NetDash: **`ghcr.io/lobrzut/netdash:latest`** (od v1.3.82). Sprawdzanie co **24 h**. Tylko kontenery z etykietą `com.centurylinklabs.watchtower.enable=true`.
+Dwa kontenery: `netdash` + `netdash-watchtower`. Obraz NetDash: **`ghcr.io/lobrzut/netdash:latest`** (od v1.3.124 w full.yml). Sprawdzanie co **1 h** (`WATCHTOWER_POLL_INTERVAL=3600`). Tylko kontenery z etykietą `com.centurylinklabs.watchtower.enable=true`.
 
-> **Częsty błąd:** compose z tagiem `1.3.79` — Watchtower pobiera `:latest`, ale recreate używa starego tagu z compose → wersja się nie zmienia. Użyj `:latest` w full.yml lub ręczny Pull.
+> **Częsty błąd:** compose z tagiem semver `1.3.x` — Watchtower porównuje digest *tego samego* tagu; nowy release `1.3.(x+1)` nie aktualizuje się automatycznie. Użyj `:latest` w full.yml lub ręczny Pull semver.
 
 ### Metoda 2 — profil auto-update (SSH)
 
@@ -143,8 +143,10 @@ docker compose --profile auto-update up -d
 Zmienne (opcjonalnie w `.env`):
 
 ```env
-WATCHTOWER_POLL_INTERVAL=86400
+WATCHTOWER_POLL_INTERVAL=3600
 ```
+
+(86400 = 24 h — wolniejszy cykl)
 
 ### Ręczne jednorazowe odświeżenie (bez czekania)
 
@@ -184,7 +186,7 @@ W **Ustawienia → O projekcie**:
 - Link **Changelog** — strona release na GitHub
 - Status: „Masz najnowszą wersję” lub „Dostępna vX.Y.Z”
 
-Nie pobiera ani nie restartuje kontenera — tylko informuje. Gdy wersja na GitHub jest nowsza, a przycisk **Aktualizuj teraz** się nie pojawia, na QNAP brakuje zwykle `docker.sock` — użyj Watchtower lub Pull w Container Station. Do faktycznej aktualizacji użyj Watchtower lub `docker compose pull`.
+Nie pobiera ani nie restartuje kontenera — tylko informuje. Gdy wersja na GitHub jest nowsza, a przycisk **Aktualizuj teraz** otwiera modal Watchtower (gdy `NETDASH_WATCHTOWER_ENABLED=true` w compose.full) lub instrukcję ręcznego Pull. Samo-aktualizacja z wnętrza kontenera bez `docker.sock` jest niemożliwa — Watchtower na hoście **jest** mechanizmem auto-update.
 
 ---
 
