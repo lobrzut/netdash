@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.73"
+VERSION = "1.3.74"
 DEFAULT_PORT = 18787
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
 GHCR_IMAGE = "ghcr.io/lobrzut/netdash"

@@ -21,6 +21,6 @@ ENV NETDASH_PORT=18787
 EXPOSE 18787
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD-SHELL curl -f "http://127.0.0.1:$${NETDASH_PORT:-18787}/api/health" || exit 1
+  CMD sh -c 'curl -f "http://127.0.0.1:${NETDASH_PORT:-18787}/api/health" || exit 1'
 
 CMD ["python", "run.py"]

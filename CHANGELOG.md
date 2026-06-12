@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.74
+
+- **Fix**: składnia `HEALTHCHECK` w Dockerfile (`CMD-SHELL` → `CMD sh -c`) — blokowała build obrazu GHCR.
+
 ## v1.3.73
 
 - **Domyślny port 18787** (`NETDASH_PORT`): unika kolizji z **Readarr (8787)** i typowymi portami homelab (80, 443, 3000, 5000, 8080, 8096, 8989…). Wszystkie compose, healthchecki i `run.py` respektują zmienną środowiskową.
