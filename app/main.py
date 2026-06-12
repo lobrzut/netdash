@@ -735,7 +735,21 @@ async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
     settings_cidr = app_settings.scan_cidr_default or None
     scan_ready = bool(resolved) and (not docker_br or bool(env_cidr or settings_cidr))
     hints: list[str] = []
-    if settings.arp_discovery_enabled:
+    if settings.adaptive_discovery_enabled:
+        disc = get_discovery_pipeline_status()
+        line = disc.get("last_status_line")
+        if line:
+            hints.append(f"Discovery adaptacyjne — {line}. Pełny skan TCP tylko w Opcje skanu.")
+        elif disc.get("current_tier"):
+            hints.append(
+                f"Discovery adaptacyjne — cykl w toku (tier: {disc.get('current_tier')}, profil: {disc.get('profile')})."
+            )
+        else:
+            hints.append(
+                "Discovery adaptacyjne — pierwszy cykl w toku (ping → ARP → lekki skan portów). "
+                "Wymaga network_mode: host i cap_add: NET_RAW."
+            )
+    elif settings.arp_discovery_enabled:
         arp = get_arp_discovery_status()
         if arp.get("last_cycle_at"):
             hints.append(
@@ -1797,6 +1811,30 @@ async def sleep_service(
             raise HTTPException(status_code=500, detail=f"Nie udało się wysłać pakietu SOL: {exc}") from exc
 
     return PowerActionResult(ok=sent, action="sleep", message=f"Wysłano pakiet Sleep-on-LAN do {mac}")
+
+
+@app.post("/api/discovery/cycle")
+async def trigger_discovery_cycle(_: User = Depends(get_current_user)):
+    """Manual trigger for adaptive discovery cycle (admin/debug)."""
+    if not settings.adaptive_discovery_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Adaptive discovery nieaktywne — ustaw NETDASH_DISCOVERY_MODE=adaptive",
+        )
+    try:
+        count = await run_discovery_cycle()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"ok": True, "hosts": count, **get_discovery_pipeline_status()}
+
+
+@app.get("/api/discovery/status")
+async def discovery_status(_: User = Depends(get_current_user)):
+    if settings.adaptive_discovery_enabled:
+        return get_discovery_pipeline_status()
+    if settings.arp_discovery_enabled:
+        return get_arp_discovery_status()
+    return {"enabled": False, "mode": settings.effective_discovery_mode}
 
 
 @app.post("/api/discovery/arp-cycle")

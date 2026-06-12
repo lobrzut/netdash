@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.120
+
+- **Adaptive Tiered Discovery** (`NETDASH_DISCOVERY_MODE=adaptive` — nowy domyślny tryb QNAP): jeden scheduler koordynuje ping → ARP → lekki skan portów. Ping zawsze pierwszy (ICMP lub TCP :80), ARP tylko dla MAC / hostów bez ping, porty tylko dla nowych lub nieaktualnych (>24 h).
+- **Profile sprzętowe** (`NETDASH_DISCOVERY_PROFILE=auto|weak|normal|strong`): QNAP/słabe maszyny — interwał 300 s, 8 równoległych pingów, 1 host na raz przy portach, rotacja /28 zamiast floodu /24. Mocne — krótsze interwały, 32 pingi, 4 porty równolegle.
+- **ARP auto-skip**: gdy `arp-scan` zwraca 0 hostów 3× z rzędu — discovery opiera się na ping (bez masowego offline).
+- **UI**: pasek statusu „Discovery: ping 42 → arp +12 MAC → 3 nowe porty (profil: weak)”.
+- **API**: `GET /api/discovery/status`, `POST /api/discovery/cycle`. Legacy `arp` i `remote` bez zmian.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.120`.
+
 ## v1.3.119
 
 - **Fix: serwisy OFFLINE mimo HTTP 200**: status online/offline usług HTTP/TCP pochodzi wyłącznie z health checkera (`NETDASH_HEALTH_INTERVAL`, domyślnie 120 s na QNAP). ARP discovery i `mark_missing_offline` aktualizują tylko wpisy host-only (`protocol=host`, port 0) — nie nadpisują `is_online` na portach 3000/8000 itd.

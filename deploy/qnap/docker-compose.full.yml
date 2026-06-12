@@ -1,12 +1,12 @@
 # NetDash + Watchtower — QNAP Container Station
 # Import URL: https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
 #
-# Discovery: ARP na NAS (WatchYourLAN-style) — network_mode: host + arp-scan.
+# Discovery: Adaptive tiered (ping → ARP → light ports) — network_mode: host.
 # Limity RAM/CPU — ustaw ręcznie w Container Station → Resource (512 MB, 50% CPU).
 
 services:
   netdash:
-    image: ghcr.io/lobrzut/netdash:1.3.119
+    image: ghcr.io/lobrzut/netdash:1.3.120
     container_name: netdash
     restart: always
     network_mode: host
@@ -14,11 +14,13 @@ services:
       NETDASH_DEFAULT_ADMIN_USER: admin
       NETDASH_DEFAULT_ADMIN_PASSWORD: changeme
       NETDASH_SYNC_ADMIN_PASSWORD: "false"
-      NETDASH_DISCOVERY_MODE: "arp"
+      NETDASH_DISCOVERY_MODE: "adaptive"
+      NETDASH_DISCOVERY_PROFILE: "auto"
       NETDASH_SCAN_CIDR: "192.168.1.0/24"
-      NETDASH_ARP_INTERVAL: "300"
+      NETDASH_DISCOVERY_INTERVAL: "300"
+      NETDASH_ARP_EXTRA_HOSTS: "192.168.1.200,192.168.1.201"
       NETDASH_SCAN_SAFE_MODE: "true"
-      NETDASH_ARP_PROBE_NEW_HOSTS: "true"
+      NETDASH_DISCOVERY_PORT_PROBE: "true"
       NETDASH_COOKIE_SECURE: "false"
       NETDASH_LISTEN_PORT: "18787"
     volumes:

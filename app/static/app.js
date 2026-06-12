@@ -1003,12 +1003,21 @@ const DEFAULT_NETWORK = Object.freeze({
   discovery_last_import_source: null,
   discovery_last_import_hosts: null,
   discovery_mode: 'local',
+  discovery_profile: null,
+  discovery_status_line: null,
+  discovery_current_tier: null,
+  discovery_interval_sec: null,
   arp_interval_sec: null,
   arp_last_cycle_at: null,
   arp_last_cycle_hosts: null,
 });
 
 const DISCOVERY_STALE_MS = 20 * 60 * 1000;
+
+function isAdaptiveDiscovery(netRes) {
+  const net = resolveNetwork(netRes);
+  return net.discovery_mode === 'adaptive' && net.scan_disabled !== true;
+}
 
 function isArpDiscovery(netRes) {
   const net = resolveNetwork(netRes);
@@ -1021,7 +1030,7 @@ function isRemoteDiscovery(netRes) {
 }
 
 function isAutoDiscovery(netRes) {
-  return isArpDiscovery(netRes) || isRemoteDiscovery(netRes);
+  return isAdaptiveDiscovery(netRes) || isArpDiscovery(netRes) || isRemoteDiscovery(netRes);
 }
 
 function formatRelativeAgo(when) {
@@ -1054,6 +1063,19 @@ function getArpDiscoveryMeta(netRes) {
 }
 
 function formatDiscoveryStatusLine(netRes, settings) {
+  if (isAdaptiveDiscovery(netRes)) {
+    const net = resolveNetwork(netRes);
+    if (net.discovery_status_line) {
+      return `Discovery: ${net.discovery_status_line}`;
+    }
+    if (net.discovery_current_tier) {
+      return t('discovery.adaptiveRunning', {
+        tier: net.discovery_current_tier,
+        profile: net.discovery_profile || 'auto',
+      });
+    }
+    return t('discovery.adaptiveWaiting');
+  }
   if (isArpDiscovery(netRes)) {
     const { when, hosts } = getArpDiscoveryMeta(netRes);
     if (!when) return t('discovery.arpWaiting');
@@ -1094,7 +1116,7 @@ function updateDiscoveryStatusBar(netRes, settings) {
   bar.classList.remove('hidden');
   bar.classList.toggle('discovery-status-bar--ok', !!when);
   bar.classList.toggle('discovery-status-bar--wait', !when);
-  bar.classList.toggle('discovery-status-bar--info', isArpDiscovery(netRes));
+  bar.classList.toggle('discovery-status-bar--info', isArpDiscovery(netRes) || isAdaptiveDiscovery(netRes));
 }
 
 function updateDiscoverySettingsPanel(netRes, settings) {
@@ -1106,7 +1128,7 @@ function updateDiscoverySettingsPanel(netRes, settings) {
   const line = formatDiscoveryStatusLine(netRes, settings);
   if (detail) detail.textContent = line;
   if (cmd) cmd.textContent = buildDiscoveryInstallCommand();
-  if (arpIntro) arpIntro.classList.toggle('hidden', !isArpDiscovery(netRes));
+  if (arpIntro) arpIntro.classList.toggle('hidden', !isArpDiscovery(netRes) && !isAdaptiveDiscovery(netRes));
   if (card) {
     const when = isArpDiscovery(netRes)
       ? getArpDiscoveryMeta(netRes).when
@@ -1119,6 +1141,7 @@ function updateRemoteDiscoveryUI(netRes, settings) {
   try {
     const remote = isRemoteDiscovery(netRes);
     const arp = isArpDiscovery(netRes);
+    const adaptive = isAdaptiveDiscovery(netRes);
     const auto = isAutoDiscovery(netRes);
     document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
     $('#scan-btn')?.classList.toggle('hidden', auto);
@@ -1147,8 +1170,9 @@ function isLocalScanDisabled(netRes) {
 function updateScanButtonsState(netRes) {
   const remote = isRemoteDiscovery(netRes);
   const arp = isArpDiscovery(netRes);
+  const adaptive = isAdaptiveDiscovery(netRes);
   $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !remote);
-  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp);
+  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp && !adaptive);
   $('#settings-scan-profile-card')?.classList.toggle('hidden', remote);
   if (remote) {
     ['#scan-btn', '#empty-scan-btn', '#scan-start', '#scan-options-btn', '#empty-scan-options-btn', '#scan-test-btn'].forEach((sel) => {

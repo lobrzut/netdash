@@ -215,6 +215,10 @@ class NetworkInfo(BaseModel):
     arp_interval_sec: int | None = None
     arp_last_cycle_at: datetime | None = None
     arp_last_cycle_hosts: int | None = None
+    discovery_profile: str | None = None
+    discovery_status_line: str | None = None
+    discovery_current_tier: str | None = None
+    discovery_interval_sec: int | None = None
 
 
 class NetworkDiagnostics(BaseModel):

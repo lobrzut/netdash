@@ -1,6 +1,6 @@
-# NetDash na QNAP — szybki start (v1.3.119)
+# NetDash na QNAP — szybki start (v1.3.120)
 
-Obraz: `ghcr.io/lobrzut/netdash:1.3.119` — **discovery ARP na NAS** (jak WatchYourLAN / Pi.Alert). Bez agenta na innym hoście.
+Obraz: `ghcr.io/lobrzut/netdash:1.3.120` — **Adaptive Tiered Discovery** na NAS (ping → ARP → lekkie porty). Bez agenta na innym hoście.
 
 ## Import z GitHub (zalecane)
 
@@ -13,10 +13,10 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 ## Krok 1 — NetDash na QNAP (.150)
 
 1. **Container Station** → **Create Application** → **Import from URL**
-2. **Pull** obraz `1.3.119` → **Start** → `http://192.168.1.150:18787`
+2. **Pull** obraz `1.3.120` → **Start** → `http://192.168.1.150:18787`
 3. Pasek: *„Skan ARP: ostatni cykl X min temu, N hostów”* — discovery działa na NAS, **bez agenta .201**
 
-Domyślny compose (v1.3.119): `network_mode: host`, `NETDASH_DISCOVERY_MODE=arp`, `NETDASH_SCAN_CIDR=192.168.1.0/24`, `NETDASH_ARP_INTERVAL=300`, `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.201`, `cap_add: NET_RAW, NET_ADMIN`. Gdy `arp-scan` zwraca 0 hostów — auto-fallback: `ip neigh` → ping sweep → quick-scan TCP.
+Domyślny compose (v1.3.120): `network_mode: host`, `NETDASH_DISCOVERY_MODE=adaptive`, `NETDASH_SCAN_CIDR=192.168.1.0/24`, `NETDASH_DISCOVERY_INTERVAL=300`, `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.201`, `cap_add: NET_RAW, NET_ADMIN`. Pipeline: ping → ARP (MAC) → lekki skan portów (80,443,8080…) tylko dla nowych hostów.
 
 > **Host mode:** brak `ports:` — portal na `http://<IP-QNAP>:18787` bezpośrednio.
 
@@ -29,6 +29,12 @@ curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/agent/i
 ```
 
 ---
+
+## Upgrade (v1.3.119 → v1.3.120)
+
+1. **Pull** `ghcr.io/lobrzut/netdash:1.3.120` → **Restart** kontenera
+2. W compose: `NETDASH_DISCOVERY_MODE=adaptive` (domyślnie w `docker-compose.full.yml`)
+3. Health: `"version":"1.3.120"`; pasek: `Discovery: ping N → arp +M MAC → … (profil: weak)`
 
 ## Upgrade (v1.3.118 → v1.3.119)
 
