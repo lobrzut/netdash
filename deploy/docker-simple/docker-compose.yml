@@ -14,8 +14,6 @@ services:
     container_name: netdash
     restart: always
     # Słaby sprzęt homelab: limit CPU/RAM — przy potrzebie węższy CIDR (/28).
-    mem_limit: 512m
-    cpu_count: 1
     deploy:
       resources:
         limits:

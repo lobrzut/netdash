@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.97
+
+- **Compose**: QNAP — `version: "2.4"` + `mem_limit`/`cpus` (bez `deploy`; CS ignoruje deploy, schemat 2.4 bez ostrzeżeń IDE). Pozostałe compose — tylko `deploy.resources.limits` (Compose v2+).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.97`.
+
 ## v1.3.96
 
 - **Compose**: poprawka limitów zasobów — `cpus: 1.0` (niezgodne ze schematem Compose v3) zastąpione przez `cpu_count: 1` + `deploy.resources.limits` (Docker Compose v2/v3); `mem_limit: 512m` zostaje dla QNAP Container Station / Dockge / docker run.

@@ -15,9 +15,6 @@ services:
     container_name: netdash
     restart: always
     # Słaby sprzęt homelab: limit RAM/CPU — skan LAN nie może zagłodzić hosta.
-    # mem_limit/cpu_count: QNAP CS, Dockge, docker run. deploy.resources: Compose v2+ (CS często ignoruje deploy).
-    mem_limit: 512m
-    cpu_count: 1
     deploy:
       resources:
         limits:

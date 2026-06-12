@@ -54,12 +54,7 @@ services:
 
     restart: always
 
-    # Słaby sprzęt homelab: limit RAM/CPU; safe scan domyślnie (NETDASH_SCAN_SAFE_MODE).
-    # mem_limit/cpu_count: Dockge, docker run. deploy.resources: Compose v2+.
-
-    mem_limit: 512m
-
-    cpu_count: 1
+    # Słaby sprzęt homelab: limit RAM/CPU; safe scan domyślnie (Compose v2+).
 
     deploy:
 

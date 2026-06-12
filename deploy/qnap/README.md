@@ -154,7 +154,7 @@ Starsze wersje mogły zawiesić cały NAS przy skanie `/24` (254 hosty × dziesi
 | Timeout skanu | 300 s |
 | Pełny skan | wyłączony |
 
-**Odzyskiwanie po crashu:** wyłącz zasilanie QNAP na 30 s → włącz → Container Station → upewnij się, że NetDash ma obraz **1.3.96+** → Pull → Restart → skanuj tylko z **Serwisy** (nie Pulpit).
+**Odzyskiwanie po crashu:** wyłącz zasilanie QNAP na 30 s → włącz → Container Station → upewnij się, że NetDash ma obraz **1.3.97+** → Pull → Restart → skanuj tylko z **Serwisy** (nie Pulpit).
 
 ---
 

@@ -1,5 +1,5 @@
 # Opcjonalny profil: test Dockera lokalnie (bridge, bez network_mode: host).
-# Słaby sprzęt: mem_limit 512m, cpu_count 1, safe mode domyślnie true, CIDR /28.
+# Słaby sprzęt: deploy.resources 512M/1 CPU, safe mode domyślnie true, CIDR /28.
 # Skan LAN wymaga NETDASH_SCAN_CIDR — ustaw w .env lub w panelu Ustawienia.
 # Użycie: docker compose -f docker-compose.dev.yml up -d --build
 
@@ -12,8 +12,6 @@ services:
       - "18787:18787"
     volumes:
       - ./data:/app/data
-    mem_limit: 512m
-    cpu_count: 1
     deploy:
       resources:
         limits:
