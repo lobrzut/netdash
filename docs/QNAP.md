@@ -28,11 +28,11 @@ flowchart LR
 |---------|------|
 | **GitHub Actions** | Po tagu `v*` buduje obraz i publikuje na GHCR |
 | **GHCR** | Gotowy obraz — bez `git` na QNAP |
-| **Watchtower** (profil `auto-update`) | Co 24 h sprawdza nowy obraz i restartuje NetDash (tylko z etykietą) |
+| **Watchtower** (`docker-compose.full.yml` lub profil `auto-update`) | Co 24 h pobiera `:latest` z GHCR i restartuje NetDash (tylko z etykietą) |
 | **Portal NetDash** | Ustawienia → O projekcie → **Sprawdź aktualizacje** (GitHub API) |
 | **Aktualizuj teraz** (opcjonalnie) | Wymaga montowania `docker.sock` — tylko dla zaawansowanych |
 
-**Bezpieczeństwo:** automatyczna aktualizacja obrazu **nie jest włączona domyślnie**. Watchtower uruchamiasz świadomie profilem `auto-update`. Przycisk „Aktualizuj teraz” wymaga jawnej konfiguracji i montowania gniazda Docker (ryzyko — patrz niżej).
+**Bezpieczeństwo:** w podstawowym `docker-compose.yml` Watchtower **nie startuje** (profil `auto-update`). W **`docker-compose.full.yml`** Watchtower jest od razu w stacku — importuj ten plik tylko jeśli chcesz auto-update. Obraz NetDash musi być **`:latest`** (nie semver) — inaczej Watchtower nie podmieni wersji. Przycisk „Aktualizuj teraz” wymaga jawnej konfiguracji i montowania gniazda Docker (ryzyko — patrz niżej; na QNAP zwykle niedostępne).
 
 ---
 
@@ -71,7 +71,7 @@ Na QNAP w `.env` (opcjonalnie — compose v1.3.80+ ma twarde domyślne):
 ```env
 # NETDASH_SECRET_KEY opcjonalny — entrypoint zapisze klucz w data/.secret
 NETDASH_SCAN_CIDR=192.168.1.0/24
-NETDASH_IMAGE_TAG=1.3.81
+NETDASH_IMAGE_TAG=1.3.82
 ```
 
 > **Homelab (v1.3.80+):** login `admin`/`changeme` działa bez env w CS; sync hasła przy starcie także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`.
@@ -120,11 +120,21 @@ Szczegóły crash loop (`Errno 98`), duplikatów aplikacji w Container Station i
 
 ## Auto-aktualizacja — Watchtower (zalecane na QNAP)
 
-Watchtower jest w `docker-compose.yml` w profilu **`auto-update`** — domyślnie **nie startuje**.
+### Metoda 1 — jeden plik (Container Station, bez SSH)
 
-### Włączenie
+Import URL:
 
-W SSH w katalogu stacka:
+```
+https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
+```
+
+Dwa kontenery: `netdash` + `netdash-watchtower`. Obraz NetDash: **`ghcr.io/lobrzut/netdash:latest`** (od v1.3.82). Sprawdzanie co **24 h**. Tylko kontenery z etykietą `com.centurylinklabs.watchtower.enable=true`.
+
+> **Częsty błąd:** compose z tagiem `1.3.79` — Watchtower pobiera `:latest`, ale recreate używa starego tagu z compose → wersja się nie zmienia. Użyj `:latest` w full.yml lub ręczny Pull.
+
+### Metoda 2 — profil auto-update (SSH)
+
+Watchtower w `docker-compose.yml` w profilu **`auto-update`** — domyślnie **nie startuje**.
 
 ```bash
 docker compose --profile auto-update up -d
@@ -135,8 +145,6 @@ Zmienne (opcjonalnie w `.env`):
 ```env
 WATCHTOWER_POLL_INTERVAL=86400
 ```
-
-Domyślnie: sprawdzanie co **24 godziny**. Tylko kontenery z etykietą `com.centurylinklabs.watchtower.enable=true` (NetDash ma ją w compose).
 
 ### Ręczne jednorazowe odświeżenie (bez czekania)
 
@@ -176,7 +184,7 @@ W **Ustawienia → O projekcie**:
 - Link **Changelog** — strona release na GitHub
 - Status: „Masz najnowszą wersję” lub „Dostępna vX.Y.Z”
 
-Nie pobiera ani nie restartuje kontenera — tylko informuje. Do faktycznej aktualizacji użyj Watchtower lub `docker compose pull`.
+Nie pobiera ani nie restartuje kontenera — tylko informuje. Gdy wersja na GitHub jest nowsza, a przycisk **Aktualizuj teraz** się nie pojawia, na QNAP brakuje zwykle `docker.sock` — użyj Watchtower lub Pull w Container Station. Do faktycznej aktualizacji użyj Watchtower lub `docker compose pull`.
 
 ---
 

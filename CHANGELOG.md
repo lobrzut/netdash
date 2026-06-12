@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.82
+
+- **QNAP auto-update (fix)**: `docker-compose.full.yml` używa obrazu `:latest` zamiast przypiętego semver — Watchtower może pobierać nowe wersje. Literały env Watchtower (QNAP CS ignoruje `${VAR:-default}`), `WATCHTOWER_INCLUDE_STOPPED=true`.
+- **Portal — O projekcie**: poprawiony tekst o Watchtower (bez mylącego „profil auto-update”); komunikat gdy nowsza wersja jest na GitHub, ale „Aktualizuj teraz” niedostępne (brak docker.sock na QNAP).
+- **Dokumentacja**: sekcja rozwiązywania problemów auto-update w `deploy/qnap/README.md` i `docs/QNAP.md`.
+
 ## v1.3.81
 
 - **Fix sesji QNAP (odświeżanie strony)**: stabilny `NETDASH_SECRET_KEY` z `/app/data/.secret` (entrypoint zawsze preferuje plik na wolumenie; Python też ładuje `.secret`). Ciasteczko sesji `HttpOnly` z `Secure=false` na HTTP, `SameSite=Lax`, ważność 7 dni; `/api/auth/logout` czyści cookie.

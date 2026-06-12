@@ -47,7 +47,7 @@ Od **v1.3.80** compose ma **twarde domyślne** (`admin` / `changeme` / sync) —
 | `NETDASH_SCAN_CIDR` | **w compose od v1.3.81** | `192.168.1.0/24` (dostosuj do swojej podsieci) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | opcjonalna | ustaw `false` **po** zmianie hasła w portalu (żeby restart nie przywracał `changeme`) |
 
-> Compose ≥ v1.3.81: obraz `ghcr.io/lobrzut/netdash:1.3.81`, port **`NETDASH_LISTEN_PORT=18787`**, skan LAN z **`NETDASH_SCAN_CIDR=192.168.1.0/24`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
+> Compose ≥ v1.3.82: obraz `ghcr.io/lobrzut/netdash:1.3.82` (ręczny deploy) lub `:latest` w **docker-compose.full.yml** (auto-update). Port **`NETDASH_LISTEN_PORT=18787`**, skan LAN z **`NETDASH_SCAN_CIDR=192.168.1.0/24`**. Po upgrade zrób **Pull** obrazu lub ponowny import compose.
 
 Opcjonalnie wygeneruj `NETDASH_SECRET_KEY` na PC:
 
@@ -125,7 +125,7 @@ https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compos
 
 **Weryfikacja po naprawie:**
 
-1. `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.81"`
+1. `http://<IP-QNAP>:18787/api/health` → `"version":"1.3.82"`
 2. Zaloguj → **Serwisy** → **Skanuj sieć** → zostaw CIDR puste (użyje `NETDASH_SCAN_CIDR`) lub wpisz `192.168.1.0/24`
 3. Po skanie pojawią się karty urządzeń / serwisów
 
@@ -146,9 +146,29 @@ NetDash + Watchtower w **jednym** compose — jeden import w Container Station, 
 
 3. Ustaw zmienne środowiskowe (patrz Krok 3 powyżej) → **Create** → **Start**
 
-**Opis ekranu:** zobaczysz dwa serwisy — `netdash` (portal na porcie **18787**) i `netdash-watchtower` (aktualizacja co 24 h). To normalne.
+**Opis ekranu:** zobaczysz **dwa** serwisy — `netdash` (portal na porcie **18787**) i `netdash-watchtower` (aktualizacja co 24 h). Oba muszą być **Running**.
 
-Opcjonalna zmienna: `WATCHTOWER_POLL_INTERVAL=86400` (sekundy, domyślnie 24 h).
+**Ważne (od v1.3.82):** obraz NetDash w tym pliku to **`ghcr.io/lobrzut/netdash:latest`**. Watchtower **nie** aktualizuje kontenerów z przypiętym tagiem semver (np. `1.3.79`). Przypięcie digest (`@sha256:…`) zwiększa bezpieczeństwo, ale wyłącza auto-update.
+
+Interwał sprawdzania: **86400 s** (24 h) — ustawione w compose (QNAP CS ignoruje `${VAR:-default}`).
+
+### Auto-update nie działa — checklist
+
+| Sprawdź | Oczekiwane |
+|---------|------------|
+| Liczba kontenerów | **2**: `netdash` + `netdash-watchtower` (oba Running) |
+| Obraz NetDash | `ghcr.io/lobrzut/netdash:latest` (nie `1.3.x`) |
+| Etykieta | `com.centurylinklabs.watchtower.enable=true` na netdash |
+| Logi Watchtower | Container Station → `netdash-watchtower` → **Logs** — szukaj `Updated` / błędów pull |
+| Portal „Masz najnowszą wersję” | To porównanie z GitHub API — **nie** oznacza, że Watchtower zadziałał. Wersja w stopce = faktyczny obraz kontenera. |
+
+**Naprawa po starym deployu (np. v1.3.79 z przypiętym tagiem):**
+
+1. Ponowny **Import from URL** compose full (lub edycja aplikacji: obraz → `:latest`).
+2. **Recreate** / **Restart** obu kontenerów.
+3. W logach `netdash-watchtower` potwierdź start i kolejny cykl (lub jednorazowo przez SSH — patrz `docs/QNAP.md`).
+
+Przycisk **„Aktualizuj teraz”** w portalu na QNAP zwykle **nie** działa (brak `docker.sock` w kontenerze NetDash) — użyj Watchtower lub **Pull** w Container Station.
 
 ---
 
@@ -229,7 +249,7 @@ Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i C
    https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
    ```
 4. **Environment** — **nic nie musisz dodawać** (v1.3.81+ ma CIDR w compose). Dostosuj `NETDASH_SCAN_CIDR` jeśli Twoja sieć ≠ `192.168.1.0/24`. **Nie dodawaj** `NETDASH_PORT`.
-5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:1.3.81`.
+5. **Create** → **Start** — poczekaj na pobranie obrazu `ghcr.io/lobrzut/netdash:1.3.82`.
 6. Otwórz: `http://192.168.1.150:18787` (nie `:8787`).
 7. W logach: `NetDash listening on port 18787` i `Uvicorn running on http://0.0.0.0:18787`.
 
@@ -237,9 +257,9 @@ Port **8787** jest zajęty przez **Readarr** na wielu QNAP — kontener pada i C
 
 1. **Applications** — zostaw **jedną** aplikację `netdash`; usuń duplikaty.
 2. **Delete Application** (Remove containers) i zaimportuj compose od nowa — CS trzyma stare env w szablonie aplikacji.
-3. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.81` (nie `:latest`).
+3. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.82` (ręczny deploy) lub `:latest` (auto-update w full.yml).
 4. **Start**.
-5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.81","admin_ready":true,...}`.
+5. Sprawdź: `http://192.168.1.150:18787/api/health` → `{"ok":true,"version":"1.3.82","admin_ready":true,...}`.
 
 Jeśli nadal błąd — przez SSH na QNAP:
 
@@ -262,7 +282,7 @@ Import compose **dwa razy** tworzy dwie aplikacje z tym samym `container_name: n
 
 | Sprawdź | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.81` po **Pull** |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.82` po **Pull** (lub `:latest` w full.yml) |
 | Compose URL | `docker-compose.full.yml` z GitHub **main** (`NETDASH_LISTEN_PORT: "18787"`) |
 | CS Environment | tylko SECRET_KEY / hasło; **brak** `NETDASH_PORT` |
 | Log kontenera | `Uvicorn running on http://0.0.0.0:18787` |
@@ -283,7 +303,7 @@ Jeśli log nadal pokazuje `:8787` — usuń aplikację CS i zaimportuj compose o
 
 Portal działa (`http://<IP-QNAP>:18787`), ale formularz logowania odrzuca hasło.
 
-**Od v1.3.80 (zalecane):** compose ma twarde `admin` / `changeme` / `sync=true` (QNAP CS ignoruje `${VAR:-default}`). Od **v1.3.81** także `NETDASH_SCAN_CIDR=192.168.1.0/24`. Zrestartuj kontener po **Pull** obrazu `1.3.81`.
+**Od v1.3.80 (zalecane):** compose ma twarde `admin` / `changeme` / `sync=true` (QNAP CS ignoruje `${VAR:-default}`). Od **v1.3.81** także `NETDASH_SCAN_CIDR=192.168.1.0/24`. Zrestartuj kontener po **Pull** obrazu `1.3.82`.
 
 **Bezpieczeństwo (homelab):** po ustawieniu własnego hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false` w Container Station — inaczej każdy restart przywróci `changeme`.
 
@@ -291,7 +311,7 @@ Portal działa (`http://<IP-QNAP>:18787`), ale formularz logowania odrzuca hasł
 
 | Element | Oczekiwane |
 |---------|------------|
-| Obraz | `ghcr.io/lobrzut/netdash:1.3.81` (Pull w CS) |
+| Obraz | `ghcr.io/lobrzut/netdash:1.3.82` (Pull w CS) |
 | Health | `http://<IP>:18787/api/health` → `"admin_ready": true` |
 | Login | `admin` / `changeme` (wielkość liter w loginie bez znaczenia) |
 
@@ -348,7 +368,7 @@ python scripts/reset-admin-password.py --db /share/Container/netdash/data/netdas
 
 **Kroki dla użytkownika:**
 
-1. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.81` w Container Station (lub ponowny import compose).
+1. **Pull** obrazu `ghcr.io/lobrzut/netdash:1.3.82` w Container Station (lub ponowny import compose full z `:latest`).
 2. Sprawdź, że wolumen jest zamontowany: `/share/Container/netdash/data:/app/data`.
 3. Po starcie kontenera w logach: `loaded NETDASH_SECRET_KEY from /app/data/.secret`.
 4. Weryfikacja: `http://<IP-QNAP>:18787/api/health` → `"secret_key_stable": true` i `"secret_key_configured": true`.

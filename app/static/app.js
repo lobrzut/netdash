@@ -230,6 +230,7 @@ function renderUpdateCheckUI(data) {
   const errorEl = $('#about-update-error');
   const changelogEl = $('#about-changelog-link');
   const applyBtn = $('#btn-apply-update');
+  const applyHintEl = $('#about-update-apply-hint');
   if (!statusEl) return;
 
   statusEl.hidden = true;
@@ -244,6 +245,7 @@ function renderUpdateCheckUI(data) {
   }
   if (changelogEl) changelogEl.hidden = true;
   if (applyBtn) applyBtn.hidden = true;
+  if (applyHintEl) applyHintEl.hidden = true;
 
   if (!data) return;
 
@@ -276,8 +278,11 @@ function renderUpdateCheckUI(data) {
     notesEl.hidden = false;
   }
 
-  if (applyBtn && data.update_available && (data.update_apply_available || updateApplyAvailable)) {
+  const canApply = data.update_apply_available || updateApplyAvailable;
+  if (applyBtn && data.update_available && canApply) {
     applyBtn.hidden = false;
+  } else if (applyHintEl && data.update_available && !canApply) {
+    applyHintEl.hidden = false;
   }
 }
 
