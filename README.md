@@ -5,117 +5,117 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
 
-**Homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer) — with automatic LAN service discovery.**
+**A self-hosted homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer), with automatic LAN service discovery.**
 
-**NetDash = port 18787** — własny port serwisu; unika kolizji z Readarr (8787) i typowymi portami homelab/Docker/QNAP.
+**Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
 
-## Szybki start (Docker, bez git)
+## Quick start (Docker, no git)
 
-Na dowolnym **Linuxie z Dockerem** — trzy kroki:
+Run this on any Linux host with Docker:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh | bash
 ```
 
-Otwórz **http://&lt;IP-serwera&gt;:18787** → login **`admin` / `changeme`** → **zmień hasło** w Ustawienia → Hasło.
+Open **http://<server-ip>:18787** and sign in with **`admin` / `changeme`**, then change the password in **Settings → Password**.
 
-> **Port:** domyślnie **18787** (unika kolizji z Readarr **8787**). Zmiana: `NETDASH_PORT` w `.env`. Stare instalacje na 8787: ustaw `NETDASH_PORT=8787` do migracji.
+> **Port note:** NetDash uses **18787** by default. Set `NETDASH_PORT` in `.env` to change it. If you are migrating an older install on 8787, set `NETDASH_PORT=8787`.
 
-| Gdzie | Instrukcja |
-|-------|------------|
-| **Linux (Docker)** | [`deploy/docker-simple/`](deploy/docker-simple/) — `install.sh`, compose z GHCR |
-| **QNAP NAS** | [`deploy/qnap/README.md`](deploy/qnap/README.md) — Container Station, import z URL |
-| **Pełny przewodnik** | [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Platform | Guide |
+|----------|-------|
+| **Linux (Docker)** | [`deploy/docker-simple/`](deploy/docker-simple/) — `install.sh`, GHCR-based compose |
+| **QNAP NAS** | [`deploy/qnap/README.md`](deploy/qnap/README.md) — Container Station URL import |
+| **Full guide** | [DEPLOYMENT.md](DEPLOYMENT.md) |
 
-Windows (Docker Desktop): `irm …/deploy/docker-simple/install.ps1 | iex` — patrz [deploy/docker-simple/](deploy/docker-simple/).
+Windows (Docker Desktop): `irm https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.ps1 | iex` — see [deploy/docker-simple/](deploy/docker-simple/).
 
 ## Screenshots
 
 Dark-theme homelab dashboard with pinned services, API key vault, notes, and network filters.
 
-| Dashboard | Serwisy |
-|-----------|---------|
-| ![Dashboard — widgets and pinned services](docs/screenshots/dashboard.png) | ![Serwisy — filters and service cards](docs/screenshots/services.png) |
+| Dashboard | Services |
+|-----------|----------|
+| ![Dashboard — widgets and pinned services](docs/screenshots/dashboard.png) | ![Services — filters and service cards](docs/screenshots/services.png) |
 
 | Settings | Login |
 |----------|-------|
 | ![Settings — sidebar and general options](docs/screenshots/settings.png) | ![Login — JWT authentication](docs/screenshots/login.png) |
 
-> **Screenshots use demo data only** (`*.demo.local`, `10.0.0.x`, masked keys like `sk-demo-…`). Regenerate: `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py` (requires Playwright + running app on port 18787).
+> **Screenshots use demo data only** (`*.demo.local`, `10.0.0.x`, masked keys like `sk-demo-…`). Regenerate with `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py` (requires Playwright and a running app on port 18787).
 
 ## Why NetDash?
 
 | Homer | NetDash |
 |-------|---------|
-| Manual YAML config | **Auto network scan** (CIDR / local /24) |
-| Static service list | **Detects and identifies** services (HTTP, title, favicon) |
-| Icons from config | **70+ brand icons** (Jellyfin, Grafana, Plex…) + favicon |
+| Manual YAML configuration | **Automatic network scanning** (CIDR / local /24) |
+| Static service list | **Service detection and identification** (HTTP, title, favicon) |
+| Icons from config | **70+ brand icons** (Jellyfin, Grafana, Plex, and more) + favicon fallback |
 | No vault | **Encrypted API key vault** (Fernet) |
 | No notes | **Notes widget** with markdown |
-| — | **Filter: login required / public** |
+| — | **Visibility filters**: login required / public |
 | — | **Widgets**: clock, stats, search |
 
 ## Features
 
-- Auto-discovery — ping hosts, port scan, HTTP/HTTPS identification
+- Auto-discovery (ping, port scan, HTTP/HTTPS identification)
 - Dark theme with configurable accent color
-- JWT login + encrypted API key vault
-- Per-service notes, Wake-on-LAN / Sleep-on-LAN
+- JWT authentication and encrypted API key vault
+- Per-service notes plus Wake-on-LAN / Sleep-on-LAN
 - 70+ brand icons via [Simple Icons](https://simpleicons.org/)
-- Online/offline health checks with persistent tiles
-- Docker one-command deploy
-- i18n: English, Polish, German, Ukrainian
-- **Remote discovery agent** (v1.3.112) — lightweight LAN scanner on a separate host pushes to `POST /api/discovery/import` (ideal for QNAP dashboard + homelab agent)
+- Persistent online/offline health checks
+- One-command Docker deployment
+- i18n support: English, Polish, German, Ukrainian
+- **Remote discovery agent** (v1.3.112): lightweight LAN scanner on a separate host pushing to `POST /api/discovery/import` (ideal for QNAP + homelab split deployments)
 
 ## Remote Discovery Agent
 
-When NetDash runs on a weak NAS (QNAP) without safe LAN access, disable local scan and use a remote agent:
+If NetDash runs on a low-power NAS (for example QNAP) without safe LAN scan access, disable local scanning and use a remote agent:
 
 | Host | Role |
 |------|------|
 | QNAP `.150` | Dashboard only — `NETDASH_SCAN_DISABLED=true` |
 | Homelab `.201` | `deploy/agent/docker-compose.yml` — `network_mode: host`, arp-scan |
 
-See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md#remote-discovery-agent-zalecane-na-qnap-od-v13112).
+See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md).
 
 ## What's new in v1.3.27
 
-- Uptime dots stay green for login-gated and self-signed HTTPS services when reachable.
-- Fixed stale amber status when checks were OK but timestamp looked old.
+- Uptime indicators stay green for reachable login-gated and self-signed HTTPS services.
+- Fixed stale amber status when checks were healthy but timestamps were old.
 
 ## What's new in v1.3.26
 
-- **Add service modal** — icon preview, category suggestions, description, pin/login toggles, Identyfikuj (parity with edit modal)
-- Sectioned layout with URL hint; POST `/api/services` accepts `icon_url`
+- **Add service modal** with icon preview, category suggestions, description, pin/login toggles, and **Identify** action (feature parity with edit modal).
+- Sectioned layout with URL hint; `POST /api/services` now accepts `icon_url`.
 
 ## What's new in v1.3.25
 
-- Uptime dots on cards: online / offline / stale / unknown / HTTP error + subtle „last seen” text
-- Homer-inspired card polish: category color accent, stronger hover, watermark preserved
-- Friendlier empty states (pinned CTA, search no-results + clear button)
-- Debounced service search; faster pin toggle without full grid re-render
-- **Homer YAML import** — Settings → Backup → Import Homer (config.yml)
+- Uptime indicators on cards: online / offline / stale / unknown / HTTP error, plus subtle “last seen” text.
+- Homer-inspired card polish: category accent, stronger hover state, watermark preserved.
+- Friendlier empty states (pinned CTA and search no-results reset).
+- Debounced service search and faster pin toggle without full grid re-render.
+- **Homer YAML import** — Settings → Backup → Import Homer (`config.yml`).
 
-See [ROADMAP.md](ROADMAP.md) for remaining gaps.
+See [ROADMAP.md](ROADMAP.md) for remaining work.
 
 ## Deploy from GitHub
 
-Clone and run on any fresh Linux server (or locally):
+Clone and run on a fresh Linux server (or locally):
 
 ```bash
 git clone https://github.com/lobrzut/netdash.git
 cd netdash
 cp .env.example .env
-# Edit .env — set NETDASH_SECRET_KEY (password defaults to changeme)
+# Edit .env and set NETDASH_SECRET_KEY (password defaults to changeme)
 docker compose up -d --build
 ```
 
 Open **http://localhost:18787** (or `http://<server-ip>:18787` on your LAN).
 
 Default login: **`admin` / `changeme`** (synced from env on container start when `NETDASH_SYNC_ADMIN_PASSWORD=true`).  
-**You must change the password** after first login (Settings → Password).
+**Change the password immediately after first login** (Settings → Password).
 
-Full step-by-step guide: **[DEPLOYMENT.md](DEPLOYMENT.md)**
+Full deployment instructions: **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ### Dockge (homelab)
 
@@ -123,26 +123,26 @@ On a Linux host with [Dockge](https://github.com/louislam/dockge):
 
 ```bash
 git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
-cd /opt/stacks/netdash && cp .env.example .env   # edit secrets
+cd /opt/stacks/netdash && cp .env.example .env
 ```
 
-Dockge → **Scan Stacks Folder** → deploy stack **netdash**.  
+In Dockge: **Scan Stacks Folder** → deploy stack **netdash**.
 
-Compose file: **[dockge/compose.yaml](dockge/compose.yaml)** (alias [dockge/docker-compose.yml](dockge/docker-compose.yml)). Copy or symlink into the stack root if Dockge expects `compose.yaml` at repo root.
+Compose file: **[dockge/compose.yaml](dockge/compose.yaml)** (alias [dockge/docker-compose.yml](dockge/docker-compose.yml)). Copy or symlink it into the expected stack root if required by your Dockge setup.
 
-Requires `network_mode: host` (Linux only) for LAN scan — see **[dockge/README.md](dockge/README.md)**.
+LAN scanning requires `network_mode: host` (Linux only) — see **[dockge/README.md](dockge/README.md)**.
 
-## Quick start
+## Development quick start
 
-### Docker (recommended — no git)
+### Docker (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh | bash
 ```
 
-Lub ręcznie: [`deploy/docker-simple/docker-compose.yml`](deploy/docker-simple/docker-compose.yml) + [`.env.example`](deploy/docker-simple/.env.example) → `docker compose up -d`.
+Manual alternative: [`deploy/docker-simple/docker-compose.yml`](deploy/docker-simple/docker-compose.yml) + [`.env.example`](deploy/docker-simple/.env.example), then run `docker compose up -d`.
 
-### Local Python dev (3.12+)
+### Local Python development (3.12+)
 
 ```bash
 git clone https://github.com/lobrzut/netdash.git
@@ -151,51 +151,51 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # optional on dev — defaults in config.py work locally
+cp .env.example .env   # optional for local dev; config.py defaults also work
 python run.py
 ```
 
-Windows shortcut: `.\start.ps1` · Linux: `./start.sh`
+Shortcuts: Windows `.\start.ps1`, Linux `./start.sh`.
 
 ## Network scanning
 
-1. Log in
-2. Click **Scan network**
-3. Leave empty (local /24) or enter a CIDR, e.g. `192.168.1.0/24`
-4. Services appear in real time
+1. Sign in.
+2. Click **Scan network**.
+3. Leave the field empty (local /24) or provide a CIDR, for example `192.168.1.0/24`.
+4. Services appear in real time.
 
-> **Docker:** without `network_mode: host`, the container scans its bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/Mac, comment out host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings → Scanning.
+> **Docker note:** without `network_mode: host`, the container scans its own bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/macOS, disable host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings → Scanning.
 
-## Słaby sprzęt (homelab — RPi, stary PC, N100, NAS, QNAP)
+## Low-resource hardware profile (RPi, older PC, N100, NAS, QNAP)
 
-NetDash jest zaprojektowany pod **słaby sprzęt homelab** — domyślnie tryb bezpieczny skanu (`NETDASH_SCAN_SAFE_MODE=true`) z niską równoległością, krótką listą portów i limitem hostów. Wszystkie oficjalne compose ograniczają kontener do **512 MB RAM** i **1 CPU**.
+NetDash is designed to run on low-resource homelab hardware. By default, it enables safe scan mode (`NETDASH_SCAN_SAFE_MODE=true`) with lower concurrency, a shorter port list, and host limits. Official compose files also limit the container to **512 MB RAM** and **1 CPU**.
 
-| Problem | Zalecenie |
-|---------|-----------|
-| Host zawiesza się przy skanie | Zostaw safe mode; użyj **mniejszego CIDR** (`192.168.1.0/28` zamiast `/24`) w `NETDASH_SCAN_CIDR` lub Ustawienia → Skanowanie |
-| Skan za wolny, ale host mocny | `NETDASH_SCAN_SAFE_MODE=false` w `.env` / compose + restart |
-| Pełny skan portów | Tylko na mocnym sprzęcie; w UI wymaga potwierdzenia (profil **Agresywny**) |
-| Health check obciąża host | Ustawienia → zwiększ interwał health check (np. 120 s) lub wyłącz |
+| Problem | Recommendation |
+|---------|----------------|
+| Host becomes unstable during scans | Keep safe mode enabled and use a smaller CIDR (`192.168.1.0/28` instead of `/24`) via `NETDASH_SCAN_CIDR` or Settings → Scanning |
+| Scans are too slow on strong hardware | Set `NETDASH_SCAN_SAFE_MODE=false` in `.env`/compose and restart |
+| Full port scan needed | Use only on strong hardware; UI requires explicit confirmation (Aggressive profile) |
+| Health checks consume too many resources | Increase health-check interval (for example 120s) or disable it |
 
-Przykład `.env` na słabym hoście (RPi, stary PC, NAS):
+Example `.env` for low-resource hosts:
 
 ```env
 NETDASH_SCAN_SAFE_MODE=true
 NETDASH_SCAN_CIDR=192.168.1.0/28
 ```
 
-Sprawdź profil: `curl -s http://127.0.0.1:18787/api/health` → `scan_safe_mode`, `resource_profile`.
+Check profile output: `curl -s http://127.0.0.1:18787/api/health` → `scan_safe_mode`, `resource_profile`.
 
-Szczegóły deployu: **[DEPLOYMENT.md](DEPLOYMENT.md)** · QNAP: **[deploy/qnap/README.md](deploy/qnap/README.md)**.
+Deployment details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · QNAP: **[deploy/qnap/README.md](deploy/qnap/README.md)**.
 
 ## Deployment profiles
 
-| Profile | How to run | URL |
-|---------|------------|-----|
+| Profile | Run command | URL |
+|---------|-------------|-----|
 | **Local / dev** | `python run.py`, `start.ps1`, `start.sh` | http://localhost:18787 |
-| **Server / Docker** | `docker compose up -d` (Linux, `network_mode: host`) | http://&lt;server-ip&gt;:18787 |
+| **Server / Docker** | `docker compose up -d` (Linux, `network_mode: host`) | http://<server-ip>:18787 |
 
-Details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · prosty Docker: **[deploy/docker-simple/](deploy/docker-simple/)** · QNAP: **[deploy/qnap/](deploy/qnap/)** · SSH deploy: **[deploy/README.md](deploy/README.md)**
+More options: **[DEPLOYMENT.md](DEPLOYMENT.md)** · simple Docker: **[deploy/docker-simple/](deploy/docker-simple/)** · QNAP: **[deploy/qnap/](deploy/qnap/)** · SSH deploy: **[deploy/README.md](deploy/README.md)**.
 
 ## Production on Linux
 
@@ -204,12 +204,12 @@ sudo mkdir -p /opt/netdash/data
 cd /opt/netdash
 git clone https://github.com/lobrzut/netdash.git .
 cp .env.example .env
-# Set NETDASH_SECRET_KEY (≥32 random chars); default login admin/changeme — change after deploy
+# Set NETDASH_SECRET_KEY (>=32 random chars); default login is admin/changeme
 docker compose up -d --build
-docker compose ps   # expect: healthy
+docker compose ps   # expected: healthy
 ```
 
-SQLite data: `./data/netdash.db` (volume `./data:/app/data`).
+SQLite path: `./data/netdash.db` (volume `./data:/app/data`).
 
 ### Deploy from Windows (SSH)
 
@@ -220,7 +220,7 @@ $env:NETDASH_SSH_HOSTKEY = "ssh-ed25519 255 ..."
 .\deploy\install.ps1
 ```
 
-From Linux with rsync: `NETDASH_SSH_HOST=user@your-server ./deploy/install.sh`
+Linux rsync option: `NETDASH_SSH_HOST=user@your-server ./deploy/install.sh`.
 
 ### systemd (without Docker)
 
@@ -238,25 +238,25 @@ sudo systemctl enable --now netdash
 
 | Variable | Description |
 |----------|-------------|
-| `NETDASH_SECRET_KEY` | JWT key + API vault encryption (**required** in Docker) |
-| `NETDASH_DEFAULT_ADMIN_USER` | Admin username (default `admin`) |
-| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Admin password in env (default `changeme` — **change after first login**) |
-| `NETDASH_SYNC_ADMIN_PASSWORD` | Sync admin password from env on every start (default `true`; set `false` after changing password in UI) |
-| `NETDASH_SCAN_CIDR` | Override scan network (Docker bridge mode) |
-| `NETDASH_BUILD_DATE` | Optional build date (About panel) |
+| `NETDASH_SECRET_KEY` | JWT signing key and API vault encryption key (**required** for Docker) |
+| `NETDASH_DEFAULT_ADMIN_USER` | Default admin username (`admin`) |
+| `NETDASH_DEFAULT_ADMIN_PASSWORD` | Admin password from env (`changeme` by default — change after first login) |
+| `NETDASH_SYNC_ADMIN_PASSWORD` | Sync admin password from env on every start (`true` by default; set to `false` after changing in UI) |
+| `NETDASH_SCAN_CIDR` | Override scan network (useful in Docker bridge mode) |
+| `NETDASH_BUILD_DATE` | Optional build date for About panel |
 
-See **[.env.example](.env.example)** for all variables.
+See **[.env.example](.env.example)** for the full list.
 
 ## Stack
 
 - **Backend:** FastAPI, SQLAlchemy, SQLite
-- **Frontend:** Vanilla JS (no Node.js build step)
+- **Frontend:** Vanilla JavaScript (no Node.js build step)
 - **Auth:** JWT + bcrypt
-- **Vault:** Fernet (cryptography)
+- **Vault:** Fernet (`cryptography`)
 
 ## Project structure
 
-```
+```text
 netdash/
 ├── app/
 │   ├── main.py       # API routes
@@ -265,9 +265,9 @@ netdash/
 │   ├── vault.py      # Key encryption
 │   └── static/       # Frontend
 ├── deploy/
-│   ├── docker-simple/  # GHCR-only compose + install.sh (bez git)
+│   ├── docker-simple/  # GHCR-only compose + install.sh
 │   └── qnap/           # QNAP Container Station
-├── dockge/           # Dockge stack compose + deploy guide
+├── dockge/           # Dockge compose stack + deployment guide
 ├── docker-compose.yml
 ├── Dockerfile
 └── run.py
@@ -275,21 +275,21 @@ netdash/
 
 ## Roadmap
 
-- [x] Online/offline status + health check
-- [x] Per-service notes + Wake-on-LAN
+- [x] Online/offline status and health checks
+- [x] Per-service notes and Wake-on-LAN
 - [x] Homer YAML import (MVP)
 - [ ] YAML export (Homer compatibility)
-- [x] ARP scan for device discovery
+- [x] ARP-based device discovery
 - [ ] Multi-user support
 
 ## Acknowledgements
 
 - **[Homer](https://github.com/bastienwirtz/homer)** (Apache-2.0) — UI inspiration and YAML import compatibility.
-- **[GPTWOL](https://github.com/Misterbabou/gptwol)** (MIT, Misterbabou) — Wake/Sleep-on-LAN ideas and optional HTTP gateway integration (`gptwol_url` in settings). NetDash implements WoL/SOL and ARP discovery independently; it is not a fork of GPTWOL.
+- **[GPTWOL](https://github.com/Misterbabou/gptwol)** (MIT, Misterbabou) — Wake/Sleep-on-LAN ideas and optional HTTP gateway integration (`gptwol_url` in settings). NetDash implements WoL/SOL and ARP discovery independently and is not a GPTWOL fork.
 
 ## License
 
-MIT — use in portfolio, homelab, or commercial projects.
+MIT — suitable for portfolio, homelab, and commercial use.
 
 ---
 
