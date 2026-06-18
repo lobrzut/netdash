@@ -1,9 +1,5 @@
 # NetDash
 
-> **This repo is NetDash only** — homelab dashboard with LAN discovery (`:18787`).
-> Not [Brain AI Hub](https://github.com/lobrzut/brain) (second brain, `:7860`) or [AI Studio](https://github.com/lobrzut/ai-studio) (ComfyUI/ACE, `:7880`).
-> Comparison table: [brain/docs/HOMELAB-PROJECTS.md](https://github.com/lobrzut/brain/blob/main/docs/HOMELAB-PROJECTS.md)
-
 [![Version](https://img.shields.io/badge/version-1.3.130-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
