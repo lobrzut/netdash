@@ -19,7 +19,7 @@ Lub ręcznie:
 
 ```bash
 cd deploy/agent
-export NETDASH_URL=http://192.168.1.150:18787
+export NETDASH_URL=http://nas.local:18787
 export NETDASH_USER=admin
 export NETDASH_PASSWORD=twoje-haslo
 export SCAN_CIDR=192.168.1.0/24
@@ -56,6 +56,6 @@ docker compose run --rm netdash-agent python3 /agent/netdash-agent.py --once
 ```bash
 pip install  # brak zależności Python poza stdlib
 sudo apt install arp-scan iproute2 iputils-ping
-export NETDASH_URL=http://192.168.1.150:18787 NETDASH_PASSWORD=...
+export NETDASH_URL=http://nas.local:18787 NETDASH_PASSWORD=...
 python3 scripts/netdash-agent.py --once
 ```

@@ -282,9 +282,6 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
         if not app_settings.about_project:
             app_settings.about_project = DEFAULT_ABOUT_PROJECT
             changed = True
-        if app_settings.author_bio and ("Łukasz" in app_settings.author_bio or "30+" in app_settings.author_bio):
-            app_settings.author_bio = ""
-            changed = True
         layout = app_settings.pinned_card_size
         if layout in ("large", None, ""):
             app_settings.pinned_card_size = "classic"

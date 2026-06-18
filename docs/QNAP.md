@@ -3,7 +3,7 @@
 Przewodnik dla **QNAP NAS** z **Container Station** (Linux Docker). Repozytorium: [lobrzut/netdash](https://github.com/lobrzut/netdash)
 
 Przykłady:
-- **QNAP NAS:** `http://192.168.1.150:18787`
+- **QNAP NAS:** `http://nas.local:18787`
 - **Homelab Linux:** `http://192.168.1.201:18787`
 
 Port `NETDASH_PORT` domyślnie **18787** — unika kolizji z Readarr (**8787**). Na QNAP z Readarr **nie** używaj 8787 dla NetDash.
@@ -108,7 +108,7 @@ Obraz: `ghcr.io/lobrzut/netdash:latest`
 curl -s http://127.0.0.1:18787/api/health
 ```
 
-W przeglądarce: `http://192.168.1.150:18787` (QNAP) → zaloguj się → **Ustawienia** → **O projekcie** → **Sprawdź aktualizacje**.
+W przeglądarce: `http://nas.local:18787` (QNAP) → zaloguj się → **Ustawienia** → **O projekcie** → **Sprawdź aktualizacje**.
 
 ---
 

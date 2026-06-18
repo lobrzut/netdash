@@ -98,7 +98,7 @@ Watchtower porównuje **digest tagu z compose**. Przypięty semver `1.3.123` nig
 ## Krok 1 — NetDash na QNAP (.150)
 
 1. **Container Station** → **Create Application** → **Import from URL**
-2. URL z sekcji powyżej → **Start** → `http://192.168.1.150:18787`
+2. URL z sekcji powyżej → **Start** → `http://nas.local:18787`
 3. Pasek: *„Discovery: tcp N → arp +M MAC → X usług (profil: weak)”*
 
 Domyślny compose: `network_mode: host`, TCP-first adaptive discovery, `NETDASH_SCAN_CIDR=192.168.1.0/24`, `cap_add: NET_RAW, NET_ADMIN`. Proxmox i inne usługi wykrywane automatycznie po TCP (np. :8006) — bez ręcznego dodawania.

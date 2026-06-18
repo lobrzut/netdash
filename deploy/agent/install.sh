@@ -2,7 +2,7 @@
 # NetDash remote discovery agent — one-liner install (homelab .201 → QNAP .150)
 set -euo pipefail
 
-NETDASH_URL="${NETDASH_URL:-http://192.168.1.150:18787}"
+NETDASH_URL="${NETDASH_URL:-http://nas.local:18787}"
 NETDASH_USER="${NETDASH_USER:-admin}"
 NETDASH_PASSWORD="${NETDASH_PASSWORD:-changeme}"
 SCAN_CIDR="${SCAN_CIDR:-192.168.1.0/24}"

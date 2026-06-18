@@ -14,7 +14,7 @@ services:
       - NET_RAW
       - NET_ADMIN
     environment:
-      NETDASH_URL: ${NETDASH_URL:-http://192.168.1.150:18787}
+      NETDASH_URL: ${NETDASH_URL:-http://nas.local:18787}
       NETDASH_USER: ${NETDASH_USER:-admin}
       NETDASH_PASSWORD: ${NETDASH_PASSWORD:-changeme}
       # NETDASH_TOKEN: optional Bearer JWT (skip login)
