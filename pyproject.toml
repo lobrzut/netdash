@@ -1,0 +1,14 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["app/static", "data"]
+
+[tool.ruff.lint]
+# Correctness-focused gate: pyflakes (F) catches undefined names, unused imports,
+# and redefinitions. Style rules (E/W/I) are intentionally not enforced — the
+# codebase uses deliberate late/conditional imports (E402) that are not bugs.
+select = ["F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

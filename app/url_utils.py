@@ -31,6 +31,29 @@ def sanitize_service_url(url: str | bytes | None) -> str:
 
 _SAFE_ICON_HOSTS = frozenset({"cdn.simpleicons.org"})
 
+# Cloud-metadata endpoints — never fetch these server-side (SSRF guard).
+_BLOCKED_FETCH_HOSTS = frozenset({
+    "169.254.169.254",          # AWS / Azure / OpenStack IMDS
+    "100.100.100.200",          # Alibaba Cloud
+    "metadata.google.internal",  # GCP
+    "metadata.goog",
+    "fd00:ec2::254",            # AWS IMDSv6
+})
+
+
+def is_blocked_fetch_target(url: str | None) -> bool:
+    """True for URLs the server must never fetch (cloud metadata SSRF targets)."""
+    host = _hostname(ensure_str(url))
+    if not host:
+        return False
+    if host in _BLOCKED_FETCH_HOSTS:
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return str(ip) in _BLOCKED_FETCH_HOSTS
+
 
 def _hostname(url: str) -> str:
     try:

@@ -7,8 +7,6 @@ from urllib.parse import urlparse
 
 import yaml
 
-import yaml
-
 DEFAULT_CATEGORY = "Inne"
 
 

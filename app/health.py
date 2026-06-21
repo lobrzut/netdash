@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import Service
 from app.scanner import HTTP_TITLE_RE, _is_generic_title, get_local_ip, is_http_error_name
-from app.url_utils import sanitize_service_url
+from app.url_utils import is_blocked_fetch_target, sanitize_service_url
 
 logger = logging.getLogger("netdash.health")
 
@@ -37,6 +37,8 @@ def _http_detail_from_response(response: httpx.Response) -> str | None:
 
 async def _check_http_url(url: str) -> tuple[bool, str | None]:
     """Probe HTTP(S) URL; tolerate broken TLS sockets and HEAD 405."""
+    if is_blocked_fetch_target(url):
+        return False, None
     try:
         async with httpx.AsyncClient(
             verify=False,

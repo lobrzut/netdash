@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import re
 import time
 import uuid
@@ -22,6 +21,10 @@ from app.auth import (
     create_access_token,
     get_current_user,
     hash_password,
+    login_client_key,
+    login_lockout_seconds,
+    register_failed_login,
+    reset_login_attempts,
     set_auth_cookie,
     verify_password,
 )
@@ -259,6 +262,7 @@ def _migrate_db(sync_conn):
             ("discovery_last_import_at", "DATETIME"),
             ("discovery_last_import_source", "VARCHAR(128)"),
             ("discovery_last_import_hosts", "INTEGER"),
+            ("admin_password_user_set", "BOOLEAN DEFAULT 0"),
         ]
         for name, ddl in settings_migrations:
             if name not in columns:
@@ -332,6 +336,15 @@ async def _sanitize_stored_urls() -> None:
             await db.commit()
 
 
+async def _admin_password_user_set(db: AsyncSession) -> bool:
+    """True once the admin changed their password in-app — env sync must not clobber it."""
+    try:
+        result = await db.execute(select(AppSettings.admin_password_user_set).limit(1))
+        return bool(result.scalar_one_or_none())
+    except Exception:
+        return False
+
+
 async def _sync_admin_password_from_env(db: AsyncSession) -> dict[str, object]:
     """Homelab post-deploy login: ensure admin exists and password matches settings on start."""
     username = settings.default_admin_user
@@ -368,6 +381,15 @@ async def _sync_admin_password_from_env(db: AsyncSession) -> dict[str, object]:
     status["admin_exists"] = True
     if verify_password(password, user.password_hash):
         status["password_matches"] = True
+        return status
+
+    if await _admin_password_user_set(db):
+        status["user_managed"] = True
+        logger.info(
+            "Admin password changed in-app for %r — skipping env sync "
+            "(use NETDASH_RESET_ADMIN_PASSWORD to override)",
+            username,
+        )
         return status
 
     user.password_hash = hash_password(password)
@@ -408,6 +430,15 @@ def _log_admin_startup_status(status: dict[str, object], ready: bool) -> None:
         logger.warning(
             "NETDASH_SECRET_KEY is missing or too short — sessions may fail; "
             "set NETDASH_SECRET_KEY or rely on entrypoint auto-generation in /app/data/.secret",
+        )
+    if (
+        settings.sync_admin_password
+        and settings.default_admin_password == "changeme"
+        and not status.get("user_managed")
+    ):
+        logger.warning(
+            "SECURITY: admin password is the default 'changeme' with sync enabled — "
+            "set NETDASH_DEFAULT_ADMIN_PASSWORD to a strong value (reachable on host network).",
         )
 
 
@@ -560,7 +591,15 @@ async def lifespan(app: FastAPI):
         task.cancel()
 
 
-app = FastAPI(title="NetDash", description="Dashboard sieci z auto-wykrywaniem serwisów", lifespan=lifespan)
+app = FastAPI(
+    title="NetDash",
+    description="Dashboard sieci z auto-wykrywaniem serwisów",
+    lifespan=lifespan,
+    # Swagger/OpenAPI off by default — avoid API-schema disclosure on host network.
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
@@ -680,12 +719,20 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     username = (data.username or "").strip()
-    if not username:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
+    key = login_client_key(request, username)
+    locked = login_lockout_seconds(key)
+    if locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za {locked}s.",
+            headers={"Retry-After": str(locked)},
+        )
     result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(data.password, user.password_hash):
+    if not username or not user or not verify_password(data.password, user.password_hash):
+        register_failed_login(key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
+    reset_login_attempts(key)
     access_token = create_access_token(user.username)
     set_auth_cookie(response, request, access_token, username=user.username)
     return Token(access_token=access_token)
@@ -723,6 +770,9 @@ async def change_password(
     if not verify_password(data.current_password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędne aktualne hasło")
     user.password_hash = hash_password(data.new_password)
+    # Mark password as user-managed so env sync won't revert it on the next restart.
+    app_settings = await _get_or_create_settings(db)
+    app_settings.admin_password_user_set = True
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -1586,7 +1636,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
             job.error_message = str(exc)
             job.finished_at = datetime.now(timezone.utc)
             await db.commit()
-    except PermissionError as exc:
+    except PermissionError:
         msg = (
             "Brak uprawnień do ping/skanu sieci (NET_RAW). "
             "Dodaj cap_add: NET_RAW w compose lub mapuj porty (bridge) z NETDASH_SCAN_CIDR."
