@@ -263,6 +263,8 @@ def _migrate_db(sync_conn):
             ("discovery_last_import_source", "VARCHAR(128)"),
             ("discovery_last_import_hosts", "INTEGER"),
             ("admin_password_user_set", "BOOLEAN DEFAULT 0"),
+            ("show_brain", "BOOLEAN DEFAULT 0"),
+            ("brain_stats_url", "VARCHAR(256)"),
         ]
         for name, ddl in settings_migrations:
             if name not in columns:
@@ -609,7 +611,7 @@ _STATIC_NO_CACHE = frozenset({"/static/app.js", "/static/i18n.js", "/static/styl
 @app.middleware("http")
 async def static_no_cache_middleware(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path in _STATIC_NO_CACHE:
+    if request.url.path in _STATIC_NO_CACHE or request.url.path.startswith("/static/i18n/"):
         response.headers["Cache-Control"] = "no-cache, must-revalidate"
         response.headers["Pragma"] = "no-cache"
     return response
@@ -939,6 +941,49 @@ async def update_settings(
     await db.commit()
     await db.refresh(app_settings)
     return app_settings
+
+
+_brain_stats_cache: dict[str, object] = {"at": 0.0, "data": None, "url": None}
+
+
+@app.get("/api/brain/stats")
+async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    """Proxy + normalize the Brain knowledge-base stats JSON (server-side, cached 60s)."""
+    app_settings = await _get_or_create_settings(db)
+    url = (app_settings.brain_stats_url or "").strip()
+    if not app_settings.show_brain or not url:
+        return {"ok": False, "configured": bool(url), "error": "disabled"}
+
+    now = time.monotonic()
+    if (
+        _brain_stats_cache.get("url") == url
+        and _brain_stats_cache.get("data") is not None
+        and now - float(_brain_stats_cache.get("at") or 0) < 60
+    ):
+        return _brain_stats_cache["data"]
+
+    try:
+        timeout = httpx.Timeout(4.0, connect=2.0)
+        async with httpx.AsyncClient(verify=False, timeout=timeout) as client:
+            resp = await client.get(url, headers={"User-Agent": "NetDash/1.0 BrainStats"})
+        resp.raise_for_status()
+        raw = resp.json()
+        activity = raw.get("activity_7d")
+        data = {
+            "ok": True,
+            "notes": int(raw.get("notes") or 0),
+            "sessions": int(raw.get("sessions") or 0),
+            "library_docs": int(raw.get("library_docs") or 0),
+            "code_files": int(raw.get("code_files") or 0),
+            "graph_nodes": int(raw.get("graph_nodes") or 0),
+            "last_session_at": raw.get("last_session_at"),
+            "activity_7d": [int(x) for x in activity][:14] if isinstance(activity, list) else [],
+        }
+    except Exception as exc:
+        return {"ok": False, "configured": True, "error": str(exc)[:200]}
+
+    _brain_stats_cache.update(at=now, data=data, url=url)
+    return data
 
 
 def _image_extension(
