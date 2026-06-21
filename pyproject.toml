@@ -12,3 +12,5 @@ select = ["F"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# Make the repo root importable (tests do `from app...`); works with bare `pytest`.
+pythonpath = ["."]
