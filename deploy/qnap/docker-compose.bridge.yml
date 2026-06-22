@@ -8,9 +8,9 @@
 
 #
 
-# Limity RAM/CPU — NIE w YAML (ostrzeżenia IDE; Container Station może ignorować klucze).
+# Limity RAM/CPU — NIE w YAML (ostrzeżenia IDE; w Dockge limity z deploy.resources działają).
 
-# Po deploy: Container Station → netdash → Resource → Memory 512 MB, CPU 50%.
+# Po deploy (Dockge): limity z deploy.resources działają; w CS ustaw Resource ręcznie (512 MB / 50%).
 
 
 

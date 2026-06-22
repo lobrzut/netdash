@@ -1,4 +1,4 @@
-# Watchtower bez profilu — dla Container Station (Import drugiego pliku lub merge w UI)
+# Watchtower bez profilu — dodaj jako drugi serwis w stacku Dockge (lub Import w Container Station)
 
 services:
   watchtower:

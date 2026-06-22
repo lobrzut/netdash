@@ -1,250 +1,156 @@
-# NetDash na QNAP Container Station — wdrożenie i auto-aktualizacja
+# NetDash na QNAP przez Dockge — wdrożenie i aktualizacje
 
-Przewodnik dla **QNAP NAS** z **Container Station** (Linux Docker). Repozytorium: [lobrzut/netdash](https://github.com/lobrzut/netdash)
+Przewodnik dla **QNAP NAS** zarządzanego przez **[Dockge](https://github.com/louislam/dockge)** (ładny UI do compose). Repozytorium: [lobrzut/netdash](https://github.com/lobrzut/netdash)
+
+> **Container Station zostaje zainstalowany** — dostarcza silnik Dockera. Dockge to tylko warstwa zarządzania na wierzchu (zamiast klikania w GUI Container Station, którego nie da się edytować po deployu).
 
 Przykłady:
 - **QNAP NAS:** `http://nas.local:18787`
 - **Homelab Linux:** `http://192.168.1.201:18787`
 
-Port `NETDASH_PORT` domyślnie **18787** — unika kolizji z Readarr (**8787**). Na QNAP z Readarr **nie** używaj 8787 dla NetDash.
-
----
-
-## Architektura auto-aktualizacji
-
-```mermaid
-flowchart LR
-  GH[GitHub Release v*] --> GHA[GitHub Actions]
-  GHA --> GHCR[ghcr.io/lobrzut/netdash]
-  GHCR --> WT[Watchtower opcjonalnie]
-  GHCR --> CS[Container Station pull]
-  WT --> ND[NetDash container]
-  CS --> ND
-  ND --> UI[Portal: Sprawdź aktualizacje]
-  GH --> UI
-```
-
-| Warstwa | Rola |
-|---------|------|
-| **GitHub Actions** | Po tagu `v*` buduje obraz i publikuje na GHCR |
-| **GHCR** | Gotowy obraz — bez `git` na QNAP |
-| **Watchtower** (`docker-compose.full.yml` lub profil `auto-update`) | Co 1 h pobiera `:latest` z GHCR i restartuje NetDash (tylko z etykietą) |
-| **Portal NetDash** | Ustawienia → O projekcie → **Sprawdź aktualizacje** (GitHub API) |
-| **Aktualizuj teraz** (opcjonalnie) | Wymaga montowania `docker.sock` — tylko dla zaawansowanych |
-
-**Bezpieczeństwo:** w podstawowym `docker-compose.yml` Watchtower **nie startuje** (profil `auto-update`). W **`docker-compose.full.yml`** Watchtower jest od razu w stacku — importuj ten plik tylko jeśli chcesz auto-update. Obraz NetDash musi być **`:latest`** (nie semver) — inaczej Watchtower nie podmieni wersji. Przycisk „Aktualizuj teraz” wymaga jawnej konfiguracji i montowania gniazda Docker (ryzyko — patrz niżej; na QNAP zwykle niedostępne).
+Port nasłuchu domyślnie **18787** — unika kolizji z Readarr (**8787**). Na QNAP z Readarr **nie** używaj 8787.
 
 ---
 
 ## Wymagania
 
-- QNAP z Container Station 2.x+
+- QNAP z **Container Station** (silnik Dockera) i włączonym **SSH** (Panel sterowania → Telnet/SSH)
 - Dostęp do internetu (pobieranie obrazu z `ghcr.io`)
-- Sieć LAN — NetDash skanuje sieć w trybie **`network_mode: host`** (jak na Linuxie)
+- LAN — NetDash skanuje sieć w trybie **`network_mode: host`**
 
-> **Uwaga:** `network_mode: host` na QNAP działa inaczej niż na czystym Linuxie — skan LAN często wymaga jawnego CIDR. Compose **v1.3.81+** ma `NETDASH_SCAN_CIDR=192.168.1.0/24`. Gdy host mode nie skanuje LAN, użyj [`docker-compose.bridge.yml`](../deploy/qnap/docker-compose.bridge.yml). Szczegóły: [deploy/qnap/README.md — Skan sieci](../deploy/qnap/README.md#skan-sieci--nie-działa--nie-widzę-przycisku).
+> **Host network na QNAP:** w czystym `docker compose` (przez Dockge) host mode daje prawdziwy dostęp do sieci hosta. Gdy skan nie widzi LAN, ustaw `NETDASH_SCAN_CIDR` w `.env` albo CIDR w panelu (Ustawienia → Skanowanie). Awaryjnie: [`docker-compose.bridge.yml`](../deploy/qnap/docker-compose.bridge.yml).
 
 ---
 
-## Wdrożenie początkowe (bez git na NAS)
+## 1. Postaw Dockge (raz)
 
-> **Najprostsza ścieżka:** **[deploy/qnap/README.md](../deploy/qnap/README.md)** — import compose z URL w Container Station. Poniżej wersja rozszerzona.
+Dockge to jeden kontener. Najprościej odpalić go **raz przez Container Station** (Create Application → wklej poniższe), potem zarządzasz już tylko z Dockge.
 
-### 1. Przygotuj folder na QNAP
-
-Przez SSH lub File Station utwórz katalog, np.:
-
-```bash
-mkdir -p /share/Container/netdash/data
-cd /share/Container/netdash
+```yaml
+services:
+  dockge:
+    image: louislam/dockge:1
+    container_name: dockge
+    restart: unless-stopped
+    ports:
+      - "5151:5001"          # 5000/5001 zajęte przez panel QTS — daj inny wolny port
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /share/Container/dockge/data:/app/data
+      # ścieżka MUSI być identyczna host:kontener (gotcha Dockge — patrz niżej)
+      - /share/Container/dockge/stacks:/share/Container/dockge/stacks
+    environment:
+      - DOCKGE_STACKS_DIR=/share/Container/dockge/stacks
 ```
 
-### 2. Pliki compose i `.env`
+→ **Create → Start** → otwórz `http://<IP-QNAP>:5151` → załóż konto admina.
 
-Skopiuj z repozytorium GitHub (na PC):
+> **Gotcha Dockge:** katalog stacków musi mieć **tę samą ścieżkę** w hoście i kontenerze (`/share/Container/dockge/stacks` w obu) — inaczej zagnieżdżony `docker compose` nie znajdzie wolumenów.
+>
+> **Port:** `5000`/`5001` należą do panelu QTS — użyj innego (np. `5151`). Patrz też kolizja Readarr na `8787`.
+>
+> **docker.sock:** jeśli Dockge nie łączy się z Dockerem, sprawdź `ls -l /var/run/docker.sock` po SSH — na części QNAP socket jest pod ścieżką Container Station; podmień lewą stronę montażu.
 
-- `docker-compose.yml`
-- `.env.example` → `.env`
+---
 
-Na QNAP w `.env` (opcjonalnie — compose v1.3.80+ ma twarde domyślne):
+## 2. Dodaj NetDash jako stack w Dockge
+
+W Dockge: **+ Compose** → nazwa `netdash` → wklej:
+
+```yaml
+services:
+  netdash:
+    image: ghcr.io/lobrzut/netdash:latest
+    container_name: netdash
+    restart: always
+    network_mode: host          # skan LAN (ping/ARP); BEZ sekcji ports:
+    env_file: .env
+    environment:
+      NETDASH_LISTEN_PORT: "18787"
+      NETDASH_DISCOVERY_MODE: "adaptive"
+      NETDASH_SCAN_SAFE_MODE: "true"   # QNAP throttled; mocny NAS może dać false
+    volumes:
+      - ./data:/app/data
+    cap_add:
+      - NET_RAW
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+```
+
+Obok jest edytor **`.env`** tego stacka — wklej:
 
 ```env
-# NETDASH_SECRET_KEY opcjonalny — entrypoint zapisze klucz w data/.secret
-NETDASH_SCAN_CIDR=192.168.1.0/24
-NETDASH_IMAGE_TAG=1.3.85
+NETDASH_SECRET_KEY=<losowy-min-32-znaki>
+NETDASH_DEFAULT_ADMIN_USER=admin
+NETDASH_DEFAULT_ADMIN_PASSWORD=changeme
 ```
 
-> **Homelab (v1.3.80+):** login `admin`/`changeme` działa bez env w CS; sync hasła przy starcie także ze starym wolumenem. Po zmianie hasła w portalu ustaw `NETDASH_SYNC_ADMIN_PASSWORD=false`.
+Klucz wygeneruj po SSH: `openssl rand -base64 32`
 
-Opcjonalnie sieć skanowania:
+→ **Save → Deploy**. (W host mode CIDR LAN-u wykrywa się sam; inaczej ustaw w Ustawienia → Skanowanie.)
 
-```env
-NETDASH_SCAN_CIDR=192.168.1.0/24
-```
+---
 
-### 3. Container Station — utwórz aplikację
+## 3. Wejdź
 
-1. **Container Station** → **Create** → **Create Application**
-2. **Import** → wskaż `docker-compose.yml` z folderu `/share/Container/netdash`
-3. Upewnij się, że wolumen `./data` wskazuje na `/share/Container/netdash/data`
-4. **Create** / **Start**
-
-Alternatywa: w Dockge na innym hoście — patrz [DEPLOYMENT.md](../DEPLOYMENT.md).
-
-### 4. Pierwsze uruchomienie obrazu z GHCR
-
-Jeśli na QNAP nie ma lokalnego builda, w SSH (w katalogu stacka):
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-Obraz: `ghcr.io/lobrzut/netdash:latest`
-
-### 5. Weryfikacja
+`http://<IP-QNAP>:18787` → login `admin` / `changeme` → **zmień hasło** (Ustawienia → Hasło; zmiana w UI jest trwała po restarcie).
 
 ```bash
 curl -s http://127.0.0.1:18787/api/health
 ```
 
-W przeglądarce: `http://nas.local:18787` (QNAP) → zaloguj się → **Ustawienia** → **O projekcie** → **Sprawdź aktualizacje**.
+---
+
+## 4. Aktualizacje (zero reimportu)
+
+- **Ręcznie (zalecane):** Dockge → stack `netdash` → **Update** (pull najnowszego obrazu + redeploy). Compose/`.env` edytujesz **kiedy chcesz** — to cała przewaga nad Container Station.
+- **Automatycznie (Watchtower):** dodaj serwis `watchtower` do stacka (jak w [`deploy/qnap/docker-compose.full.yml`](../deploy/qnap/docker-compose.full.yml)) — co ~1 h podmienia `:latest`. Obraz musi być `:latest` (nie semver), inaczej digest się nie zmieni.
+
+Dane w `./data` (SQLite + ikony) pozostają przy każdej aktualizacji. Backupuj `/share/Container/dockge/stacks/netdash/data/`.
+
+---
+
+## 5. Strojenie skanu (Dockge to umożliwia)
+
+Throttle „safe mode" jest domyślnie ON, bo słaby NAS pada przy flood TCP na /24. Dzięki Dockge możesz **bezpiecznie sprawdzić sufit swojego sprzętu** — w `.env`:
+
+```env
+NETDASH_SCAN_SAFE_MODE=false
+NETDASH_DISCOVERY_PROFILE=strong
+```
+
+→ Redeploy → odpal skan i patrz na NAS (CPU/RAM, responsywność QTS). Stabilnie → zostaw (pełny szybki skan, całe /24). NAS się dławi → wróć do `true`. Cofnięcie w Dockge to sekundy.
 
 ---
 
 ## Rozwiązywanie problemów
 
-Szczegóły crash loop (`Errno 98`), duplikatów aplikacji w Container Station i kolizji z Readarr: **[deploy/qnap/README.md](../deploy/qnap/README.md#rozwiązywanie-problemów-qnap--container-station)**.
+| Problem | Rozwiązanie |
+|---|---|
+| **Port 5001 zajęty** | To panel QTS (5000/5001). Daj Dockge inny port (np. `5151`). |
+| **Crash loop / port 8787** | Stary `NETDASH_PORT=8787`. Entrypoint wymusza 18787 — w logach musi być `LISTEN_PORT=18787`. |
+| **Skan nie widzi LAN** | Ustaw `NETDASH_SCAN_CIDR` w `.env` lub CIDR w Ustawienia → Skanowanie; awaryjnie `docker-compose.bridge.yml`. |
+| **Nie mogę się zalogować** | `/api/health` → `admin_ready: true`. Domyślnie `admin`/`changeme`. |
+| **Dockge nie łączy się z Dockerem** | Sprawdź ścieżkę `docker.sock` (patrz pkt 1). |
 
 ---
 
-## Auto-aktualizacja — Watchtower (zalecane na QNAP)
+## Opcja zaawansowana: „Aktualizuj teraz" z portalu
 
-### Metoda 1 — jeden plik (Container Station, bez SSH)
-
-Import URL:
-
-```
-https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/qnap/docker-compose.full.yml
-```
-
-Dwa kontenery: `netdash` + `netdash-watchtower`. Obraz NetDash: **`ghcr.io/lobrzut/netdash:latest`** (od v1.3.124 w full.yml). Sprawdzanie co **1 h** (`WATCHTOWER_POLL_INTERVAL=3600`). Tylko kontenery z etykietą `com.centurylinklabs.watchtower.enable=true`.
-
-> **Częsty błąd:** compose z tagiem semver `1.3.x` — Watchtower porównuje digest *tego samego* tagu; nowy release `1.3.(x+1)` nie aktualizuje się automatycznie. Użyj `:latest` w full.yml lub ręczny Pull semver.
-
-### Metoda 2 — profil auto-update (SSH)
-
-Watchtower w `docker-compose.yml` w profilu **`auto-update`** — domyślnie **nie startuje**.
-
-```bash
-docker compose --profile auto-update up -d
-```
-
-Zmienne (opcjonalnie w `.env`):
-
-```env
-WATCHTOWER_POLL_INTERVAL=3600
-```
-
-(86400 = 24 h — wolniejszy cykl)
-
-### Ręczne jednorazowe odświeżenie (bez czekania)
-
-```bash
-docker run --rm \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  containrrr/watchtower:1.7.1 \
-  --run-once --cleanup netdash
-```
-
-### Wyłączenie auto-aktualizacji
-
-```bash
-docker compose stop netdash-watchtower
-docker compose rm -f netdash-watchtower
-```
-
----
-
-## Aktualizacja ręczna (bez Watchtower)
-
-```bash
-cd /share/Container/netdash
-docker compose pull
-docker compose up -d
-```
-
-Dane w `./data` (SQLite, ikony) pozostają.
-
----
-
-## Portal — Sprawdź aktualizacje
-
-W **Ustawienia → O projekcie**:
-
-- **Sprawdź aktualizacje** — porównuje wersję z GitHub Releases (`/releases/latest`)
-- Link **Changelog** — strona release na GitHub
-- Status: „Masz najnowszą wersję” lub „Dostępna vX.Y.Z”
-
-Nie pobiera ani nie restartuje kontenera — tylko informuje. Gdy wersja na GitHub jest nowsza, a przycisk **Aktualizuj teraz** otwiera modal Watchtower (gdy `NETDASH_WATCHTOWER_ENABLED=true` w compose.full) lub instrukcję ręcznego Pull. Samo-aktualizacja z wnętrza kontenera bez `docker.sock` jest niemożliwa — Watchtower na hoście **jest** mechanizmem auto-update.
-
----
-
-## Opcja zaawansowana: „Aktualizuj teraz” z portalu
-
-**Ryzyko:** montowanie `/var/run/docker.sock` daje kontenerowi NetDash pełną kontrolę nad Dockerem na hoście.
-
-Włączenie tylko jeśli akceptujesz to ryzyko:
-
-1. W `docker-compose.yml` odkomentuj:
-
-   ```yaml
-   volumes:
-     - ./data:/app/data
-     - /var/run/docker.sock:/var/run/docker.sock
-   ```
-
-2. W `.env`:
-
-   ```env
-   NETDASH_UPDATE_APPLY_ENABLED=true
-   ```
-
-3. `docker compose up -d`
-
-W portalu pojawi się **Aktualizuj teraz** (gdy dostępna nowsza wersja) — pobiera obraz z GHCR i restartuje kontener `netdash`.
-
----
-
-## GitHub Actions i GHCR
-
-Przy każdym tagu `v*` (np. `v1.3.72`) workflow `.github/workflows/docker-publish.yml`:
-
-- buduje obraz Docker,
-- publikuje `ghcr.io/lobrzut/netdash:latest` oraz `ghcr.io/lobrzut/netdash:1.3.72`.
-
-Pierwszy raz obraz musi powstać z release na GitHub — dopiero wtedy `docker compose pull` na QNAP ma skąd pobrać.
-
----
-
-## Ograniczenia
-
-| Temat | Opis |
-|-------|------|
-| **Brak git na QNAP** | Używaj obrazu GHCR, nie `git pull` |
-| **Host network na QNAP** | Skan LAN może wymagać `NETDASH_SCAN_CIDR` |
-| **GHCR prywatny** | Domyślnie pakiet publiczny; przy prywatnym — `docker login ghcr.io` na NAS |
-| **Watchtower** | Restartuje kontener bez pytania — włącz świadomie |
-| **docker.sock** | Pełne uprawnienia do hosta — unikaj jeśli nie musisz |
-| **Watchdog** | `deploy/netdash-watchdog.sh` restartuje przy awarii health — to nie aktualizacja wersji |
+**Ryzyko:** montowanie `/var/run/docker.sock` daje kontenerowi NetDash pełną kontrolę nad Dockerem na hoście. Na QNAP zwykle zbędne — Dockge/Watchtower wystarczą. Jeśli akceptujesz ryzyko: dodaj `- /var/run/docker.sock:/var/run/docker.sock` do `volumes:` i `NETDASH_UPDATE_APPLY_ENABLED=true` do `.env`, redeploy.
 
 ---
 
 ## Powiązane pliki
 
-- [`deploy/qnap/docker-compose.yml`](../deploy/qnap/docker-compose.yml) — compose pod QNAP (import URL)
-- [`deploy/qnap/README.md`](../deploy/qnap/README.md) — krótki przewodnik PL
-- [`docker-compose.yml`](../docker-compose.yml) — NetDash + Watchtower (profil)
-- [`dockge/compose.yaml`](../dockge/compose.yaml) — ten sam stack dla Dockge
+- [`dockge/compose.yaml`](../dockge/compose.yaml) — stack NetDash dla Dockge
+- [`deploy/qnap/README.md`](../deploy/qnap/README.md) — krótki przewodnik QNAP/Dockge
+- [`deploy/qnap/docker-compose.full.yml`](../deploy/qnap/docker-compose.full.yml) — NetDash + Watchtower
+- [`deploy/qnap/docker-compose.bridge.yml`](../deploy/qnap/docker-compose.bridge.yml) — bridge mode (gdy host mode nie skanuje)
 - [`DEPLOYMENT.md`](../DEPLOYMENT.md) — ogólny przewodnik wdrożenia
-- [`deploy/netdash-watchdog.sh`](../deploy/netdash-watchdog.sh) — odzyskiwanie po awarii (nie update)

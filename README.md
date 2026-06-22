@@ -24,7 +24,7 @@ Open **http://<server-ip>:18787** and sign in with **`admin` / `changeme`**, the
 | Platform | Guide |
 |----------|-------|
 | **Linux (Docker)** | [`deploy/docker-simple/`](deploy/docker-simple/) — `install.sh`, GHCR-based compose |
-| **QNAP NAS** | [`deploy/qnap/README.md`](deploy/qnap/README.md) — Container Station URL import |
+| **QNAP NAS** | [`deploy/qnap/README.md`](deploy/qnap/README.md) — wdrożenie przez Dockge |
 | **Full guide** | [DEPLOYMENT.md](DEPLOYMENT.md) |
 
 Windows (Docker Desktop): `irm https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.ps1 | iex` — see [deploy/docker-simple/](deploy/docker-simple/).
@@ -266,7 +266,7 @@ netdash/
 │   └── static/       # Frontend
 ├── deploy/
 │   ├── docker-simple/  # GHCR-only compose + install.sh
-│   └── qnap/           # QNAP Container Station
+│   └── qnap/           # QNAP (Dockge)
 ├── dockge/           # Dockge compose stack + deployment guide
 ├── docker-compose.yml
 ├── Dockerfile

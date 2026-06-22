@@ -1,4 +1,4 @@
-# NetDash + Watchtower — QNAP Container Station
+# NetDash + Watchtower — QNAP przez Dockge (lub Container Station)
 # Import raz — auto-update przez Watchtower. NIE edytuj YAML na QNAP (CS nie pozwala).
 # Jedyny plik do importu: wszystkie env, discovery, Watchtower — gotowe od pierwszego Start.
 #
