@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.132
+
+- **UI — watermark na wszystkich kafelkach**: przywrócony pochylony, dyfuzyjny watermark marki (`rotate(-8deg)` + miękka maska) dla logo. Emoji/litera nie znikają już w wygaszanym rogu — dostają ten sam skos bez maski, jako duży, lekko „ucięty" glif. Przypięte kafelki (classic / classic-sm / medium) miały krycie watermarku ściśnięte do ~0.02–0.05 — odblokowane (×0.95 / ×0.9 / ×0.75), więc tło widać też w sekcji „Przypięte serwisy". Bazowe krycie podbite (0.10→0.13 / 0.06→0.11) dla cienkich logo (Portainer, n8n).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.132`.
+
 ## v1.3.131
 
 - **Bezpieczeństwo — limit prób logowania**: `POST /api/auth/login` ma teraz in-memory brute-force guard (5 prób / 5 min na parę IP+login, odpowiedź `429 Retry-After`). Reset po udanym logowaniu.

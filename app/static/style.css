@@ -55,7 +55,7 @@
   --glass-blur: blur(16px);
   --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --card-watermark-opacity: 0.10;
+  --card-watermark-opacity: 0.13;
 }
 
 [data-theme="ocean"] {
@@ -199,7 +199,7 @@
   --shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
   --shadow-sm: 0 2px 12px rgba(15, 23, 42, 0.06);
   --shadow-glow: 0 0 32px rgba(22, 163, 74, 0.08);
-  --card-watermark-opacity: 0.06;
+  --card-watermark-opacity: 0.11;
 }
 
 [data-theme="homer"] {
@@ -4036,7 +4036,7 @@ body[data-dashboard-layout="classic"] .service-card--pinned .service-card-waterm
   right: -6%;
   bottom: -6%;
   font-size: clamp(2.25rem, 38%, 5rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.55);
+  opacity: calc(var(--card-watermark-opacity) * 0.95);
 }
 
 body[data-dashboard-layout="classic"] .service-card--pinned .service-card-watermark--letter {
@@ -4184,7 +4184,7 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-card-wat
   right: -6%;
   bottom: -6%;
   font-size: clamp(1.4375rem, 38%, 3.125rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.52);
+  opacity: calc(var(--card-watermark-opacity) * 0.9);
 }
 
 body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-card-watermark--letter {
@@ -4403,7 +4403,7 @@ body[data-dashboard-layout="medium"] .service-card--pinned-medium .service-card-
   width: 48%;
   height: 78%;
   font-size: clamp(1rem, 42%, 1.625rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.22);
+  opacity: calc(var(--card-watermark-opacity) * 0.75);
   transform: rotate(-6deg);
   -webkit-mask-image: linear-gradient(135deg, black 0%, black 12%, transparent 40%);
 }
@@ -4602,12 +4602,10 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 
 .service-card-watermark {
   position: absolute;
-  right: -0.5rem;
-  bottom: -0.5rem;
-  width: 70%;
-  height: 86%;
-  max-width: 8rem;
-  max-height: 8rem;
+  right: -8%;
+  bottom: -8%;
+  width: 110%;
+  height: 110%;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
@@ -4618,7 +4616,11 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
   background: none;
   border: none;
   opacity: var(--card-watermark-opacity);
-  font-size: clamp(3.5rem, 75%, 6.75rem);
+  transform: rotate(-8deg);
+  transform-origin: 85% 85%;
+  -webkit-mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
+  mask-image: linear-gradient(135deg, black 0%, black 25%, transparent 55%);
+  font-size: clamp(4rem, 90%, 9rem);
 }
 
 .service-card-watermark--img {
@@ -4637,7 +4639,7 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 
 .service-card-watermark--letter {
   font-family: var(--font);
-  font-size: clamp(2.25rem, 48%, 3.75rem);
+  font-size: clamp(3.5rem, 90%, 8rem);
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.04em;
@@ -4647,12 +4649,18 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
   opacity: 1;
 }
 
-/* Emoji/letter watermarks are monochrome and vanish at brand-image opacity —
-   give every non-brand tile a clearly visible background icon too. The base
-   mask fades the bottom-right (where the icon sits), so drop it here. */
+/* Emoji/letter watermarks are a single monochrome glyph — the diffuse mask
+   fades exactly the bottom-right corner where the glyph sits, so it vanishes.
+   Keep the tilt, drop the mask, and let the big glyph bleed off the corner
+   (cut-off is fine, looks good) at a clearly visible opacity. */
 .service-card-watermark--letter,
 .service-card-watermark[class*="icon-"] {
-  opacity: 0.22;
+  right: -0.5rem;
+  bottom: -0.5rem;
+  width: 100%;
+  height: 100%;
+  opacity: 0.3;
+  font-size: clamp(5rem, 42%, 8rem);
   -webkit-mask-image: none;
   mask-image: none;
 }

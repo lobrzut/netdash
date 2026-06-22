@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.131"
+VERSION = "1.3.132"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Watermark marek/ikon na wszystkich kafelkach — także przypiętych i emoji",
     "Hardening bezpieczeństwa: limit prób logowania (brute-force)",
     "Hasło zmienione w UI nie jest już nadpisywane przy restarcie",
     "Swagger /docs domyślnie wyłączony (NETDASH_DOCS_ENABLED=true by włączyć)",
