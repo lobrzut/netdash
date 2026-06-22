@@ -4602,12 +4602,12 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 
 .service-card-watermark {
   position: absolute;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  width: 46%;
-  height: 62%;
-  max-width: 5.5rem;
-  max-height: 5.5rem;
+  right: -0.5rem;
+  bottom: -0.5rem;
+  width: 70%;
+  height: 86%;
+  max-width: 8rem;
+  max-height: 8rem;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
@@ -4618,7 +4618,7 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
   background: none;
   border: none;
   opacity: var(--card-watermark-opacity);
-  font-size: clamp(2.5rem, 50%, 4.25rem);
+  font-size: clamp(3.5rem, 75%, 6.75rem);
 }
 
 .service-card-watermark--img {

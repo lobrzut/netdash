@@ -167,6 +167,8 @@ class Settings(BaseSettings):
     docs_enabled: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
     demo_mode: bool = False
+    # Seed example/demo services on first boot when the DB is empty (NETDASH_SEED_DEMO=true)
+    seed_demo: bool = False
     # Optional in-container update apply (requires docker.sock mount — see docs/QNAP.md)
     update_apply_enabled: bool = False
     docker_image: str = GHCR_IMAGE
@@ -206,6 +208,15 @@ class Settings(BaseSettings):
     @field_validator("docs_enabled", mode="before")
     @classmethod
     def _docs_enabled(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("seed_demo", mode="before")
+    @classmethod
+    def _seed_demo(cls, v: object) -> bool:
         if v is None or (isinstance(v, str) and not v.strip()):
             return False
         if isinstance(v, str):

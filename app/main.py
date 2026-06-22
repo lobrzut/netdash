@@ -465,6 +465,42 @@ async def _maybe_reset_admin_password(db: AsyncSession) -> None:
     )
 
 
+async def _maybe_seed_demo(db: AsyncSession) -> None:
+    """Seed example services on a fresh DB when NETDASH_SEED_DEMO=true (opt-in)."""
+    if not settings.seed_demo:
+        return
+    result = await db.execute(select(func.count()).select_from(Service))
+    if (result.scalar_one() or 0) > 0:
+        return
+    try:
+        from scripts.seed_demo_data import DEMO_KEYS, DEMO_NOTES, DEMO_SERVICES
+    except Exception:
+        logger.warning("NETDASH_SEED_DEMO set but demo data could not be imported")
+        return
+    for svc in DEMO_SERVICES:
+        db.add(Service(**svc))
+    for key in DEMO_KEYS:
+        secret = key["secret"]
+        db.add(
+            ApiKey(
+                name=key["name"],
+                secret_encrypted=encrypt_secret(secret),
+                secret_hint=secret[-4:] if len(secret) >= 4 else secret,
+                service=key["service"],
+                username=key.get("username"),
+                notes=key.get("notes"),
+                pinned=key.get("pinned", False),
+            )
+        )
+    for note in DEMO_NOTES:
+        db.add(Note(**note))
+    await db.commit()
+    logger.info(
+        "Seeded %s demo services (NETDASH_SEED_DEMO) — remove with scripts/cleanup_demo_data.py --apply",
+        len(DEMO_SERVICES),
+    )
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -485,6 +521,7 @@ async def init_db():
             admin_status["password_matches"] = True
         await _maybe_reset_admin_password(db)
         await _get_or_create_settings(db)
+        await _maybe_seed_demo(db)
         _log_admin_startup_status(admin_status, await _admin_ready(db))
 
     await _ensure_local_host_service()
