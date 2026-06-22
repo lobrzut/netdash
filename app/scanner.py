@@ -778,7 +778,10 @@ async def discover_live_hosts(
 
     # Docker: ping often fails even with correct CIDR — TCP sweep entire subnet.
     ping_only_hosts = len(live - extra)
-    use_tcp = tcp_fallback and (not icmp_ok or ping_only_hosts <= 1)
+    # Normal mode: always TCP-sweep so hosts that block ICMP ping (e.g. a
+    # firewalled Proxmox/server) but have open ports are still found. Safe mode
+    # keeps the conservative ping-first behaviour to avoid flooding weak NAS HW.
+    use_tcp = tcp_fallback and (not settings.scan_safe_mode or not icmp_ok or ping_only_hosts <= 1)
     if use_tcp:
         tcp_live = await discover_live_hosts_tcp(cidr, progress_callback=progress_callback)
         live.update(tcp_live)
