@@ -4641,10 +4641,13 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 }
 
 /* Emoji/letter watermarks are monochrome and vanish at brand-image opacity —
-   give every non-brand tile a clearly visible background icon too. */
+   give every non-brand tile a clearly visible background icon too. The base
+   mask fades the bottom-right (where the icon sits), so drop it here. */
 .service-card-watermark--letter,
 .service-card-watermark[class*="icon-"] {
-  opacity: 0.2;
+  opacity: 0.22;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .service-card--compact .service-card-watermark {
