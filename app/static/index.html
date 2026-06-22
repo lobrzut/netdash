@@ -398,7 +398,10 @@
             <label class="checkbox-row"><input type="checkbox" id="settings-show-vault" /><span data-i18n="settings.showVault">Pokaż sejf API</span></label>
             <label class="checkbox-row"><input type="checkbox" id="settings-show-notes" /><span data-i18n="settings.showNotes">Pokaż notatki</span></label>
             <label class="checkbox-row"><input type="checkbox" id="settings-show-stats" /><span data-i18n="settings.showStats">Pokaż statystyki</span></label>
-            <label class="checkbox-row"><input type="checkbox" id="settings-show-brain" /><span data-i18n="settings.showBrain">Pokaż kafelkę Brain</span></label>
+            <!-- Brain tile: dormant feature, kept for future use. Needs a Brain /stats HTTP endpoint
+                 (knowledge counts). Remove `hidden` here to re-enable; widget #widget-brain,
+                 endpoint /api/brain/stats and renderBrainStats() stay wired. -->
+            <label class="checkbox-row hidden"><input type="checkbox" id="settings-show-brain" /><span data-i18n="settings.showBrain">Pokaż kafelkę Brain</span></label>
             <div class="settings-brain-url hidden" id="settings-brain-url-row" style="margin:6px 0 2px;">
               <label for="settings-brain-url" data-i18n="settings.brainStatsUrl" style="display:block; font-size:0.8125rem; color:var(--text-muted); margin-bottom:4px;">URL statystyk Brain</label>
               <input type="url" id="settings-brain-url" placeholder="http://192.168.1.201:7862/stats" autocomplete="off" />
