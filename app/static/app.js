@@ -37,6 +37,7 @@ const SERVICE_ICON_PRESETS = [
   'shield', 'router', 'code', 'api', 'folder', 'mail', 'dns', 'ftp', 'monitor', 'queue',
   'search', 'storage', 'ai', 'dashboard', 'workflow', 'mqtt', 'nas', 'plug', 'download', 'tv',
   'film', 'photo', 'doc', 'wifi', 'ci', 'nginx', 'apache', 'python', 'windows', 'caddy', 'traefik',
+  'printer', 'camera',
 ];
 const RECENT_ICONS_KEY = 'netdash_recent_icons';
 const SCAN_CONFIRM_SKIP_KEY = 'netdash_scan_confirm_skip';

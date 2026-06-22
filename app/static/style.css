@@ -5498,6 +5498,8 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 .icon-dns::after { content: '🔗'; }
 .icon-ftp::after { content: '📂'; }
 .icon-monitor::after { content: '🖥️'; }
+.icon-printer::after { content: '🖨️'; }
+.icon-camera::after { content: '📷'; }
 .icon-queue::after { content: '📬'; }
 .icon-search::after { content: '🔍'; }
 .icon-storage::after { content: '💾'; }
