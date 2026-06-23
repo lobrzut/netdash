@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.133
+
+- **Kafelek Brain (opcjonalny, OFF domyślnie)**: ożywiony — gdy ustawisz **URL statystyk Brain** (Ustawienia → Wygląd) wskazujący na endpoint `/stats` zwracający liczby wiedzy (`notes`, `sessions`, `library_docs`, `code_files`, `graph_nodes`, `last_session_at`, `activity_7d`), kafelek pokazuje realne dane. Serwer proxuje i cache'uje (60 s) przez `GET /api/brain/stats` (auth-gated). Domyślnie `show_brain=false`, więc nic się nie zmienia dla osób bez Brain.
+- **i18n**: dodane tłumaczenia kafelka Brain dla EN/DE/UK (wcześniej tylko PL).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.133`.
+
 ## v1.3.132
 
 - **UI — watermark na wszystkich kafelkach**: przywrócony pochylony, dyfuzyjny watermark marki (`rotate(-8deg)` + miękka maska) dla logo. Emoji/litera nie znikają już w wygaszanym rogu — dostają ten sam skos bez maski, jako duży, lekko „ucięty" glif. Przypięte kafelki (classic / classic-sm / medium) miały krycie watermarku ściśnięte do ~0.02–0.05 — odblokowane (×0.95 / ×0.9 / ×0.75), więc tło widać też w sekcji „Przypięte serwisy". Bazowe krycie podbite (0.10→0.13 / 0.06→0.11) dla cienkich logo (Portainer, n8n).
