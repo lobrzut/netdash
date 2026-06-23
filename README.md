@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.132-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.133-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -65,6 +65,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - Persistent online/offline health checks
 - One-command Docker deployment
 - i18n support: English, Polish, German, Ukrainian
+- **Optional Brain stats tile** — live knowledge-base counts (notes, sessions, library, graph) from a `/stats` endpoint; off by default
 - **Remote discovery agent** (v1.3.112): lightweight LAN scanner on a separate host pushing to `POST /api/discovery/import` (ideal for QNAP + homelab split deployments)
 
 ## Remote Discovery Agent
@@ -79,6 +80,10 @@ If NetDash runs on a low-power NAS (for example QNAP) without safe LAN scan acce
 See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md).
 
 ## What's new
+
+### v1.3.133
+
+- **Optional Brain stats tile** (off by default) — point it at a Brain `/stats` endpoint (knowledge counts) in Settings → Appearance and it shows live numbers; served via the auth-gated `/api/brain/stats` proxy.
 
 ### v1.3.132
 
