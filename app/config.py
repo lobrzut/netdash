@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.138"
+VERSION = "1.3.139"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
     "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",

@@ -1942,12 +1942,6 @@ async function renderNetworkInfo() {
     </div>`;
   }
 
-  const bars = Array.isArray(d.activity_7d) ? d.activity_7d.slice(-7) : [];
-  const max = Math.max(1, ...bars);
-  const barsHtml = bars.map((v, i) =>
-    `<span class="net-bar ${i === bars.length - 1 ? 'net-bar--last' : ''}" style="height:${Math.max(4, Math.round((Number(v) || 0) / max * 100))}%" title="${Number(v) || 0}"></span>`
-  ).join('');
-
   const lat = Array.isArray(d.latency) ? d.latency : [];
   const latHtml = lat.length ? `<div class="net-latency">${lat.map((l) => {
     const ms = l.ms;
@@ -1961,7 +1955,6 @@ async function renderNetworkInfo() {
     + `<div class="net-rows">${rows}</div>`
     + wanHtml
     + (latHtml ? `<div class="net-section-label">${t('net.latency')}</div>${latHtml}` : '')
-    + (barsHtml ? `<div class="net-section-label">${t('net.discovered7d')}</div><div class="net-bars">${barsHtml}</div>` : '')
     + `<div class="net-foot"><span>${t('net.lastScan')} · ${esc(lastScan)}</span></div>`;
 }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.139
+
+- **Kafelek Sieć mieści się w kaflu**: treść przekraczała `max-height: 360px` widgetu i dół („Ostatni skan") był ucinany. Usunięty najsłabszy element — sparkline „Wykryte · 7 dni" (cienkie dane, zwykle jeden słupek) — zostaje LAN + WAN + latency + ostatni skan. Dodatkowo `.network-tile` przewija się, gdyby treść kiedyś urosła (zamiast ucinać stopkę).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.139`.
+
 ## v1.3.138
 
 - **Kafelek Sieć — latency zamiast donuta kategorii**: sekcja „Serwisy wg kategorii" (donut + legenda, która się nie mieściła) zastąpiona **opóźnieniem łącza** — TCP do `1.1.1.1` (Cloudflare) i `8.8.8.8` (Google), z kolorowym wskaźnikiem (zielony < 40 ms, żółty < 120 ms, czerwony wolno/brak). Mierzone serwerowo, cache 60 s, działa nawet przy zablokowanym ICMP.
