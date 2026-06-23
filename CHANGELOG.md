@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.137
+
+- **Fix — Sejf API w wąskim widgecie**: karty kluczy były ściskane w pionie (`flex-shrink` w kontenerze o stałej wysokości) i ich treść nachodziła na siebie. Teraz `flex-shrink: 0` (karty trzymają wysokość, lista się przewija), a przyciski akcji zawijają się pod tekst klucza, gdy kolumna jest wąska. Maskowane kropki nie łamią się w środku.
+- **Notatki jako wiersze**: kwadratowe kafelki → pełnoszerokościowe wiersze (tytuł + 2 linie podglądu), czytelniejsze w wąskiej kolumnie. Subtelniejszy kolor tła wg etykiety notatki.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.137`.
+
 ## v1.3.136
 
 - **Zatrzymanie skanu sieci**: pasek skanowania ma teraz przycisk **Zatrzymaj**. Anuluje task w tle (`POST /api/scan/{id}/cancel`), ustawia status `cancelled` i czyści pasek. `_run_scan` obsługuje `CancelledError`.

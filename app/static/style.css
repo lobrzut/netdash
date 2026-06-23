@@ -2639,10 +2639,12 @@ body.modal-open {
 
 .key-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.4rem 0.75rem;
   width: 100%;
   min-height: 2.75rem;
+  flex-shrink: 0;
   padding: 0.5rem 0.625rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
@@ -2660,7 +2662,9 @@ body.modal-open {
   background: var(--accent-soft);
 }
 
-.key-info { min-width: 0; flex: 1 1 auto; }
+/* Keep the info from shrinking to nothing next to the action buttons; on narrow
+   widgets (dashboard tile) the actions wrap to their own row below instead. */
+.key-info { min-width: 12rem; flex: 1 1 auto; }
 
 .key-name {
   font-size: 0.875rem;
@@ -2683,7 +2687,7 @@ body.modal-open {
   color: var(--text-muted);
   margin-top: 0.25rem;
   overflow-wrap: anywhere;
-  word-break: break-all;
+  width: 100%;
 }
 
 /* Revealed key can be long — keep it inside the card as a bounded, scrollable box. */
@@ -2702,6 +2706,7 @@ body.modal-open {
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .btn-icon {
@@ -2788,36 +2793,35 @@ body.modal-open {
 }
 
 .notes-tiles-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
   min-width: 0;
 }
 
 .note-tile {
   --note-accent: var(--accent);
-  --note-accent-soft: rgba(34, 197, 94, 0.22);
-  --note-accent-glow: rgba(34, 197, 94, 0.35);
+  --note-accent-soft: rgba(34, 197, 94, 0.14);
+  --note-accent-glow: rgba(34, 197, 94, 0.3);
   position: relative;
-  aspect-ratio: 1;
   border-radius: 8px;
   border: 1px solid var(--note-accent-glow);
-  background: linear-gradient(145deg, var(--note-accent-soft) 0%, rgba(0, 0, 0, 0.35) 100%);
+  background: var(--note-accent-soft);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 0.25rem;
-  padding: 0.4375rem;
-  padding-top: 0.5rem;
+  gap: 0.15rem;
+  padding: 0.5rem 0.65rem;
+  padding-right: 1.4rem;
   overflow: hidden;
   cursor: pointer;
   min-width: 0;
-  transition: transform var(--transition-fast), box-shadow var(--transition), border-color var(--transition);
+  flex-shrink: 0;
+  transition: background var(--transition), border-color var(--transition);
 }
 
 .note-tile:hover {
-  transform: scale(1.04);
-  box-shadow: 0 0 16px var(--note-accent-glow);
+  background: var(--note-accent-glow);
   border-color: var(--note-accent);
 }
 
@@ -2828,32 +2832,32 @@ body.modal-open {
 
 .note-tile.note-green {
   --note-accent: var(--accent);
-  --note-accent-soft: rgba(34, 197, 94, 0.28);
-  --note-accent-glow: rgba(34, 197, 94, 0.4);
+  --note-accent-soft: rgba(34, 197, 94, 0.16);
+  --note-accent-glow: rgba(34, 197, 94, 0.34);
 }
 
 .note-tile.note-red {
   --note-accent: #ef4444;
-  --note-accent-soft: rgba(239, 68, 68, 0.28);
-  --note-accent-glow: rgba(239, 68, 68, 0.4);
+  --note-accent-soft: rgba(239, 68, 68, 0.16);
+  --note-accent-glow: rgba(239, 68, 68, 0.34);
 }
 
 .note-tile.note-blue {
   --note-accent: #3b82f6;
-  --note-accent-soft: rgba(59, 130, 246, 0.28);
-  --note-accent-glow: rgba(59, 130, 246, 0.4);
+  --note-accent-soft: rgba(59, 130, 246, 0.16);
+  --note-accent-glow: rgba(59, 130, 246, 0.34);
 }
 
 .note-tile.note-yellow {
   --note-accent: #eab308;
-  --note-accent-soft: rgba(234, 179, 8, 0.28);
-  --note-accent-glow: rgba(234, 179, 8, 0.4);
+  --note-accent-soft: rgba(234, 179, 8, 0.16);
+  --note-accent-glow: rgba(234, 179, 8, 0.34);
 }
 
 .note-tile.note-purple {
   --note-accent: #a855f7;
-  --note-accent-soft: rgba(168, 85, 247, 0.28);
-  --note-accent-glow: rgba(168, 85, 247, 0.4);
+  --note-accent-soft: rgba(168, 85, 247, 0.16);
+  --note-accent-glow: rgba(168, 85, 247, 0.34);
 }
 
 .note-tile.pinned {
@@ -2873,33 +2877,26 @@ body.modal-open {
 }
 
 .note-tile-title {
-  font-size: 0.625rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text);
-  line-height: 1.25;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.note-tile-preview {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  flex-shrink: 0;
-}
-
-.note-tile-preview {
-  font-size: 0.5625rem;
-  font-weight: 400;
-  color: var(--text);
-  opacity: 0.7;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  flex: 1;
-  min-height: 0;
 }
 
 .note-tile-preview--empty {
