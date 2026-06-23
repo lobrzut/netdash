@@ -82,6 +82,11 @@ See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.
 
 ## What's new
 
+### v1.3.137 – 1.3.139
+
+- **Network tile polish** — **link latency** (TCP to Cloudflare / Google, colour-coded) replaced the services-by-category donut; the **WAN** line shows city + country; the tile fits the widget (no clipped footer).
+- **API vault & notes** — key cards no longer overlap in the narrow dashboard tile (actions wrap below); notes are now full-width **list rows** instead of square tiles.
+
 ### v1.3.136
 
 - **Stop a running network scan** — the scan bar now has a **Stop** button that cancels the background job.
