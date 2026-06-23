@@ -2161,6 +2161,27 @@ body.modal-open {
   color: var(--accent-bright);
 }
 
+.scan-stop-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font);
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.scan-stop-btn::before { content: '⏹'; font-size: 0.85rem; line-height: 1; }
+.scan-stop-btn:hover { background: rgba(239, 68, 68, 0.22); color: #fee2e2; }
+.scan-stop-btn:disabled { opacity: 0.5; cursor: default; }
+
 .scan-pulse {
   width: 8px;
   height: 8px;
@@ -2437,7 +2458,9 @@ body.modal-open {
 .net-row-k { color: var(--text-dim); }
 .net-row-v { color: var(--highlight); font-family: var(--mono); }
 .net-wan { display: flex; align-items: center; gap: 8px; background: var(--accent-muted); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; }
-.net-wan-flag { font-size: 1.25rem; line-height: 1; }
+.net-wan-flag { font-size: 1.25rem; line-height: 1; display: flex; align-items: center; flex-shrink: 0; }
+.net-flag-img { width: 30px; height: auto; border-radius: 3px; display: block; box-shadow: 0 0 0 1px var(--border); }
+.net-flag-fallback { font-family: var(--mono); font-size: 0.8rem; font-weight: 600; color: var(--text-muted); padding: 2px 5px; border: 1px solid var(--border); border-radius: 4px; }
 .net-wan-main { display: flex; flex-direction: column; min-width: 0; }
 .net-wan-main b { color: var(--highlight); font-family: var(--mono); font-size: 0.9rem; }
 .net-wan-isp { color: var(--text-dim); font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2660,6 +2683,19 @@ body.modal-open {
   color: var(--text-muted);
   margin-top: 0.25rem;
   overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+/* Revealed key can be long — keep it inside the card as a bounded, scrollable box. */
+.key-secret.is-revealed {
+  display: block;
+  max-height: 4.75em;
+  overflow-y: auto;
+  color: var(--accent);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.45rem;
 }
 
 .key-actions {

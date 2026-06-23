@@ -20,6 +20,7 @@ let serviceSearch = '';
 let appSettings = {};
 let scanPollTimer = null;
 let scanPollFailures = 0;
+let currentScanJobId = null;
 let lastScanServicesRefresh = 0;
 const SCAN_POLL_BASE_MS = 6000;
 const SCAN_POLL_MAX_MS = 20000;
@@ -1783,7 +1784,7 @@ function renderKeys() {
       <div class="key-info">
         <div class="key-name">${k.pinned ? '📌 ' : ''}${esc(k.name)}</div>
         <div class="key-meta">${esc(k.service)}${k.username ? ` · ${esc(k.username)}` : ''}</div>
-        <div class="key-secret" data-secret>${secretDisplay}</div>
+        <div class="key-secret ${revealed ? 'is-revealed' : ''}" data-secret>${secretDisplay}</div>
         ${k.notes ? `<div class="key-meta">${esc(k.notes)}</div>` : ''}
       </div>
       <div class="key-actions">
@@ -1904,10 +1905,11 @@ async function renderBrainStats() {
 }
 
 function _netFlag(cc) {
-  if (!cc || cc.length !== 2) return '🌐';
-  try {
-    return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
-  } catch { return '🌐'; }
+  // Emoji flags don't render on Windows (shows "CH"), so use a flag image with a text fallback.
+  if (!cc || !/^[a-zA-Z]{2}$/.test(cc)) return '<span class="net-flag-fallback">🌐</span>';
+  const code = cc.toLowerCase();
+  const label = esc(cc.toUpperCase());
+  return `<img class="net-flag-img" src="https://flagcdn.com/${code}.svg" alt="${label}" title="${label}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'net-flag-fallback',textContent:'${label}'}))" />`;
 }
 
 function _netDonut(items) {
@@ -4277,6 +4279,13 @@ async function pollScanProgress(jobId) {
       }
       return true;
     }
+    if (status.status === 'cancelled') {
+      stopScanPolling();
+      if (statusEl) statusEl.textContent = '';
+      await loadDashboard();
+      showToast(t('scan.stopped'), 'info');
+      return true;
+    }
     if (status.status === 'failed') {
       stopScanPolling();
       showScanError(status.error_message || t('scan.failed'));
@@ -4305,9 +4314,28 @@ function stopScanPolling(opts = {}) {
   if (scanPollTimer) clearTimeout(scanPollTimer);
   scanPollTimer = null;
   scanPollFailures = 0;
+  currentScanJobId = null;
   if (!keepBar) $('#scan-bar')?.classList.add('hidden');
   setScanControlsDisabled(false);
   if (resumeHealth) startHealthPolling();
+}
+
+async function cancelCurrentScan() {
+  const jobId = currentScanJobId;
+  if (!jobId) return;
+  const stopBtn = $('#scan-stop-btn');
+  if (stopBtn) stopBtn.disabled = true;
+  try {
+    await api(`/api/scan/${jobId}/cancel`, { method: 'POST' });
+  } catch {
+    showToast(t('scan.stopFailed'), 'error');
+    if (stopBtn) stopBtn.disabled = false;
+    return;
+  }
+  stopScanPolling();
+  showToast(t('scan.stopped'), 'info');
+  await loadDashboard();
+  if (stopBtn) stopBtn.disabled = false;
 }
 
 function scheduleScanPoll(jobId) {
@@ -4325,6 +4353,7 @@ function scheduleScanPoll(jobId) {
 function attachScanPolling(job) {
   if (!job?.id) return;
   stopScanPolling({ keepBar: true, resumeHealth: false });
+  currentScanJobId = job.id;
   scanPollFailures = 0;
   lastScanServicesRefresh = 0;
   pauseHealthPolling();
@@ -4520,6 +4549,12 @@ function bindScanUi() {
       }
       console.log('[NetDash] scan: oneClickScan click', { id: quickScanBtn.id });
       void oneClickScan();
+      return;
+    }
+    const stopBtn = e.target.closest('#scan-stop-btn');
+    if (stopBtn) {
+      e.preventDefault();
+      void cancelCurrentScan();
       return;
     }
   });

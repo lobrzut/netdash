@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.135-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.136-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -81,6 +81,11 @@ If NetDash runs on a low-power NAS (for example QNAP) without safe LAN scan acce
 See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md).
 
 ## What's new
+
+### v1.3.136
+
+- **Stop a running network scan** — the scan bar now has a **Stop** button that cancels the background job.
+- Network tile shows a real **country flag image** (emoji flags don't render on Windows); revealed API keys stay inside the card (scrollable).
 
 ### v1.3.134
 

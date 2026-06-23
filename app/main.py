@@ -1848,6 +1848,17 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
             job.error_message = msg
             job.finished_at = datetime.now(timezone.utc)
             await db.commit()
+    except asyncio.CancelledError:
+        logger.info("Scan %s cancelled by user", job_id)
+        async with async_session() as db:
+            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+            job = result.scalar_one_or_none()
+            if job and job.status in ("running", "pending"):
+                job.status = "cancelled"
+                job.error_message = "Skan zatrzymany przez użytkownika."
+                job.finished_at = datetime.now(timezone.utc)
+                await db.commit()
+        raise
     except Exception as exc:
         msg = f"Skanowanie nie powiodło się: {exc}"
         logger.exception("Scan %s failed for %s", job_id, format_cidr_list(cidrs))
@@ -2039,6 +2050,25 @@ async def scan_status(job_id: int, db: AsyncSession = Depends(get_db), _: User =
     job = result.scalar_one_or_none()
     if not job:
         raise HTTPException(status_code=404, detail="Skan nie znaleziony")
+    return job
+
+
+@app.post("/api/scan/{job_id}/cancel", response_model=ScanStatus)
+async def cancel_scan(job_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+    job = result.scalar_one_or_none()
+    if not job:
+        raise HTTPException(status_code=404, detail="Skan nie znaleziony")
+    task = scan_tasks.get(job_id)
+    if task and not task.done():
+        task.cancel()
+        logger.info("Scan %s cancel requested by %s", job_id, _.username)
+    if job.status in ("running", "pending"):
+        job.status = "cancelled"
+        job.error_message = "Skan zatrzymany przez użytkownika."
+        job.finished_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(job)
     return job
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.136
+
+- **Zatrzymanie skanu sieci**: pasek skanowania ma teraz przycisk **Zatrzymaj**. Anuluje task w tle (`POST /api/scan/{id}/cancel`), ustawia status `cancelled` i czyści pasek. `_run_scan` obsługuje `CancelledError`.
+- **Kafelek Sieć — prawdziwa flaga**: zamiast emoji (Windows pokazywał „CH" tekstem) używamy obrazka flagi z `flagcdn.com` wg kodu kraju, z fallbackiem do kodu literowego.
+- **Sejf API — podgląd klucza**: odsłonięty długi klucz nie wylewa się już z kafelka — jest w ograniczonym, przewijanym boxie (`word-break` + `max-height`).
+- **i18n**: klucze `scan.stop` / `scan.stopped` dla PL/EN/DE/UK.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.136`.
+
 ## v1.3.135
 
 - **Fix UI — pole „URL statystyk Brain"**: input był wąski (domyślna szerokość) i ucinał długie adresy (np. `…7860/s`). Teraz pełna szerokość panelu, czcionka mono — widać cały URL.
