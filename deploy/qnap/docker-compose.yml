@@ -30,7 +30,7 @@ services:
       NETDASH_LISTEN_PORT: "18787"
       # Auto-update status + "Aktualizuj teraz" przez Watchtower HTTP API (ten sam token co niżej)
       NETDASH_WATCHTOWER_ENABLED: "true"
-      NETDASH_WATCHTOWER_API_URL: "http://127.0.0.1:8080/v1/update"
+      NETDASH_WATCHTOWER_API_URL: "http://127.0.0.1:18080/v1/update"
       NETDASH_WATCHTOWER_API_TOKEN: "${WATCHTOWER_HTTP_TOKEN:-change-me-watchtower-token}"
     volumes:
       - /share/Container/netdash/data:/app/data
@@ -51,7 +51,7 @@ services:
     container_name: netdash-watchtower
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:8080"   # HTTP API tylko lokalnie (panel woła przez host network)
+      - "127.0.0.1:18080:8080"   # HTTP API tylko lokalnie (8080 często zajęty na QNAP)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
