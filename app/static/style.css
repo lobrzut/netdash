@@ -501,6 +501,23 @@ body.modal-open {
   transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
 }
 
+/* Inline settings URL inputs (e.g. Brain stats URL) — full width so long URLs aren't clipped. */
+.settings-brain-url input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.6rem 0.8rem;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+.settings-brain-url input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .field input[type="color"] {
   -webkit-appearance: none;
   appearance: none;

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.135
+
+- **Fix UI — pole „URL statystyk Brain"**: input był wąski (domyślna szerokość) i ucinał długie adresy (np. `…7860/s`). Teraz pełna szerokość panelu, czcionka mono — widać cały URL.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.135`.
+
 ## v1.3.134
 
 - **Kafelek „Sieć" (opcjonalny, OFF domyślnie)**: nowy widget pulpitu. Pokazuje **LAN IP / bramę / podsieć**, licznik **urządzeń online/total**, **ostatni skan**, oraz **WAN**: publiczny IP + ISP + kraj/miasto (GeoIP `ip-api.com`, serwerowo, cache ~1h) z flagą. „Fikuśne" staty: **donut** serwisów wg kategorii i **sparkline** wykrytych urządzeń / 7 dni. Serwer: `GET /api/network/info` (auth-gated, cache 60 s). WAN/GeoIP wyłączysz przez `NETDASH_NETWORK_WAN_LOOKUP=false`.
