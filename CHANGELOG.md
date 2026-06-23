@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.134
+
+- **Kafelek „Sieć" (opcjonalny, OFF domyślnie)**: nowy widget pulpitu. Pokazuje **LAN IP / bramę / podsieć**, licznik **urządzeń online/total**, **ostatni skan**, oraz **WAN**: publiczny IP + ISP + kraj/miasto (GeoIP `ip-api.com`, serwerowo, cache ~1h) z flagą. „Fikuśne" staty: **donut** serwisów wg kategorii i **sparkline** wykrytych urządzeń / 7 dni. Serwer: `GET /api/network/info` (auth-gated, cache 60 s). WAN/GeoIP wyłączysz przez `NETDASH_NETWORK_WAN_LOOKUP=false`.
+- **„Aktualizuj teraz" przez Watchtower HTTP API**: przycisk w panelu zleca update Watchtowerowi (`POST /v1/update`, Bearer) — **bez montowania `docker.sock` do panelu**. Bezpieczne na QNAP. Ustaw `NETDASH_WATCHTOWER_API_URL` + `NETDASH_WATCHTOWER_API_TOKEN` (ten sam token co `WATCHTOWER_HTTP_API_TOKEN`). YAML QNAP zaktualizowany (port `127.0.0.1:8080`, `WATCHTOWER_HTTP_API_UPDATE`).
+- **i18n**: klucze kafelka Sieć dla PL/EN/DE/UK.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.134`.
+
 ## v1.3.133
 
 - **Kafelek Brain (opcjonalny, OFF domyślnie)**: ożywiony — gdy ustawisz **URL statystyk Brain** (Ustawienia → Wygląd) wskazujący na endpoint `/stats` zwracający liczby wiedzy (`notes`, `sessions`, `library_docs`, `code_files`, `graph_nodes`, `last_session_at`, `activity_7d`), kafelek pokazuje realne dane. Serwer proxuje i cache'uje (60 s) przez `GET /api/brain/stats` (auth-gated). Domyślnie `show_brain=false`, więc nic się nie zmienia dla osób bez Brain.

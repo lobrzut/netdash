@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.133-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.134-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -66,6 +66,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - One-command Docker deployment
 - i18n support: English, Polish, German, Ukrainian
 - **Optional Brain stats tile** — live knowledge-base counts (notes, sessions, library, graph) from a `/stats` endpoint; off by default
+- **Optional Network tile** — LAN/WAN info (public IP, ISP, country), services-by-category donut and a discovery sparkline; off by default
 - **Remote discovery agent** (v1.3.112): lightweight LAN scanner on a separate host pushing to `POST /api/discovery/import` (ideal for QNAP + homelab split deployments)
 
 ## Remote Discovery Agent
@@ -80,6 +81,11 @@ If NetDash runs on a low-power NAS (for example QNAP) without safe LAN scan acce
 See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md).
 
 ## What's new
+
+### v1.3.134
+
+- **Network tile** (off by default) — LAN IP / gateway / subnet, device online/total counts, **WAN public IP + ISP/country** (GeoIP) with flag, a services-by-category **donut** and a 7-day discovery **sparkline**.
+- **"Update now" via the Watchtower HTTP API** — triggers an immediate pull + recreate without mounting `docker.sock` into the portal (safe on QNAP).
 
 ### v1.3.133
 

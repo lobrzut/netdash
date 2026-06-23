@@ -29,7 +29,12 @@ from app.auth import (
     verify_password,
 )
 from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, WHATS_NEW, settings
-from app.docker_update import pull_and_restart, update_apply_available
+from app.docker_update import (
+    pull_and_restart,
+    trigger_watchtower_update,
+    update_apply_available,
+    watchtower_update_available,
+)
 from app.updates import fetch_latest_release, is_newer_version, normalize_version
 from app.database import Base, async_session, engine, get_db
 from app.enrich import enrich_all_services, enrich_mac_addresses, enrich_service_icons, should_auto_wol
@@ -46,6 +51,7 @@ from app.scanner import (
     _fallback_service_name,
     build_local_host_service,
     format_cidr_list,
+    get_default_gateway,
     get_detected_cidrs,
     get_local_ip,
     get_local_network,
@@ -265,6 +271,7 @@ def _migrate_db(sync_conn):
             ("admin_password_user_set", "BOOLEAN DEFAULT 0"),
             ("show_brain", "BOOLEAN DEFAULT 0"),
             ("brain_stats_url", "VARCHAR(256)"),
+            ("show_network", "BOOLEAN DEFAULT 0"),
         ]
         for name, ddl in settings_migrations:
             if name not in columns:
@@ -738,6 +745,17 @@ async def apply_update(_: User = Depends(get_current_user)):
             detail="Aktualizacja z portalu wymaga docker.sock — bez niego użyj Watchtower lub ręcznego pull obrazu",
         )
     image = f"{settings.docker_image}:{settings.docker_image_tag}"
+    if watchtower_update_available():
+        try:
+            await trigger_watchtower_update()
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        return UpdateApplyOut(
+            ok=True,
+            message="Zlecono aktualizację Watchtowerowi — pobierze nowy obraz i zrestartuje panel. Odśwież za chwilę.",
+            image=image,
+            container=settings.container_name,
+        )
     try:
         result = await pull_and_restart(image, settings.container_name)
     except Exception as exc:
@@ -1020,6 +1038,105 @@ async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_
         return {"ok": False, "configured": True, "error": str(exc)[:200]}
 
     _brain_stats_cache.update(at=now, data=data, url=url)
+    return data
+
+
+_network_info_cache: dict[str, object] = {"at": 0.0, "data": None}
+_wan_info_cache: dict[str, object] = {"at": 0.0, "data": None}
+
+
+async def _fetch_wan_info() -> dict | None:
+    """Public IP + GeoIP via ip-api.com (free, no key). Cached ~1h; returns stale on error."""
+    now = time.monotonic()
+    cached = _wan_info_cache.get("data")
+    if cached is not None and now - float(_wan_info_cache.get("at") or 0) < 3600:
+        return cached  # type: ignore[return-value]
+    try:
+        timeout = httpx.Timeout(4.0, connect=2.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.get(
+                "http://ip-api.com/json/",
+                params={"fields": "status,query,isp,country,countryCode,city"},
+                headers={"User-Agent": "NetDash/1.0 NetworkTile"},
+            )
+        resp.raise_for_status()
+        raw = resp.json()
+        if raw.get("status") != "success":
+            return cached  # type: ignore[return-value]
+        wan = {
+            "ip": raw.get("query"),
+            "isp": raw.get("isp"),
+            "country": raw.get("country"),
+            "country_code": raw.get("countryCode"),
+            "city": raw.get("city"),
+        }
+    except Exception:
+        return cached  # type: ignore[return-value]
+    _wan_info_cache.update(at=now, data=wan)
+    return wan
+
+
+@app.get("/api/network/info")
+async def network_tile_info(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    """LAN + WAN + activity/category stats for the optional Network tile (cached 60s)."""
+    app_settings = await _get_or_create_settings(db)
+    if not app_settings.show_network:
+        return {"ok": False, "error": "disabled"}
+
+    now = time.monotonic()
+    cached = _network_info_cache.get("data")
+    if cached is not None and now - float(_network_info_cache.get("at") or 0) < 60:
+        return cached
+
+    total = (await db.execute(select(func.count()).select_from(Service))).scalar() or 0
+    online = (
+        await db.execute(select(func.count()).select_from(Service).where(Service.is_online.is_(True)))
+    ).scalar() or 0
+
+    cat_rows = (
+        await db.execute(
+            select(Service.category, func.count())
+            .group_by(Service.category)
+            .order_by(func.count().desc())
+        )
+    ).all()
+    by_category = [{"category": (c or "—"), "count": int(n)} for c, n in cat_rows]
+
+    day_rows = (
+        await db.execute(
+            select(func.date(Service.created_at), func.count()).group_by(func.date(Service.created_at))
+        )
+    ).all()
+    per_day = {str(d): int(n) for d, n in day_rows if d}
+    today = datetime.now(timezone.utc).date()
+    activity_7d = [per_day.get((today - timedelta(days=i)).isoformat(), 0) for i in range(6, -1, -1)]
+
+    last_scan = app_settings.discovery_last_import_at
+    if last_scan is None:
+        last_scan = (await db.execute(select(func.max(Service.created_at)))).scalar()
+
+    demo = settings.demo_mode
+    wan = None
+    if settings.network_wan_lookup:
+        if demo:
+            wan = {"ip": "203.0.113.7", "isp": "Example ISP", "country": "Demoland",
+                   "country_code": "DE", "city": "Demo City"}
+        else:
+            wan = await _fetch_wan_info()
+
+    data = {
+        "ok": True,
+        "lan_ip": "10.0.0.5" if demo else get_local_ip(),
+        "gateway": "10.0.0.1" if demo else get_default_gateway(),
+        "cidr": "10.0.0.0/24" if demo else get_local_network(),
+        "devices_total": int(total),
+        "devices_online": int(online),
+        "last_scan_at": last_scan.isoformat() if last_scan else None,
+        "wan": wan,
+        "activity_7d": activity_7d,
+        "services_by_category": by_category,
+    }
+    _network_info_cache.update(at=now, data=data)
     return data
 
 

@@ -14,10 +14,33 @@ def _docker_socket_path() -> Path:
     return Path(settings.docker_socket)
 
 
+def watchtower_update_available() -> bool:
+    """True when an immediate update can be triggered via the Watchtower HTTP API."""
+    return bool((settings.watchtower_api_url or "").strip())
+
+
 def update_apply_available() -> bool:
+    if watchtower_update_available():
+        return True
     if not settings.update_apply_enabled:
         return False
     return _docker_socket_path().is_socket()
+
+
+async def trigger_watchtower_update() -> dict[str, str]:
+    """Ask Watchtower (which holds docker.sock) to pull + recreate label-enabled containers."""
+    url = (settings.watchtower_api_url or "").strip()
+    if not url:
+        raise RuntimeError("Watchtower API URL not configured")
+    headers = {}
+    token = (settings.watchtower_api_token or "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(url, headers=headers)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Watchtower API returned {resp.status_code}")
+    return {"via": "watchtower", "status": "update-triggered"}
 
 
 def _split_image_ref(image: str) -> tuple[str, str]:

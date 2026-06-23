@@ -6,9 +6,11 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.133"
+VERSION = "1.3.134"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Kafelek „Sieć" — LAN/brama/CIDR, WAN IP + ISP/kraj (GeoIP), wykresy (sparkline + donut)",
+    "„Aktualizuj teraz" przez Watchtower HTTP API — bez docker.sock w panelu (bezpieczne na QNAP)",
     "Kafelek Brain (opcjonalny) — statystyki wiedzy z endpointu /stats; domyślnie wyłączony",
     "Watermark marek/ikon na wszystkich kafelkach — także przypiętych i emoji",
     "Hardening bezpieczeństwa: limit prób logowania (brute-force)",
@@ -180,6 +182,12 @@ class Settings(BaseSettings):
     # QNAP compose.full.yml sets this so the portal can show Watchtower auto-update status
     watchtower_enabled: bool = False
     watchtower_poll_interval: int = 3600
+    # Trigger an immediate update via Watchtower's HTTP API (safer than mounting docker.sock
+    # into the portal). When set, "Update now" POSTs here instead of using the socket.
+    watchtower_api_url: str = ""
+    watchtower_api_token: str = ""
+    # Network info tile: WAN/GeoIP lookup via ip-api.com. Tile is opt-in in Settings.
+    network_wan_lookup: bool = True
 
     class Config:
         env_prefix = "NETDASH_"

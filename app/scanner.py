@@ -286,6 +286,32 @@ def get_local_ip() -> str:
         return "127.0.0.1"
 
 
+def get_default_gateway() -> str | None:
+    """Best-effort default gateway IP: parse `ip route`, else fall back to the .1 of the LAN."""
+    import shutil
+    import subprocess
+
+    if shutil.which("ip"):
+        try:
+            proc = subprocess.run(
+                ["ip", "route", "get", "1.1.1.1"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            match = re.search(r"\bvia\s+(\d{1,3}(?:\.\d{1,3}){3})", proc.stdout or "")
+            if match:
+                return match.group(1)
+        except OSError:
+            pass
+    try:
+        net = ipaddress.ip_network(f"{get_local_ip()}/24", strict=False)
+        return str(net.network_address + 1)
+    except ValueError:
+        return None
+
+
 def is_running_in_docker() -> bool:
     if Path("/.dockerenv").exists():
         return True

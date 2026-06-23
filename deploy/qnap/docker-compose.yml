@@ -28,6 +28,10 @@ services:
       NETDASH_DISCOVERY_STARTUP_DELAY: "60"
       NETDASH_COOKIE_SECURE: "false"
       NETDASH_LISTEN_PORT: "18787"
+      # Auto-update status + "Aktualizuj teraz" przez Watchtower HTTP API (ten sam token co niżej)
+      NETDASH_WATCHTOWER_ENABLED: "true"
+      NETDASH_WATCHTOWER_API_URL: "http://127.0.0.1:8080/v1/update"
+      NETDASH_WATCHTOWER_API_TOKEN: "${WATCHTOWER_HTTP_TOKEN:-change-me-watchtower-token}"
     volumes:
       - /share/Container/netdash/data:/app/data
     cap_add:
@@ -46,8 +50,8 @@ services:
     image: containrrr/watchtower:1.7.1
     container_name: netdash-watchtower
     restart: unless-stopped
-    profiles:
-      - auto-update
+    ports:
+      - "127.0.0.1:8080:8080"   # HTTP API tylko lokalnie (panel woła przez host network)
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -56,3 +60,6 @@ services:
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_INCLUDE_RESTARTING: "true"
       WATCHTOWER_ROLLING_RESTART: "true"
+      # "Aktualizuj teraz" z panelu zleca update tutaj (ten sam token co netdash)
+      WATCHTOWER_HTTP_API_UPDATE: "true"
+      WATCHTOWER_HTTP_API_TOKEN: "${WATCHTOWER_HTTP_TOKEN:-change-me-watchtower-token}"

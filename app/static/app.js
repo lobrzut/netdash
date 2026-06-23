@@ -852,6 +852,7 @@ async function setLanguage(lang) {
   renderKeys();
   renderNotes();
   renderBrainStats();
+  renderNetworkInfo();
 }
 
 function gridDensityClass() {
@@ -958,12 +959,14 @@ function applyLayout() {
   $('#widget-vault')?.classList.toggle('hidden', appSettings.show_vault === false);
   $('#widget-notes')?.classList.toggle('hidden', appSettings.show_notes === false);
   $('#widget-brain')?.classList.toggle('hidden', appSettings.show_brain !== true);
+  $('#widget-network')?.classList.toggle('hidden', appSettings.show_network !== true);
   // Reflow the top widgets row so hidden widgets leave no empty column.
   const wcols = [];
   if (appSettings.show_clock !== false) wcols.push('200px');
   if (appSettings.show_vault !== false) wcols.push('minmax(0, 0.85fr)');
   if (appSettings.show_notes !== false) wcols.push('minmax(0, 1.15fr)');
   if (appSettings.show_brain === true) wcols.push('minmax(0, 1.1fr)');
+  if (appSettings.show_network === true) wcols.push('minmax(0, 1.1fr)');
   document.querySelector('.widgets-row')?.style.setProperty('--widgets-cols', wcols.join(' ') || 'minmax(0, 1fr)');
   const showStats = appSettings.show_stats !== false && currentPage === 'services';
   $('#stats')?.classList.toggle('hidden', !showStats);
@@ -1072,6 +1075,7 @@ const DEFAULT_SETTINGS = {
   show_stats: true,
   show_brain: false,
   brain_stats_url: null,
+  show_network: false,
   show_category_filters: true,
   show_service_urls: true,
   show_ports: true,
@@ -1897,6 +1901,82 @@ async function renderBrainStats() {
       </div>`
     + (barsHtml ? `<div><div class="brain-activity-label">${t('brain.activity')}</div><div class="brain-bars">${barsHtml}</div></div>` : '')
     + `<div class="brain-foot"><span>${t('brain.lastSession')} · ${esc(last)}</span><span>${t('brain.graph')} · ${fmt(d.graph_nodes)}</span></div>`;
+}
+
+function _netFlag(cc) {
+  if (!cc || cc.length !== 2) return '🌐';
+  try {
+    return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+  } catch { return '🌐'; }
+}
+
+function _netDonut(items) {
+  const top = items.slice(0, 6);
+  const total = top.reduce((s, i) => s + (Number(i.count) || 0), 0) || 1;
+  const colors = ['#22c55e', '#38bdf8', '#a78bfa', '#f59e0b', '#ef4444', '#14b8a6'];
+  let acc = 0;
+  const segs = top.map((it, idx) => {
+    const frac = (Number(it.count) || 0) / total * 100;
+    const seg = `<circle r="15.915" cx="18" cy="18" fill="none" stroke="${colors[idx % colors.length]}" stroke-width="4.5" stroke-dasharray="${frac.toFixed(2)} ${(100 - frac).toFixed(2)}" stroke-dashoffset="${(25 - acc).toFixed(2)}"></circle>`;
+    acc += frac;
+    return seg;
+  }).join('');
+  const legend = top.map((it, idx) =>
+    `<span class="net-legend-item"><span class="net-legend-dot" style="background:${colors[idx % colors.length]}"></span>${esc(it.category)} <b>${Number(it.count) || 0}</b></span>`
+  ).join('');
+  return `<div class="net-donut-wrap">
+    <svg viewBox="0 0 36 36" class="net-donut"><circle r="15.915" cx="18" cy="18" fill="none" stroke="var(--border)" stroke-width="4.5"></circle>${segs}<text x="18" y="19" class="net-donut-center">${total}</text></svg>
+    <div class="net-legend">${legend}</div>
+  </div>`;
+}
+
+async function renderNetworkInfo() {
+  const tile = document.getElementById('network-tile');
+  if (!tile || appSettings.show_network !== true) return;
+  const head = (statusCls, statusText) => `
+    <div class="net-head">
+      <span class="net-head-title"><span class="net-head-icon">🌐</span>${t('widget.network')}</span>
+      <span class="net-status ${statusCls}"><span class="net-dot"></span>${statusText}</span>
+    </div>`;
+  const renderEmpty = () => { tile.innerHTML = head('is-off', t('net.offline')) + `<div class="net-empty">${esc(t('net.unreachable'))}</div>`; };
+  let d;
+  try { d = await api('/api/network/info'); }
+  catch { renderEmpty(); return; }
+  if (!d || !d.ok) { renderEmpty(); return; }
+
+  const rows = [
+    [t('net.lanIp'), esc(d.lan_ip || '—')],
+    [t('net.gateway'), esc(d.gateway || '—')],
+    [t('net.cidr'), esc(d.cidr || '—')],
+    [t('net.devices'), `${Number(d.devices_online) || 0} / ${Number(d.devices_total) || 0}`],
+  ].map(([k, v]) => `<div class="net-row"><span class="net-row-k">${k}</span><span class="net-row-v">${v}</span></div>`).join('');
+
+  let wanHtml = '';
+  if (d.wan && d.wan.ip) {
+    const loc = [d.wan.city, d.wan.country].filter(Boolean).join(', ');
+    wanHtml = `<div class="net-wan">
+      <span class="net-wan-flag">${_netFlag(d.wan.country_code)}</span>
+      <span class="net-wan-main"><b>${esc(d.wan.ip)}</b>${d.wan.isp ? `<span class="net-wan-isp">${esc(d.wan.isp)}</span>` : ''}</span>
+      ${loc ? `<span class="net-wan-loc">${esc(loc)}</span>` : ''}
+    </div>`;
+  }
+
+  const bars = Array.isArray(d.activity_7d) ? d.activity_7d.slice(-7) : [];
+  const max = Math.max(1, ...bars);
+  const barsHtml = bars.map((v, i) =>
+    `<span class="net-bar ${i === bars.length - 1 ? 'net-bar--last' : ''}" style="height:${Math.max(4, Math.round((Number(v) || 0) / max * 100))}%" title="${Number(v) || 0}"></span>`
+  ).join('');
+
+  const cats = Array.isArray(d.services_by_category) ? d.services_by_category : [];
+  const donutHtml = cats.length ? _netDonut(cats) : '';
+  const lastScan = d.last_scan_at ? formatRelativeTime(d.last_scan_at) : '—';
+
+  tile.innerHTML = head('', 'online')
+    + `<div class="net-rows">${rows}</div>`
+    + wanHtml
+    + (donutHtml ? `<div class="net-section-label">${t('net.byCategory')}</div>${donutHtml}` : '')
+    + (barsHtml ? `<div class="net-section-label">${t('net.discovered7d')}</div><div class="net-bars">${barsHtml}</div>` : '')
+    + `<div class="net-foot"><span>${t('net.lastScan')} · ${esc(lastScan)}</span></div>`;
 }
 
 function renderNotes() {
@@ -4550,6 +4630,7 @@ function readSettingsFromForm() {
     show_stats: $('#settings-show-stats').checked,
     show_brain: $('#settings-show-brain').checked,
     brain_stats_url: $('#settings-brain-url').value.trim() || null,
+    show_network: $('#settings-show-network').checked,
     show_category_filters: $('#settings-show-category-filters').checked,
     show_service_urls: $('#settings-show-service-urls').checked,
     show_ports: $('#settings-show-ports').checked,
@@ -4601,6 +4682,7 @@ function fillSettingsForm() {
   $('#settings-show-brain').checked = appSettings.show_brain === true;
   $('#settings-brain-url').value = appSettings.brain_stats_url || '';
   $('#settings-brain-url-row')?.classList.toggle('hidden', appSettings.show_brain !== true);
+  $('#settings-show-network').checked = appSettings.show_network === true;
   $('#settings-show-category-filters').checked = appSettings.show_category_filters !== false;
   $('#settings-show-service-urls').checked = appSettings.show_service_urls !== false;
   $('#settings-show-ports').checked = appSettings.show_ports !== false;
@@ -5292,7 +5374,7 @@ function openSolSetupHelp() {
 const SETTINGS_PREVIEW_IDS = [
   'settings-title', 'settings-subtitle', 'settings-footer', 'settings-favicon',
   'settings-custom-css', 'settings-accent', 'settings-show-clock', 'settings-show-vault',
-  'settings-show-notes', 'settings-show-stats', 'settings-show-brain', 'settings-brain-url', 'settings-show-category-filters',
+  'settings-show-notes', 'settings-show-stats', 'settings-show-brain', 'settings-brain-url', 'settings-show-network', 'settings-show-category-filters',
   'settings-show-service-urls', 'settings-show-ports', 'settings-services-grouped',
   'settings-default-access', 'settings-services-columns', 'settings-card-style',
   'settings-pinned-card-size',

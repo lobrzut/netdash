@@ -175,6 +175,9 @@
           <div class="widget widget-brain hidden" id="widget-brain" aria-label="Brain">
             <div class="brain-tile" id="brain-tile"></div>
           </div>
+          <div class="widget widget-network hidden" id="widget-network" aria-label="Network">
+            <div class="network-tile" id="network-tile"></div>
+          </div>
         </section>
 
         <section class="pinned-section" id="pinned-section" aria-labelledby="pinned-section-title">
@@ -414,6 +417,8 @@
               <label for="settings-brain-url" data-i18n="settings.brainStatsUrl" style="display:block; font-size:0.8125rem; color:var(--text-muted); margin-bottom:4px;">URL statystyk Brain</label>
               <input type="url" id="settings-brain-url" placeholder="http://192.168.1.201:7860/stats" autocomplete="off" />
             </div>
+            <!-- Network tile: LAN/WAN/charts. OFF by default; WAN does an external GeoIP lookup. -->
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-network" /><span data-i18n="settings.showNetwork">Pokaż kafelkę Sieć</span></label>
           </div>
         </details>
         <details class="settings-accordion" open>
