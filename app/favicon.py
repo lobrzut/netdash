@@ -20,7 +20,7 @@ from app.icons import (
     resolve_port_brand_icon,
 )
 from app.models import Service
-from app.url_utils import is_safe_browser_icon_url, sanitize_service_url
+from app.url_utils import is_blocked_fetch_target, is_safe_browser_icon_url, sanitize_service_url
 
 logger = logging.getLogger("netdash")
 
@@ -81,6 +81,8 @@ def service_needs_icon_fetch(svc: Service) -> bool:
 
 
 async def _download_icon(client: httpx.AsyncClient, url: str) -> tuple[bytes, str] | None:
+    if is_blocked_fetch_target(url):
+        return None
     try:
         response = await client.get(url, headers={"User-Agent": _USER_AGENT})
     except (httpx.HTTPError, asyncio.TimeoutError):
@@ -123,6 +125,9 @@ async def fetch_remote_favicon(service_url: str) -> tuple[bytes, str] | None:
                     page_url = f"{scheme}://{host}:{port}"
                 else:
                     page_url = f"{scheme}://{host}"
+
+            if is_blocked_fetch_target(page_url):
+                continue
 
             try:
                 response = await client.get(page_url, headers={"User-Agent": _USER_AGENT})

@@ -7,7 +7,7 @@ Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1
 | Cel | Co zrobić |
 |-----|-----------|
 | **Linux + Docker** | `curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh \| bash` |
-| **QNAP Container Station** | Import URL → [`deploy/qnap/compose.url`](deploy/qnap/compose.url) — szczegóły: **[deploy/qnap/README.md](deploy/qnap/README.md)** |
+| **QNAP (Dockge)** | Import URL → [`deploy/qnap/compose.url`](deploy/qnap/compose.url) — szczegóły: **[deploy/qnap/README.md](deploy/qnap/README.md)** |
 | **Windows Docker Desktop** | `irm …/deploy/docker-simple/install.ps1 \| iex` — patrz **[deploy/docker-simple/](deploy/docker-simple/)** |
 
 Obraz: `ghcr.io/lobrzut/netdash:latest` (GHCR, bez budowania lokalnie).

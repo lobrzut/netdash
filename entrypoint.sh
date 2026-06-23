@@ -1,14 +1,14 @@
 #!/bin/sh
 set -e
 
-ENTRYPOINT_VERSION="1.3.130"
+ENTRYPOINT_VERSION="1.3.131"
 
 echo "================================================================"
 echo " NetDash entrypoint v${ENTRYPOINT_VERSION}"
 echo " LISTEN_PORT=18787 (8787 blocked — Readarr conflict)"
 echo "================================================================"
 
-# QNAP Container Station may persist NETDASH_PORT=8787 (Readarr conflict).
+# QNAP may persist a stale NETDASH_PORT=8787 (Readarr conflict).
 # Nuclear fix: always 18787; NETDASH_PORT is never read by the app.
 if [ -n "${NETDASH_PORT:-}" ]; then
   echo "NetDash entrypoint: WARNING — unsetting stale NETDASH_PORT=${NETDASH_PORT}"

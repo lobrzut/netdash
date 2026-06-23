@@ -258,6 +258,8 @@ class AppSettingsOut(BaseModel):
     show_about: bool = False
     show_clock: bool = True
     show_stats: bool = True
+    show_brain: bool = False
+    brain_stats_url: str | None = None
     services_columns: str = "normal"
     show_category_filters: bool = True
     show_service_urls: bool = True
@@ -306,6 +308,8 @@ class AppSettingsUpdate(BaseModel):
     show_about: bool | None = None
     show_clock: bool | None = None
     show_stats: bool | None = None
+    show_brain: bool | None = None
+    brain_stats_url: str | None = None
     services_columns: str | None = None
     show_category_filters: bool | None = None
     show_service_urls: bool | None = None

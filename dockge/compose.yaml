@@ -14,7 +14,7 @@
 
 #
 
-# GHCR image (no git on host — QNAP Container Station):
+# GHCR image (no git on host):
 
 #   docker compose pull && docker compose up -d
 

@@ -17,7 +17,32 @@ env:
   IMAGE_NAME: lobrzut/netdash
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Lint (ruff)
+        run: ruff check app scripts
+
+      - name: Unit tests (pytest)
+        run: pytest
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,6 +54,12 @@ jobs:
           VERSION=$(grep -E '^VERSION = ' app/config.py | sed -E 's/.*"([^"]+)".*/\1/')
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "NetDash VERSION=${VERSION}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -42,9 +73,12 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
             NETDASH_BUILD_DATE=${{ github.event.release.published_at || github.event.head_commit.timestamp || '' }}

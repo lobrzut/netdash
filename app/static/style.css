@@ -55,7 +55,7 @@
   --glass-blur: blur(16px);
   --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  --card-watermark-opacity: 0.10;
+  --card-watermark-opacity: 0.13;
 }
 
 [data-theme="ocean"] {
@@ -199,7 +199,7 @@
   --shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
   --shadow-sm: 0 2px 12px rgba(15, 23, 42, 0.06);
   --shadow-glow: 0 0 32px rgba(22, 163, 74, 0.08);
-  --card-watermark-opacity: 0.06;
+  --card-watermark-opacity: 0.11;
 }
 
 [data-theme="homer"] {
@@ -1954,10 +1954,18 @@ body.modal-open {
 }
 
 .scan-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.125rem;
+  display: inline-flex;
+  align-items: stretch;
+}
+.scan-actions .scan-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.scan-actions .scan-opt {
+  padding: 0 0.55rem;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid rgba(0, 0, 0, 0.22);
 }
 
 .scan-options-link {
@@ -1995,7 +2003,8 @@ body.modal-open {
   flex: 0 0 auto;
 }
 
-#dashboard-view[data-page="home"] .header-actions-services #add-btn {
+#dashboard-view[data-page="home"] .header-actions-services #add-btn,
+#dashboard-view[data-page="home"] .header-actions-services .scan-actions {
   visibility: hidden;
   pointer-events: none;
   position: absolute;
@@ -2374,9 +2383,32 @@ body.modal-open {
 }
 
 /* ── Widgets (Homer-style) ── */
+.widget-brain { padding: 1rem 1.125rem; }
+.brain-tile { display: flex; flex-direction: column; height: 100%; gap: 0.7rem; }
+.brain-head { display: flex; align-items: center; gap: 0.5rem; }
+.brain-head-title { color: var(--accent); font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; }
+.brain-status { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 0.7rem; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.brain-status.is-off { background: rgba(148, 163, 184, 0.12); color: var(--text-dim); }
+.brain-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: brain-pulse 1.6s ease-in-out infinite; }
+.brain-status.is-off .brain-dot { background: var(--text-dim); animation: none; }
+@keyframes brain-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.brain-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.brain-metric { background: var(--accent-muted); border-radius: var(--radius-sm); padding: 0.55rem 0.7rem; }
+.brain-metric-label { color: var(--text-dim); font-size: 0.7rem; margin-bottom: 3px; }
+.brain-metric-value { color: var(--highlight); font-family: var(--mono); font-size: 1.4rem; font-weight: 500; line-height: 1.1; }
+.brain-activity-label { color: var(--text-dim); font-size: 0.7rem; margin-bottom: 6px; }
+.brain-bars { display: flex; align-items: flex-end; gap: 5px; height: 30px; }
+.brain-bar { flex: 1; background: var(--accent-soft); border-radius: 3px; min-height: 2px; }
+.brain-bar--last { background: var(--accent); }
+.brain-foot { margin-top: auto; display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--border); padding-top: 0.6rem; color: var(--text-dim); font-size: 0.7rem; }
+.brain-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; min-height: 130px; color: var(--text-dim); font-size: 0.8rem; text-align: center; padding: 1rem; }
+.brain-empty-icon { font-size: 1.6rem; opacity: 0.6; }
+.brain-emblem-icon { width: 26px; height: 26px; border-radius: 7px; object-fit: cover; flex-shrink: 0; }
+.brain-empty-emblem { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; opacity: 0.9; }
+
 .widgets-row {
   display: grid;
-  grid-template-columns: 200px 1fr 1fr;
+  grid-template-columns: var(--widgets-cols, 200px minmax(0, 0.85fr) minmax(0, 1.15fr));
   gap: var(--grid-gap);
   margin-bottom: 1.5rem;
 }
@@ -2537,8 +2569,8 @@ body.modal-open {
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  min-height: 3.25rem;
-  padding: 0.625rem 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.625rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   transition: background var(--transition);
@@ -2555,7 +2587,7 @@ body.modal-open {
   background: var(--accent-soft);
 }
 
-.key-info { min-width: 0; flex: 0 1 auto; }
+.key-info { min-width: 0; flex: 1 1 auto; }
 
 .key-name {
   font-size: 0.875rem;
@@ -2577,6 +2609,7 @@ body.modal-open {
   font-size: 0.75rem;
   color: var(--text-muted);
   margin-top: 0.25rem;
+  overflow-wrap: anywhere;
 }
 
 .key-actions {
@@ -2888,7 +2921,7 @@ body.modal-open {
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1.375rem 1.5rem;
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -2923,11 +2956,12 @@ body.modal-open {
 }
 
 .stat-label {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.03em;
   color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
 /* ── Filters ── */
@@ -4002,7 +4036,7 @@ body[data-dashboard-layout="classic"] .service-card--pinned .service-card-waterm
   right: -6%;
   bottom: -6%;
   font-size: clamp(2.25rem, 38%, 5rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.55);
+  opacity: calc(var(--card-watermark-opacity) * 0.95);
 }
 
 body[data-dashboard-layout="classic"] .service-card--pinned .service-card-watermark--letter {
@@ -4150,7 +4184,7 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-card-wat
   right: -6%;
   bottom: -6%;
   font-size: clamp(1.4375rem, 38%, 3.125rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.52);
+  opacity: calc(var(--card-watermark-opacity) * 0.9);
 }
 
 body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-card-watermark--letter {
@@ -4369,7 +4403,7 @@ body[data-dashboard-layout="medium"] .service-card--pinned-medium .service-card-
   width: 48%;
   height: 78%;
   font-size: clamp(1rem, 42%, 1.625rem);
-  opacity: calc(var(--card-watermark-opacity) * 0.22);
+  opacity: calc(var(--card-watermark-opacity) * 0.75);
   transform: rotate(-6deg);
   -webkit-mask-image: linear-gradient(135deg, black 0%, black 12%, transparent 40%);
 }
@@ -4613,6 +4647,22 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 
 .service-card-watermark[class*="icon-"]::after {
   opacity: 1;
+}
+
+/* Emoji/letter watermarks are a single monochrome glyph — the diffuse mask
+   fades exactly the bottom-right corner where the glyph sits, so it vanishes.
+   Keep the tilt, drop the mask, and let the big glyph bleed off the corner
+   (cut-off is fine, looks good) at a clearly visible opacity. */
+.service-card-watermark--letter,
+.service-card-watermark[class*="icon-"] {
+  right: -0.5rem;
+  bottom: -0.5rem;
+  width: 100%;
+  height: 100%;
+  opacity: 0.3;
+  font-size: clamp(5rem, 42%, 8rem);
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .service-card--compact .service-card-watermark {
@@ -5463,6 +5513,8 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 .icon-dns::after { content: '🔗'; }
 .icon-ftp::after { content: '📂'; }
 .icon-monitor::after { content: '🖥️'; }
+.icon-printer::after { content: '🖨️'; }
+.icon-camera::after { content: '📷'; }
 .icon-queue::after { content: '📬'; }
 .icon-search::after { content: '🔍'; }
 .icon-storage::after { content: '💾'; }

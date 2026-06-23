@@ -37,6 +37,7 @@ const SERVICE_ICON_PRESETS = [
   'shield', 'router', 'code', 'api', 'folder', 'mail', 'dns', 'ftp', 'monitor', 'queue',
   'search', 'storage', 'ai', 'dashboard', 'workflow', 'mqtt', 'nas', 'plug', 'download', 'tv',
   'film', 'photo', 'doc', 'wifi', 'ci', 'nginx', 'apache', 'python', 'windows', 'caddy', 'traefik',
+  'printer', 'camera',
 ];
 const RECENT_ICONS_KEY = 'netdash_recent_icons';
 const SCAN_CONFIRM_SKIP_KEY = 'netdash_scan_confirm_skip';
@@ -850,6 +851,7 @@ async function setLanguage(lang) {
   else renderServices();
   renderKeys();
   renderNotes();
+  renderBrainStats();
 }
 
 function gridDensityClass() {
@@ -955,6 +957,14 @@ function applyLayout() {
   $('#widget-clock')?.classList.toggle('hidden', appSettings.show_clock === false);
   $('#widget-vault')?.classList.toggle('hidden', appSettings.show_vault === false);
   $('#widget-notes')?.classList.toggle('hidden', appSettings.show_notes === false);
+  $('#widget-brain')?.classList.toggle('hidden', appSettings.show_brain !== true);
+  // Reflow the top widgets row so hidden widgets leave no empty column.
+  const wcols = [];
+  if (appSettings.show_clock !== false) wcols.push('200px');
+  if (appSettings.show_vault !== false) wcols.push('minmax(0, 0.85fr)');
+  if (appSettings.show_notes !== false) wcols.push('minmax(0, 1.15fr)');
+  if (appSettings.show_brain === true) wcols.push('minmax(0, 1.1fr)');
+  document.querySelector('.widgets-row')?.style.setProperty('--widgets-cols', wcols.join(' ') || 'minmax(0, 1fr)');
   const showStats = appSettings.show_stats !== false && currentPage === 'services';
   $('#stats')?.classList.toggle('hidden', !showStats);
   $('#category-filters')?.classList.toggle('hidden', appSettings.show_category_filters === false);
@@ -1060,6 +1070,8 @@ const DEFAULT_SETTINGS = {
   show_notes: true,
   show_clock: true,
   show_stats: true,
+  show_brain: false,
+  brain_stats_url: null,
   show_category_filters: true,
   show_service_urls: true,
   show_ports: true,
@@ -1783,8 +1795,8 @@ function renderKeys() {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const data = await api(`/api/keys/${btn.dataset.id}/reveal`);
-      await navigator.clipboard.writeText(data.secret);
-      btn.textContent = '✓';
+      const ok = await copyToClipboard(data.secret);
+      btn.textContent = ok ? '✓' : '⚠';
       setTimeout(() => { btn.textContent = '⎘'; }, 1500);
     });
   });
@@ -1822,6 +1834,69 @@ function renderKeys() {
       await loadDashboard();
     });
   });
+}
+
+// Clipboard helper that also works on plain HTTP (navigator.clipboard is
+// undefined outside secure contexts — e.g. http://NAS:18787 on the LAN).
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch { /* fall through to legacy path */ }
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+async function renderBrainStats() {
+  const tile = document.getElementById('brain-tile');
+  if (!tile || appSettings.show_brain !== true) return;
+  const fmt = (n) => Number(n || 0).toLocaleString('pl-PL');
+  const head = (statusCls, statusText) => `
+    <div class="brain-head">
+      <span class="brain-head-title"><img class="brain-emblem-icon" src="/static/brain-emblem.png" alt="" />${t('widget.brain')}</span>
+      <span class="brain-status ${statusCls}"><span class="brain-dot"></span>${statusText}</span>
+    </div>`;
+  const renderEmpty = (msg) => {
+    tile.innerHTML = head('is-off', t('brain.offline'))
+      + `<div class="brain-empty"><img class="brain-empty-emblem" src="/static/brain-emblem.png" alt="" /><span>${esc(msg)}</span></div>`;
+  };
+  let d;
+  try { d = await api('/api/brain/stats'); }
+  catch { renderEmpty(t('brain.unreachable')); return; }
+  if (!d || !d.ok) {
+    renderEmpty(d && d.configured ? t('brain.unreachable') : t('brain.notConfigured'));
+    return;
+  }
+  const bars = Array.isArray(d.activity_7d) ? d.activity_7d.slice(-7) : [];
+  const max = Math.max(1, ...bars);
+  const barsHtml = bars.map((v, i) =>
+    `<span class="brain-bar ${i === bars.length - 1 ? 'brain-bar--last' : ''}" style="height:${Math.max(4, Math.round((Number(v) || 0) / max * 100))}%" title="${Number(v) || 0}"></span>`
+  ).join('');
+  const last = d.last_session_at ? formatRelativeTime(d.last_session_at) : '—';
+  tile.innerHTML = head('', 'online')
+    + `<div class="brain-metrics">
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.notes')}</div><div class="brain-metric-value">${fmt(d.notes)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.sessions')}</div><div class="brain-metric-value">${fmt(d.sessions)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.library')}</div><div class="brain-metric-value">${fmt(d.library_docs)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.code')}</div><div class="brain-metric-value">${fmt(d.code_files)}</div></div>
+      </div>`
+    + (barsHtml ? `<div><div class="brain-activity-label">${t('brain.activity')}</div><div class="brain-bars">${barsHtml}</div></div>` : '')
+    + `<div class="brain-foot"><span>${t('brain.lastSession')} · ${esc(last)}</span><span>${t('brain.graph')} · ${fmt(d.graph_nodes)}</span></div>`;
 }
 
 function renderNotes() {
@@ -2656,6 +2731,9 @@ function bindServiceCards(root) {
       try {
         await api(`/api/services/${btn.dataset.id}/wol`, { method: 'POST' });
         showToast(t('toast.wolSent'), 'success');
+        const orig = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
       } catch (err) {
         showToast(err.message || t('action.wolFailed'), 'error');
       }
@@ -3407,6 +3485,9 @@ function bindPinnedChips(root) {
       try {
         await api(`/api/services/${btn.dataset.id}/wol`, { method: 'POST' });
         showToast(t('toast.wolSent'), 'success');
+        const orig = btn.textContent;
+        btn.textContent = '✓';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
       } catch (err) {
         showToast(err.message || t('action.wolFailed'), 'error');
       }
@@ -4467,6 +4548,8 @@ function readSettingsFromForm() {
     show_vault: $('#settings-show-vault').checked,
     show_notes: $('#settings-show-notes').checked,
     show_stats: $('#settings-show-stats').checked,
+    show_brain: $('#settings-show-brain').checked,
+    brain_stats_url: $('#settings-brain-url').value.trim() || null,
     show_category_filters: $('#settings-show-category-filters').checked,
     show_service_urls: $('#settings-show-service-urls').checked,
     show_ports: $('#settings-show-ports').checked,
@@ -4515,6 +4598,9 @@ function fillSettingsForm() {
   $('#settings-show-vault').checked = appSettings.show_vault !== false;
   $('#settings-show-notes').checked = appSettings.show_notes !== false;
   $('#settings-show-stats').checked = appSettings.show_stats !== false;
+  $('#settings-show-brain').checked = appSettings.show_brain === true;
+  $('#settings-brain-url').value = appSettings.brain_stats_url || '';
+  $('#settings-brain-url-row')?.classList.toggle('hidden', appSettings.show_brain !== true);
   $('#settings-show-category-filters').checked = appSettings.show_category_filters !== false;
   $('#settings-show-service-urls').checked = appSettings.show_service_urls !== false;
   $('#settings-show-ports').checked = appSettings.show_ports !== false;
@@ -4711,6 +4797,10 @@ $('#settings-btn').addEventListener('click', () => {
   switchSettingsTab(activeTab);
   updateSettingsFooter(activeTab);
   openModal('settings-modal');
+});
+
+$('#settings-show-brain')?.addEventListener('change', (e) => {
+  $('#settings-brain-url-row')?.classList.toggle('hidden', !e.target.checked);
 });
 
 $('#discovery-copy-cmd')?.addEventListener('click', async () => {
@@ -5202,7 +5292,7 @@ function openSolSetupHelp() {
 const SETTINGS_PREVIEW_IDS = [
   'settings-title', 'settings-subtitle', 'settings-footer', 'settings-favicon',
   'settings-custom-css', 'settings-accent', 'settings-show-clock', 'settings-show-vault',
-  'settings-show-notes', 'settings-show-stats', 'settings-show-category-filters',
+  'settings-show-notes', 'settings-show-stats', 'settings-show-brain', 'settings-brain-url', 'settings-show-category-filters',
   'settings-show-service-urls', 'settings-show-ports', 'settings-services-grouped',
   'settings-default-access', 'settings-services-columns', 'settings-card-style',
   'settings-pinned-card-size',

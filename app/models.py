@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -127,6 +127,11 @@ class AppSettings(Base):
     discovery_last_import_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     discovery_last_import_source: Mapped[str | None] = mapped_column(String(128), nullable=True)
     discovery_last_import_hosts: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Set true after the admin changes their password in-app; blocks env password sync on restart.
+    admin_password_user_set: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Optional "Brain" knowledge-base stats tile on the dashboard.
+    show_brain: Mapped[bool] = mapped_column(Boolean, default=False)
+    brain_stats_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
 
 class ScanJob(Base):

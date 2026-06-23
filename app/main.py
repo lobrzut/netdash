@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import re
 import time
 import uuid
@@ -22,6 +21,10 @@ from app.auth import (
     create_access_token,
     get_current_user,
     hash_password,
+    login_client_key,
+    login_lockout_seconds,
+    register_failed_login,
+    reset_login_attempts,
     set_auth_cookie,
     verify_password,
 )
@@ -259,6 +262,9 @@ def _migrate_db(sync_conn):
             ("discovery_last_import_at", "DATETIME"),
             ("discovery_last_import_source", "VARCHAR(128)"),
             ("discovery_last_import_hosts", "INTEGER"),
+            ("admin_password_user_set", "BOOLEAN DEFAULT 0"),
+            ("show_brain", "BOOLEAN DEFAULT 0"),
+            ("brain_stats_url", "VARCHAR(256)"),
         ]
         for name, ddl in settings_migrations:
             if name not in columns:
@@ -332,6 +338,15 @@ async def _sanitize_stored_urls() -> None:
             await db.commit()
 
 
+async def _admin_password_user_set(db: AsyncSession) -> bool:
+    """True once the admin changed their password in-app — env sync must not clobber it."""
+    try:
+        result = await db.execute(select(AppSettings.admin_password_user_set).limit(1))
+        return bool(result.scalar_one_or_none())
+    except Exception:
+        return False
+
+
 async def _sync_admin_password_from_env(db: AsyncSession) -> dict[str, object]:
     """Homelab post-deploy login: ensure admin exists and password matches settings on start."""
     username = settings.default_admin_user
@@ -368,6 +383,15 @@ async def _sync_admin_password_from_env(db: AsyncSession) -> dict[str, object]:
     status["admin_exists"] = True
     if verify_password(password, user.password_hash):
         status["password_matches"] = True
+        return status
+
+    if await _admin_password_user_set(db):
+        status["user_managed"] = True
+        logger.info(
+            "Admin password changed in-app for %r — skipping env sync "
+            "(use NETDASH_RESET_ADMIN_PASSWORD to override)",
+            username,
+        )
         return status
 
     user.password_hash = hash_password(password)
@@ -409,6 +433,15 @@ def _log_admin_startup_status(status: dict[str, object], ready: bool) -> None:
             "NETDASH_SECRET_KEY is missing or too short — sessions may fail; "
             "set NETDASH_SECRET_KEY or rely on entrypoint auto-generation in /app/data/.secret",
         )
+    if (
+        settings.sync_admin_password
+        and settings.default_admin_password == "changeme"
+        and not status.get("user_managed")
+    ):
+        logger.warning(
+            "SECURITY: admin password is the default 'changeme' with sync enabled — "
+            "set NETDASH_DEFAULT_ADMIN_PASSWORD to a strong value (reachable on host network).",
+        )
 
 
 async def _maybe_reset_admin_password(db: AsyncSession) -> None:
@@ -432,6 +465,42 @@ async def _maybe_reset_admin_password(db: AsyncSession) -> None:
     )
 
 
+async def _maybe_seed_demo(db: AsyncSession) -> None:
+    """Seed example services on a fresh DB when NETDASH_SEED_DEMO=true (opt-in)."""
+    if not settings.seed_demo:
+        return
+    result = await db.execute(select(func.count()).select_from(Service))
+    if (result.scalar_one() or 0) > 0:
+        return
+    try:
+        from scripts.seed_demo_data import DEMO_KEYS, DEMO_NOTES, DEMO_SERVICES
+    except Exception:
+        logger.warning("NETDASH_SEED_DEMO set but demo data could not be imported")
+        return
+    for svc in DEMO_SERVICES:
+        db.add(Service(**svc))
+    for key in DEMO_KEYS:
+        secret = key["secret"]
+        db.add(
+            ApiKey(
+                name=key["name"],
+                secret_encrypted=encrypt_secret(secret),
+                secret_hint=secret[-4:] if len(secret) >= 4 else secret,
+                service=key["service"],
+                username=key.get("username"),
+                notes=key.get("notes"),
+                pinned=key.get("pinned", False),
+            )
+        )
+    for note in DEMO_NOTES:
+        db.add(Note(**note))
+    await db.commit()
+    logger.info(
+        "Seeded %s demo services (NETDASH_SEED_DEMO) — remove with scripts/cleanup_demo_data.py --apply",
+        len(DEMO_SERVICES),
+    )
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -452,6 +521,7 @@ async def init_db():
             admin_status["password_matches"] = True
         await _maybe_reset_admin_password(db)
         await _get_or_create_settings(db)
+        await _maybe_seed_demo(db)
         _log_admin_startup_status(admin_status, await _admin_ready(db))
 
     await _ensure_local_host_service()
@@ -560,7 +630,15 @@ async def lifespan(app: FastAPI):
         task.cancel()
 
 
-app = FastAPI(title="NetDash", description="Dashboard sieci z auto-wykrywaniem serwisów", lifespan=lifespan)
+app = FastAPI(
+    title="NetDash",
+    description="Dashboard sieci z auto-wykrywaniem serwisów",
+    lifespan=lifespan,
+    # Swagger/OpenAPI off by default — avoid API-schema disclosure on host network.
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "app" / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
@@ -570,7 +648,7 @@ _STATIC_NO_CACHE = frozenset({"/static/app.js", "/static/i18n.js", "/static/styl
 @app.middleware("http")
 async def static_no_cache_middleware(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path in _STATIC_NO_CACHE:
+    if request.url.path in _STATIC_NO_CACHE or request.url.path.startswith("/static/i18n/"):
         response.headers["Cache-Control"] = "no-cache, must-revalidate"
         response.headers["Pragma"] = "no-cache"
     return response
@@ -680,12 +758,20 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     username = (data.username or "").strip()
-    if not username:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
+    key = login_client_key(request, username)
+    locked = login_lockout_seconds(key)
+    if locked:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Zbyt wiele nieudanych prób logowania. Spróbuj ponownie za {locked}s.",
+            headers={"Retry-After": str(locked)},
+        )
     result = await db.execute(select(User).where(func.lower(User.username) == username.lower()))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(data.password, user.password_hash):
+    if not username or not user or not verify_password(data.password, user.password_hash):
+        register_failed_login(key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędny login lub hasło")
+    reset_login_attempts(key)
     access_token = create_access_token(user.username)
     set_auth_cookie(response, request, access_token, username=user.username)
     return Token(access_token=access_token)
@@ -723,6 +809,9 @@ async def change_password(
     if not verify_password(data.current_password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędne aktualne hasło")
     user.password_hash = hash_password(data.new_password)
+    # Mark password as user-managed so env sync won't revert it on the next restart.
+    app_settings = await _get_or_create_settings(db)
+    app_settings.admin_password_user_set = True
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -889,6 +978,49 @@ async def update_settings(
     await db.commit()
     await db.refresh(app_settings)
     return app_settings
+
+
+_brain_stats_cache: dict[str, object] = {"at": 0.0, "data": None, "url": None}
+
+
+@app.get("/api/brain/stats")
+async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    """Proxy + normalize the Brain knowledge-base stats JSON (server-side, cached 60s)."""
+    app_settings = await _get_or_create_settings(db)
+    url = (app_settings.brain_stats_url or "").strip()
+    if not app_settings.show_brain or not url:
+        return {"ok": False, "configured": bool(url), "error": "disabled"}
+
+    now = time.monotonic()
+    if (
+        _brain_stats_cache.get("url") == url
+        and _brain_stats_cache.get("data") is not None
+        and now - float(_brain_stats_cache.get("at") or 0) < 60
+    ):
+        return _brain_stats_cache["data"]
+
+    try:
+        timeout = httpx.Timeout(4.0, connect=2.0)
+        async with httpx.AsyncClient(verify=False, timeout=timeout) as client:
+            resp = await client.get(url, headers={"User-Agent": "NetDash/1.0 BrainStats"})
+        resp.raise_for_status()
+        raw = resp.json()
+        activity = raw.get("activity_7d")
+        data = {
+            "ok": True,
+            "notes": int(raw.get("notes") or 0),
+            "sessions": int(raw.get("sessions") or 0),
+            "library_docs": int(raw.get("library_docs") or 0),
+            "code_files": int(raw.get("code_files") or 0),
+            "graph_nodes": int(raw.get("graph_nodes") or 0),
+            "last_session_at": raw.get("last_session_at"),
+            "activity_7d": [int(x) for x in activity][:14] if isinstance(activity, list) else [],
+        }
+    except Exception as exc:
+        return {"ok": False, "configured": True, "error": str(exc)[:200]}
+
+    _brain_stats_cache.update(at=now, data=data, url=url)
+    return data
 
 
 def _image_extension(
@@ -1586,7 +1718,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
             job.error_message = str(exc)
             job.finished_at = datetime.now(timezone.utc)
             await db.commit()
-    except PermissionError as exc:
+    except PermissionError:
         msg = (
             "Brak uprawnień do ping/skanu sieci (NET_RAW). "
             "Dodaj cap_add: NET_RAW w compose lub mapuj porty (bridge) z NETDASH_SCAN_CIDR."

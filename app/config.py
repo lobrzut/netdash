@@ -6,13 +6,14 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.130"
+VERSION = "1.3.132"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Watermark ikon na kafelkach auto-wykrytych serwisów",
-    "Pobieranie favicon w tle po TCP discovery",
-    "Fallback ikon po porcie (Proxmox :8006, Portainer :9000…)",
-    "MeshCentral i inne marki w mapowaniu ikon",
+    "Watermark marek/ikon na wszystkich kafelkach — także przypiętych i emoji",
+    "Hardening bezpieczeństwa: limit prób logowania (brute-force)",
+    "Hasło zmienione w UI nie jest już nadpisywane przy restarcie",
+    "Swagger /docs domyślnie wyłączony (NETDASH_DOCS_ENABLED=true by włączyć)",
+    "Migracja JWT na PyJWT + guard SSRF na metadane chmurowe",
 ]
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"
@@ -163,8 +164,12 @@ class Settings(BaseSettings):
     arp_ping_delay: float = 0.1
     # HttpOnly session cookie Secure flag — false for plain HTTP homelab (default).
     cookie_secure: bool = False
+    # Expose Swagger /docs, /redoc, /openapi.json — off by default (info disclosure on host network).
+    docs_enabled: bool = False
     # Mask real LAN IP in /api/network (for README screenshots only)
     demo_mode: bool = False
+    # Seed example/demo services on first boot when the DB is empty (NETDASH_SEED_DEMO=true)
+    seed_demo: bool = False
     # Optional in-container update apply (requires docker.sock mount — see docs/QNAP.md)
     update_apply_enabled: bool = False
     docker_image: str = GHCR_IMAGE
@@ -195,6 +200,24 @@ class Settings(BaseSettings):
     @field_validator("cookie_secure", mode="before")
     @classmethod
     def _cookie_secure(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("docs_enabled", mode="before")
+    @classmethod
+    def _docs_enabled(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("seed_demo", mode="before")
+    @classmethod
+    def _seed_demo(cls, v: object) -> bool:
         if v is None or (isinstance(v, str) and not v.strip()):
             return False
         if isinstance(v, str):

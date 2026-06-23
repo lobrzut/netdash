@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.3.132
+
+- **UI — watermark na wszystkich kafelkach**: przywrócony pochylony, dyfuzyjny watermark marki (`rotate(-8deg)` + miękka maska) dla logo. Emoji/litera nie znikają już w wygaszanym rogu — dostają ten sam skos bez maski, jako duży, lekko „ucięty" glif. Przypięte kafelki (classic / classic-sm / medium) miały krycie watermarku ściśnięte do ~0.02–0.05 — odblokowane (×0.95 / ×0.9 / ×0.75), więc tło widać też w sekcji „Przypięte serwisy". Bazowe krycie podbite (0.10→0.13 / 0.06→0.11) dla cienkich logo (Portainer, n8n).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.132`.
+
+## v1.3.131
+
+- **Bezpieczeństwo — limit prób logowania**: `POST /api/auth/login` ma teraz in-memory brute-force guard (5 prób / 5 min na parę IP+login, odpowiedź `429 Retry-After`). Reset po udanym logowaniu.
+- **Bezpieczeństwo — hasło z UI trwałe**: zmiana hasła w panelu ustawia flagę `app_settings.admin_password_user_set`; `NETDASH_SYNC_ADMIN_PASSWORD=true` nie nadpisuje już hasła przy restarcie. Powrót do hasła z env nadal przez `NETDASH_RESET_ADMIN_PASSWORD`. Log ostrzega, gdy nadal działa domyślne `changeme`.
+- **Bezpieczeństwo — Swagger off**: `/docs`, `/redoc`, `/openapi.json` domyślnie wyłączone (panel jest w LAN); włącz `NETDASH_DOCS_ENABLED=true`.
+- **Bezpieczeństwo — guard SSRF**: serwerowe pobierania (favicon, health-check) blokują endpointy metadanych chmurowych (`169.254.169.254`, `metadata.google.internal`, …).
+- **Zależności**: migracja `python-jose` → `PyJWT==2.10.1` (jose nie jest utrzymywany, CVE-2024-33663/33664); `cryptography` przypięte jawnie (`==44.0.0`, używane przez sejf API keys).
+- **CI**: bramka `test` (ruff + pytest) przed buildem; obraz multi-arch `linux/amd64,linux/arm64`; cache `type=gha`.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.131`.
+
 ## v1.3.130
 
 - **Fix — watermark ikon na kafelkach auto-wykrytych serwisów**: TCP discovery (v1.3.125+) tworzyło wpisy bez `icon_url` — kafelki pokazywały tylko generyczną ikonę CSS zamiast dużego watermarku marki. Po auto-create uruchamiane jest pobieranie favicon w tle (`/favicon.ico`, `<link rel=icon>`, cache w `/uploads/icons/`).

@@ -1,8 +1,9 @@
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
+import jwt
 from fastapi import Cookie, Depends, HTTPException, Request, status
-from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -128,7 +129,7 @@ async def get_current_user(
             username: str | None = payload.get("sub")
             if username is None:
                 continue
-        except JWTError:
+        except jwt.PyJWTError:
             continue
 
         result = await db.execute(select(User).where(User.username == username))
@@ -139,3 +140,43 @@ async def get_current_user(
     if request.url.path == "/api/auth/me":
         logger.info("GET /api/auth/me: nieprawidłowy lub wygasły token")
     raise credentials_error
+
+
+# --- In-memory brute-force guard (per process; homelab single-instance) ---
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 300.0
+_LOGIN_FAILURES: dict[str, list[float]] = {}
+
+
+def login_client_key(request: Request, username: str) -> str:
+    ip = request.client.host if request.client else "?"
+    return f"{ip}:{(username or '?').lower()}"
+
+
+def _prune_failures(key: str, now: float) -> list[float]:
+    fails = [t for t in _LOGIN_FAILURES.get(key, []) if now - t < LOGIN_WINDOW_SECONDS]
+    if fails:
+        _LOGIN_FAILURES[key] = fails
+    else:
+        _LOGIN_FAILURES.pop(key, None)
+    return fails
+
+
+def login_lockout_seconds(key: str) -> int:
+    """Seconds the caller must wait before the next attempt, or 0 if not locked."""
+    now = time.monotonic()
+    fails = _prune_failures(key, now)
+    if len(fails) >= LOGIN_MAX_ATTEMPTS:
+        return max(1, int(LOGIN_WINDOW_SECONDS - (now - fails[0])))
+    return 0
+
+
+def register_failed_login(key: str) -> None:
+    now = time.monotonic()
+    fails = _prune_failures(key, now)
+    fails.append(now)
+    _LOGIN_FAILURES[key] = fails
+
+
+def reset_login_attempts(key: str) -> None:
+    _LOGIN_FAILURES.pop(key, None)

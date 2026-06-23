@@ -92,6 +92,10 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     80: ("HTTP", "globe", "Web"),
     443: ("HTTPS", "lock", "Web"),
     445: ("SMB", "folder", "Pliki"),
+    515: ("Drukarka (LPD)", "printer", "Drukarki"),
+    554: ("Kamera (RTSP)", "camera", "Kamery"),
+    631: ("Drukarka (IPP)", "printer", "Drukarki"),
+    9100: ("Drukarka (RAW)", "printer", "Drukarki"),
     3000: ("Node.js / Dev", "code", "Development"),
     3306: ("MySQL", "database", "Baza danych"),
     3389: ("RDP", "monitor", "Zdalny dostęp"),
@@ -177,6 +181,15 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
     (r"zigbee2mqtt|zigbee", "Zigbee2MQTT", "home", "Smart Home"),
     (r"proxmox", "Proxmox", "server", "DevOps"),
     (r"mesh\s*central|meshcentral", "MeshCentral", "monitor", "Zdalny dostęp"),
+    (r"guacamole", "Apache Guacamole", "monitor", "Zdalny dostęp"),
+    (r"anydesk", "AnyDesk", "monitor", "Zdalny dostęp"),
+    (r"teamviewer", "TeamViewer", "monitor", "Zdalny dostęp"),
+    (r"rustdesk", "RustDesk", "monitor", "Zdalny dostęp"),
+    (r"nomachine|no\s*machine", "NoMachine", "monitor", "Zdalny dostęp"),
+    (r"kasm", "Kasm Workspaces", "monitor", "Zdalny dostęp"),
+    (r"\bxrdp\b|\brdp\b", "RDP", "monitor", "Zdalny dostęp"),
+    (r"drukark|\bprinter\b|laserjet|officejet|deskjet", "Drukarka", "printer", "Drukarki"),
+    (r"\bkamera\b|\bcamera\b|\bcctv\b|\bnvr\b|hikvision|reolink|dahua|amcrest|foscam|ipcam", "Kamera", "camera", "Kamery"),
     (r"uptime\s*kuma", "Uptime Kuma", "chart", "Monitoring"),
     (r"frigate", "Frigate", "home", "Smart Home"),
     (r"audiobookshelf", "Audiobookshelf", "play", "Media"),
@@ -765,7 +778,10 @@ async def discover_live_hosts(
 
     # Docker: ping often fails even with correct CIDR — TCP sweep entire subnet.
     ping_only_hosts = len(live - extra)
-    use_tcp = tcp_fallback and (not icmp_ok or ping_only_hosts <= 1)
+    # Normal mode: always TCP-sweep so hosts that block ICMP ping (e.g. a
+    # firewalled Proxmox/server) but have open ports are still found. Safe mode
+    # keeps the conservative ping-first behaviour to avoid flooding weak NAS HW.
+    use_tcp = tcp_fallback and (not settings.scan_safe_mode or not icmp_ok or ping_only_hosts <= 1)
     if use_tcp:
         tcp_live = await discover_live_hosts_tcp(cidr, progress_callback=progress_callback)
         live.update(tcp_live)
