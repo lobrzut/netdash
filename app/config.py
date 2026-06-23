@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.137"
+VERSION = "1.3.138"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",
     "Sejf API: klucze nie nakładają się już w wąskim widgecie; notatki jako czytelne wiersze",
     "Zatrzymanie skanu sieci (przycisk Zatrzymaj) + flaga kraju WAN i czytelny podgląd klucza",
     "Kafelek Sieć — LAN/brama/CIDR, WAN IP + ISP/kraj (GeoIP), wykresy (sparkline + donut)",

@@ -338,6 +338,8 @@
   "net.cidr": "Subnetz",
   "net.devices": "Geräte (online/gesamt)",
   "net.byCategory": "Dienste nach Kategorie",
+  "net.latency": "Verbindung · Latenz",
+  "net.latencyDown": "k. A.",
   "net.discovered7d": "Erkannt · 7 Tage",
   "net.lastScan": "Letzter Scan",
   "settings.showNetwork": "Netzwerk-Kachel anzeigen",

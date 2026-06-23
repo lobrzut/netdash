@@ -333,6 +333,8 @@
   "net.cidr": "Підмережа",
   "net.devices": "Пристрої (онлайн/всього)",
   "net.byCategory": "Сервіси за категорією",
+  "net.latency": "Затримка зʼєднання",
+  "net.latencyDown": "немає",
   "net.discovered7d": "Виявлено · 7 днів",
   "net.lastScan": "Останній скан",
   "settings.showNetwork": "Показати плитку Мережа",

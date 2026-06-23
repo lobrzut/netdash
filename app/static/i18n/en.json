@@ -348,6 +348,8 @@
   "net.cidr": "Subnet",
   "net.devices": "Devices (online/total)",
   "net.byCategory": "Services by category",
+  "net.latency": "Link latency",
+  "net.latencyDown": "down",
   "net.discovered7d": "Discovered · 7 days",
   "net.lastScan": "Last scan",
   "settings.showNetwork": "Show Network tile",

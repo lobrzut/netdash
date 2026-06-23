@@ -1076,6 +1076,21 @@ async def _fetch_wan_info() -> dict | None:
     return wan
 
 
+async def _tcp_latency_ms(host: str, port: int) -> int | None:
+    """TCP-connect round trip in ms (works even when ICMP is blocked). None on failure."""
+    start = time.monotonic()
+    try:
+        _, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=2.0)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return round((time.monotonic() - start) * 1000)
+    except Exception:
+        return None
+
+
 @app.get("/api/network/info")
 async def network_tile_info(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     """LAN + WAN + activity/category stats for the optional Network tile (cached 60s)."""
@@ -1093,15 +1108,6 @@ async def network_tile_info(db: AsyncSession = Depends(get_db), _: User = Depend
         await db.execute(select(func.count()).select_from(Service).where(Service.is_online.is_(True)))
     ).scalar() or 0
 
-    cat_rows = (
-        await db.execute(
-            select(Service.category, func.count())
-            .group_by(Service.category)
-            .order_by(func.count().desc())
-        )
-    ).all()
-    by_category = [{"category": (c or "—"), "count": int(n)} for c, n in cat_rows]
-
     day_rows = (
         await db.execute(
             select(func.date(Service.created_at), func.count()).group_by(func.date(Service.created_at))
@@ -1117,12 +1123,17 @@ async def network_tile_info(db: AsyncSession = Depends(get_db), _: User = Depend
 
     demo = settings.demo_mode
     wan = None
+    latency: list[dict] = []
     if settings.network_wan_lookup:
         if demo:
             wan = {"ip": "203.0.113.7", "isp": "Example ISP", "country": "Demoland",
                    "country_code": "DE", "city": "Demo City"}
+            latency = [{"name": "Cloudflare", "ms": 12}, {"name": "Google", "ms": 15}]
         else:
             wan = await _fetch_wan_info()
+            targets = [("Cloudflare", "1.1.1.1", 443), ("Google", "8.8.8.8", 53)]
+            results = await asyncio.gather(*[_tcp_latency_ms(h, p) for _, h, p in targets])
+            latency = [{"name": targets[i][0], "ms": results[i]} for i in range(len(targets))]
 
     data = {
         "ok": True,
@@ -1134,7 +1145,7 @@ async def network_tile_info(db: AsyncSession = Depends(get_db), _: User = Depend
         "last_scan_at": last_scan.isoformat() if last_scan else None,
         "wan": wan,
         "activity_7d": activity_7d,
-        "services_by_category": by_category,
+        "latency": latency,
     }
     _network_info_cache.update(at=now, data=data)
     return data

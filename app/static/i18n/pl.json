@@ -356,6 +356,8 @@
   "net.cidr": "Podsieć",
   "net.devices": "Urządzenia (online/total)",
   "net.byCategory": "Serwisy wg kategorii",
+  "net.latency": "Łącze · opóźnienie",
+  "net.latencyDown": "brak",
   "net.discovered7d": "Wykryte · 7 dni",
   "net.lastScan": "Ostatni skan",
   "settings.showNetwork": "Pokaż kafelkę Sieć",

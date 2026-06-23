@@ -2466,13 +2466,16 @@ body.modal-open {
 .net-wan-isp { color: var(--text-dim); font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .net-wan-loc { margin-left: auto; color: var(--text-dim); font-size: 0.7rem; text-align: right; flex-shrink: 0; }
 .net-section-label { color: var(--text-dim); font-size: 0.7rem; margin-bottom: 2px; }
-.net-donut-wrap { display: flex; align-items: center; gap: 0.85rem; }
-.net-donut { width: 72px; height: 72px; flex-shrink: 0; }
-.net-donut-center { fill: var(--highlight); font-size: 9px; font-family: var(--mono); text-anchor: middle; dominant-baseline: middle; }
-.net-legend { display: flex; flex-direction: column; gap: 3px; font-size: 0.72rem; color: var(--text-muted); min-width: 0; flex: 1; }
-.net-legend-item { display: flex; align-items: center; gap: 6px; }
-.net-legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-.net-legend-item b { color: var(--highlight); font-family: var(--mono); margin-left: auto; }
+.net-latency { display: flex; flex-direction: column; gap: 4px; }
+.net-lat-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+.net-lat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.net-lat-dot.is-good { background: #22c55e; }
+.net-lat-dot.is-ok { background: #eab308; }
+.net-lat-dot.is-slow { background: #f97316; }
+.net-lat-dot.is-down { background: #ef4444; }
+.net-lat-name { color: var(--text-muted); }
+.net-lat-val { margin-left: auto; font-family: var(--mono); color: var(--highlight); }
+.net-lat-val.is-down { color: #ef4444; }
 .net-bars { display: flex; align-items: flex-end; gap: 5px; height: 30px; }
 .net-bar { flex: 1; background: var(--accent-soft); border-radius: 3px; min-height: 2px; }
 .net-bar--last { background: var(--accent); }

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.138
+
+- **Kafelek Sieć — latency zamiast donuta kategorii**: sekcja „Serwisy wg kategorii" (donut + legenda, która się nie mieściła) zastąpiona **opóźnieniem łącza** — TCP do `1.1.1.1` (Cloudflare) i `8.8.8.8` (Google), z kolorowym wskaźnikiem (zielony < 40 ms, żółty < 120 ms, czerwony wolno/brak). Mierzone serwerowo, cache 60 s, działa nawet przy zablokowanym ICMP.
+- **WAN — miasto i kraj zamiast ISP**: pod publicznym IP pokazujemy teraz lokalizację (np. „Zurich, Switzerland") zamiast nazwy operatora.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.138`.
+
 ## v1.3.137
 
 - **Fix — Sejf API w wąskim widgecie**: karty kluczy były ściskane w pionie (`flex-shrink` w kontenerze o stałej wysokości) i ich treść nachodziła na siebie. Teraz `flex-shrink: 0` (karty trzymają wysokość, lista się przewija), a przyciski akcji zawijają się pod tekst klucza, gdy kolumna jest wąska. Maskowane kropki nie łamią się w środku.

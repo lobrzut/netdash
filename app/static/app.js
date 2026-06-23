@@ -1912,26 +1912,6 @@ function _netFlag(cc) {
   return `<img class="net-flag-img" src="https://flagcdn.com/${code}.svg" alt="${label}" title="${label}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'net-flag-fallback',textContent:'${label}'}))" />`;
 }
 
-function _netDonut(items) {
-  const top = items.slice(0, 6);
-  const total = top.reduce((s, i) => s + (Number(i.count) || 0), 0) || 1;
-  const colors = ['#22c55e', '#38bdf8', '#a78bfa', '#f59e0b', '#ef4444', '#14b8a6'];
-  let acc = 0;
-  const segs = top.map((it, idx) => {
-    const frac = (Number(it.count) || 0) / total * 100;
-    const seg = `<circle r="15.915" cx="18" cy="18" fill="none" stroke="${colors[idx % colors.length]}" stroke-width="4.5" stroke-dasharray="${frac.toFixed(2)} ${(100 - frac).toFixed(2)}" stroke-dashoffset="${(25 - acc).toFixed(2)}"></circle>`;
-    acc += frac;
-    return seg;
-  }).join('');
-  const legend = top.map((it, idx) =>
-    `<span class="net-legend-item"><span class="net-legend-dot" style="background:${colors[idx % colors.length]}"></span>${esc(it.category)} <b>${Number(it.count) || 0}</b></span>`
-  ).join('');
-  return `<div class="net-donut-wrap">
-    <svg viewBox="0 0 36 36" class="net-donut"><circle r="15.915" cx="18" cy="18" fill="none" stroke="var(--border)" stroke-width="4.5"></circle>${segs}<text x="18" y="19" class="net-donut-center">${total}</text></svg>
-    <div class="net-legend">${legend}</div>
-  </div>`;
-}
-
 async function renderNetworkInfo() {
   const tile = document.getElementById('network-tile');
   if (!tile || appSettings.show_network !== true) return;
@@ -1958,8 +1938,7 @@ async function renderNetworkInfo() {
     const loc = [d.wan.city, d.wan.country].filter(Boolean).join(', ');
     wanHtml = `<div class="net-wan">
       <span class="net-wan-flag">${_netFlag(d.wan.country_code)}</span>
-      <span class="net-wan-main"><b>${esc(d.wan.ip)}</b>${d.wan.isp ? `<span class="net-wan-isp">${esc(d.wan.isp)}</span>` : ''}</span>
-      ${loc ? `<span class="net-wan-loc">${esc(loc)}</span>` : ''}
+      <span class="net-wan-main"><b>${esc(d.wan.ip)}</b>${loc ? `<span class="net-wan-isp">${esc(loc)}</span>` : ''}</span>
     </div>`;
   }
 
@@ -1969,14 +1948,19 @@ async function renderNetworkInfo() {
     `<span class="net-bar ${i === bars.length - 1 ? 'net-bar--last' : ''}" style="height:${Math.max(4, Math.round((Number(v) || 0) / max * 100))}%" title="${Number(v) || 0}"></span>`
   ).join('');
 
-  const cats = Array.isArray(d.services_by_category) ? d.services_by_category : [];
-  const donutHtml = cats.length ? _netDonut(cats) : '';
+  const lat = Array.isArray(d.latency) ? d.latency : [];
+  const latHtml = lat.length ? `<div class="net-latency">${lat.map((l) => {
+    const ms = l.ms;
+    const cls = ms == null ? 'is-down' : ms < 40 ? 'is-good' : ms < 120 ? 'is-ok' : 'is-slow';
+    const val = ms == null ? t('net.latencyDown') : `${ms} ms`;
+    return `<div class="net-lat-row"><span class="net-lat-dot ${cls}"></span><span class="net-lat-name">${esc(l.name)}</span><span class="net-lat-val ${cls}">${val}</span></div>`;
+  }).join('')}</div>` : '';
   const lastScan = d.last_scan_at ? formatRelativeTime(d.last_scan_at) : '—';
 
   tile.innerHTML = head('', 'online')
     + `<div class="net-rows">${rows}</div>`
     + wanHtml
-    + (donutHtml ? `<div class="net-section-label">${t('net.byCategory')}</div>${donutHtml}` : '')
+    + (latHtml ? `<div class="net-section-label">${t('net.latency')}</div>${latHtml}` : '')
     + (barsHtml ? `<div class="net-section-label">${t('net.discovered7d')}</div><div class="net-bars">${barsHtml}</div>` : '')
     + `<div class="net-foot"><span>${t('net.lastScan')} · ${esc(lastScan)}</span></div>`;
 }
