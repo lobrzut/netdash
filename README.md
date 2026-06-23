@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.130-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.132-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -78,23 +78,23 @@ If NetDash runs on a low-power NAS (for example QNAP) without safe LAN scan acce
 
 See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md).
 
-## What's new in v1.3.27
+## What's new
 
-- Uptime indicators stay green for reachable login-gated and self-signed HTTPS services.
-- Fixed stale amber status when checks were healthy but timestamps were old.
+### v1.3.132
 
-## What's new in v1.3.26
+- Visible brand/icon **watermark on every tile** — pinned cards and emoji/letter tiles now included (no more blank backgrounds).
 
-- **Add service modal** with icon preview, category suggestions, description, pin/login toggles, and **Identify** action (feature parity with edit modal).
-- Sectioned layout with URL hint; `POST /api/services` now accepts `icon_url`.
+### v1.3.131 — security hardening
 
-## What's new in v1.3.25
+- Login **brute-force guard** (`429` + `Retry-After`, 5 attempts / 5 min per IP+user); UI-set password no longer overwritten on restart.
+- Swagger `/docs` **off by default** (`NETDASH_DOCS_ENABLED=true` to enable).
+- `python-jose` → **`PyJWT`** (CVE-2024-33663/33664); SSRF guard for cloud-metadata endpoints.
 
-- Uptime indicators on cards: online / offline / stale / unknown / HTTP error, plus subtle “last seen” text.
-- Homer-inspired card polish: category accent, stronger hover state, watermark preserved.
-- Friendlier empty states (pinned CTA and search no-results reset).
-- Debounced service search and faster pin toggle without full grid re-render.
-- **Homer YAML import** — Settings → Backup → Import Homer (`config.yml`).
+### Deployment
+
+- **QNAP via Dockge** (Container Station stays as the Docker engine) — see [`deploy/qnap/README.md`](deploy/qnap/README.md).
+
+Full version history: **[CHANGELOG.md](CHANGELOG.md)**.
 
 See [ROADMAP.md](ROADMAP.md) for remaining work.
 
