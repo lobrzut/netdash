@@ -9,8 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 VERSION = "1.3.134"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Kafelek „Sieć" — LAN/brama/CIDR, WAN IP + ISP/kraj (GeoIP), wykresy (sparkline + donut)",
-    "„Aktualizuj teraz" przez Watchtower HTTP API — bez docker.sock w panelu (bezpieczne na QNAP)",
+    "Kafelek Sieć — LAN/brama/CIDR, WAN IP + ISP/kraj (GeoIP), wykresy (sparkline + donut)",
+    "Przycisk Aktualizuj teraz przez Watchtower HTTP API — bez docker.sock w panelu (bezpieczne na QNAP)",
     "Kafelek Brain (opcjonalny) — statystyki wiedzy z endpointu /stats; domyślnie wyłączony",
     "Watermark marek/ikon na wszystkich kafelkach — także przypiętych i emoji",
     "Hardening bezpieczeństwa: limit prób logowania (brute-force)",
