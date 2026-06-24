@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.139"
+VERSION = "1.3.140"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Wykrywanie serwisów na dowolnym porcie — NETDASH_SCAN_ALL_PORTS sonduje żywe hosty po ~190 portach usług",
     "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",
     "Sejf API: klucze nie nakładają się już w wąskim widgecie; notatki jako czytelne wiersze",
     "Zatrzymanie skanu sieci (przycisk Zatrzymaj) + flaga kraju WAN i czytelny podgląd klucza",
@@ -138,6 +139,9 @@ class Settings(BaseSettings):
     scan_cidr: str | None = None
     # Disable built-in LAN scan (QNAP dashboard) — use remote discovery agent instead
     scan_disabled: bool = False
+    # Probe every LIVE host on the full service-port list (scanner.SERVICE_PORTS) so services
+    # on non-standard ports are auto-discovered. Heavier but stays safe (only live hosts).
+    scan_all_ports: bool = False
     # local = manual TCP scan; adaptive = tiered ping→ARP→ports (default QNAP);
     # arp = legacy background arp-scan; remote = deploy/agent
     discovery_mode: str = "local"
@@ -248,6 +252,15 @@ class Settings(BaseSettings):
     @field_validator("scan_disabled", mode="before")
     @classmethod
     def _scan_disabled(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("scan_all_ports", mode="before")
+    @classmethod
+    def _scan_all_ports(cls, v: object) -> bool:
         if v is None or (isinstance(v, str) and not v.strip()):
             return False
         if isinstance(v, str):

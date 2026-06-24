@@ -32,6 +32,7 @@ from app.database import async_session
 from app.discovery_import import import_discovery_hosts
 from app.models import AppSettings
 from app.scanner import (
+    SERVICE_PORTS,
     TCP_DISCOVERY_PRIMARY_PORTS,
     _check_port,
     _identify_service,
@@ -286,6 +287,18 @@ async def _tier1_tcp_discovery(
                 return
 
             live.add(ip)
+            # Host is live — when scan_all_ports is on, deep-probe it on the full service-port
+            # list so services on non-standard ports are found. Only live hosts get this (a few
+            # dozen), gated by port_sem, so it stays throttled and won't flood the NAS.
+            if settings.scan_all_ports:
+                extra_ports = [p for p in SERVICE_PORTS if p not in host_ports]
+                extra_checks = await asyncio.gather(
+                    *(_check_port(ip, port, port_sem) for port in extra_ports)
+                )
+                host_ports = host_ports + [
+                    port for port, ok in zip(extra_ports, extra_checks) if ok
+                ]
+
             open_ports_by_ip[ip] = host_ports
             logger.info("TCP discovery: %s live ports=%s", ip, host_ports)
 

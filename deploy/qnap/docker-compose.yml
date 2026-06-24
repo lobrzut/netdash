@@ -23,6 +23,7 @@ services:
       NETDASH_SCAN_CIDR: "192.168.1.0/24"
       NETDASH_DISCOVERY_INTERVAL: "300"
       NETDASH_SCAN_SAFE_MODE: "true"
+      NETDASH_SCAN_ALL_PORTS: "true"   # deep-probe każdy żywy host po pełnej liście portów usług
       NETDASH_DISCOVERY_PORT_PROBE: "true"
       NETDASH_STARTUP_HEALTH_DEFER: "true"
       NETDASH_DISCOVERY_STARTUP_DELAY: "60"

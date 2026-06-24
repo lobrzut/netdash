@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.139-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.140-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -82,10 +82,14 @@ See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.
 
 ## What's new
 
-### v1.3.137 – 1.3.139
+### v1.3.140
 
-- **Network tile polish** — **link latency** (TCP to Cloudflare / Google, colour-coded) replaced the services-by-category donut; the **WAN** line shows city + country; the tile fits the widget (no clipped footer).
-- **API vault & notes** — key cards no longer overlap in the narrow dashboard tile (actions wrap below); notes are now full-width **list rows** instead of square tiles.
+- **Discover services on any port** — set `NETDASH_SCAN_ALL_PORTS=true` and every host found live is deep-probed against a comprehensive ~190-port service list, so services on non-standard ports (`8123`, `32400`, `9090`, …) are discovered automatically. Only live hosts are deep-probed, so it stays safe on a NAS. On by default in the QNAP compose.
+
+### v1.3.137 to 1.3.139
+
+- **Network tile polish** — link latency (Cloudflare / Google) replaced the category donut; the WAN line shows city + country; the tile fits the widget.
+- **API vault & notes** — key cards no longer overlap in the narrow tile; notes are full-width list rows.
 
 ### v1.3.136
 

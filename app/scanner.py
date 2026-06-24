@@ -83,6 +83,26 @@ COMMON_PORTS = [
 
 NOISE_PORTS = {135, 139, 445, 110, 143, 993, 995, 587, 465, 25, 23}
 
+# NETDASH_SCAN_ALL_PORTS=true: once a host is found live, probe it on this comprehensive
+# service-port list so services on non-standard ports get discovered too. Only live hosts
+# are probed this deeply (a few dozen), so it stays safe under the usual throttling —
+# unlike a 1-65535 sweep of the whole /24, which would flood the NAS.
+SERVICE_PORTS = [
+    21, 22, 23, 25, 53, 67, 69, 80, 81, 88, 110, 111, 123, 135, 139, 143, 161, 389,
+    443, 445, 465, 502, 515, 548, 554, 587, 631, 636, 873, 902, 993, 995, 1080, 1194,
+    1234, 1400, 1433, 1521, 1880, 1883, 2049, 2052, 2082, 2083, 2086, 2087, 2095, 2096,
+    2222, 2375, 2376, 2379, 2483, 3000, 3001, 3002, 3128, 3260, 3306, 3389, 3478, 3493,
+    4000, 4040, 4200, 4433, 4443, 4444, 4533, 4567, 5000, 5001, 5006, 5044, 5060, 5076,
+    5173, 5201, 5222, 5280, 5299, 5353, 5432, 5601, 5672, 5683, 5800, 5900, 5901, 5984,
+    6052, 6379, 6443, 6767, 6789, 6881, 7000, 7001, 7070, 7100, 7359, 7474, 7575, 7777,
+    7878, 8000, 8001, 8006, 8007, 8008, 8009, 8010, 8042, 8069, 8080, 8081, 8082, 8083,
+    8085, 8086, 8088, 8089, 8090, 8091, 8095, 8096, 8112, 8118, 8123, 8125, 8181, 8191,
+    8200, 8222, 8266, 8333, 8384, 8443, 8500, 8501, 8554, 8581, 8585, 8686, 8765, 8786,
+    8787, 8800, 8810, 8843, 8880, 8888, 8920, 8989, 9000, 9001, 9002, 9003, 9090, 9091,
+    9092, 9093, 9100, 9117, 9119, 9200, 9292, 9443, 9696, 9981, 9999, 10000, 11211,
+    13378, 15672, 18787, 19132, 19999, 20000, 25565, 27017, 32400, 37777, 49152, 61208,
+]
+
 PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     21: ("FTP", "ftp", "Pliki"),
     22: ("SSH", "terminal", "Zdalny dostęp"),
@@ -1311,7 +1331,12 @@ async def scan_network(
     progress_callback: ProgressCallback | None = None,
     service_callback: ServiceCallback | None = None,
 ) -> list[DiscoveredService]:
-    if full_scan and not settings.scan_safe_mode:
+    if settings.scan_all_ports:
+        extra = host_scan_ports if host_scan_ports is not None else (
+            SAFE_HOST_DISCOVERY_PORTS if settings.scan_safe_mode else HOST_DISCOVERY_PORTS
+        )
+        ports = sorted(set(SERVICE_PORTS + extra))
+    elif full_scan and not settings.scan_safe_mode:
         ports = COMMON_PORTS
     elif settings.scan_safe_mode:
         extra = host_scan_ports if host_scan_ports is not None else SAFE_HOST_DISCOVERY_PORTS

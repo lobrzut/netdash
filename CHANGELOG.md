@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.140
+
+- **Wykrywanie serwisów na nietypowych portach (`NETDASH_SCAN_ALL_PORTS=true`)**: dotąd adaptive discovery sondowało hosty tylko po 11 portach (`TCP_DISCOVERY_PRIMARY_PORTS`), a tryb safe po ~6 — serwis na np. `8123`, `32400`, `9090` nigdy nie był znajdowany w tle. Teraz, gdy host zostanie wykryty jako żywy, jest **głęboko sondowany po pełnej liście ~190 portów usług** (`scanner.SERVICE_PORTS`). Tylko żywe hosty (kilkadziesiąt), bramkowane semaforem — bez floodu sweepa /24, więc bezpieczne na QNAP. Działa też w skanie ręcznym. W YAML-u QNAP włączone domyślnie. Zweryfikowane: skan znalazł usługę na porcie 8123.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.140`.
+
 ## v1.3.139
 
 - **Kafelek Sieć mieści się w kaflu**: treść przekraczała `max-height: 360px` widgetu i dół („Ostatni skan") był ucinany. Usunięty najsłabszy element — sparkline „Wykryte · 7 dni" (cienkie dane, zwykle jeden słupek) — zostaje LAN + WAN + latency + ostatni skan. Dodatkowo `.network-tile` przewija się, gdyby treść kiedyś urosła (zamiast ucinać stopkę).
