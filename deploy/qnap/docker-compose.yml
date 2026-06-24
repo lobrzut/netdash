@@ -45,6 +45,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s
+    # Chroni NAS: netdash nie weźmie więcej niż limit. Podnieś do 768M, jeśli robisz
+    # ciężkie pełne skany /24; przy NETDASH_SCAN_SAFE_MODE=true 512M wystarcza.
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
 
   watchtower:
     image: containrrr/watchtower:1.7.1
