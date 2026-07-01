@@ -45,7 +45,6 @@ from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.url_utils import sanitize_service_url
 from app.scanner import (
     expand_cidrs_for_safe_mode,
-    validate_cidrs_for_safe_mode,
     validate_manual_scan_cidrs,
     DiscoveredService,
     ScanError,
