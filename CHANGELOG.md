@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.145
+
+- **Kafelek Brain**: dyskretny link „Otwórz dashboard” w nagłówku kafelka — widoczny tylko gdy Brain jest online; URL wyliczany z `brain_stats_url` w ustawieniach (np. `…/stats` → baza UI).
+- **API**: `/api/brain/stats` zwraca `dashboard_url` przy sukcesie.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.145`.
+
 ## v1.3.144
 
 - **Auto-usuwanie nieaktywnych serwisów**: `NETDASH_STALE_REMOVE_DAYS` (0 = wyłączone) lub checkbox w **Ustawienia → Skanowanie**. Po każdym cyklu health check usuwa auto-wykryte wpisy offline dłużej niż N dni (wg `last_seen`); pomija przypięte i ręczne.

@@ -1883,10 +1883,13 @@ async function renderBrainStats() {
   const tile = document.getElementById('brain-tile');
   if (!tile || appSettings.show_brain !== true) return;
   const fmt = (n) => Number(n || 0).toLocaleString('pl-PL');
-  const head = (statusCls, statusText) => `
+  const dashLink = (href) => href
+    ? `<a class="brain-dash-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="${esc(t('brain.openDashboard'))}">${t('brain.openDashboard')}</a>`
+    : '';
+  const head = (statusCls, statusText, dashboardUrl = null) => `
     <div class="brain-head">
       <span class="brain-head-title"><img class="brain-emblem-icon" src="/static/brain-emblem.png" alt="" />${t('widget.brain')}</span>
-      <span class="brain-status ${statusCls}"><span class="brain-dot"></span>${statusText}</span>
+      <span class="brain-head-actions">${dashLink(dashboardUrl)}<span class="brain-status ${statusCls}"><span class="brain-dot"></span>${statusText}</span></span>
     </div>`;
   const renderEmpty = (msg) => {
     tile.innerHTML = head('is-off', t('brain.offline'))
@@ -1905,7 +1908,8 @@ async function renderBrainStats() {
     `<span class="brain-bar ${i === bars.length - 1 ? 'brain-bar--last' : ''}" style="height:${Math.max(4, Math.round((Number(v) || 0) / max * 100))}%" title="${Number(v) || 0}"></span>`
   ).join('');
   const last = d.last_session_at ? formatRelativeTime(d.last_session_at) : '—';
-  tile.innerHTML = head('', 'online')
+  const dashboardUrl = d.dashboard_url || null;
+  tile.innerHTML = head('', 'online', dashboardUrl)
     + `<div class="brain-metrics">
         <div class="brain-metric"><div class="brain-metric-label">${t('brain.notes')}</div><div class="brain-metric-value">${fmt(d.notes)}</div></div>
         <div class="brain-metric"><div class="brain-metric-label">${t('brain.sessions')}</div><div class="brain-metric-value">${fmt(d.sessions)}</div></div>

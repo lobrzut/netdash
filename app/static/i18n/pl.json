@@ -353,6 +353,7 @@
   "brain.activity": "Aktywność · 7 dni",
   "brain.lastSession": "Ostatnia sesja",
   "brain.graph": "Graf",
+  "brain.openDashboard": "Otwórz dashboard",
   "settings.showBrain": "Pokaż kafelkę Brain",
   "settings.brainStatsUrl": "URL statystyk Brain",
   "widget.network": "Sieć",

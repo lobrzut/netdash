@@ -42,7 +42,7 @@ from app.health import check_all_services, effective_stale_remove_days, purge_st
 from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
-from app.url_utils import sanitize_service_url
+from app.url_utils import brain_dashboard_url, sanitize_service_url
 from app.scanner import (
     expand_cidrs_for_safe_mode,
     validate_manual_scan_cidrs,
@@ -1048,6 +1048,7 @@ async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_
         activity = raw.get("activity_7d")
         data = {
             "ok": True,
+            "dashboard_url": brain_dashboard_url(url),
             "notes": int(raw.get("notes") or 0),
             "sessions": int(raw.get("sessions") or 0),
             "library_docs": int(raw.get("library_docs") or 0),

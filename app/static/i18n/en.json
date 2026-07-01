@@ -346,6 +346,7 @@
   "brain.activity": "Activity · 7 days",
   "brain.lastSession": "Last session",
   "brain.graph": "Graph",
+  "brain.openDashboard": "Open dashboard",
   "settings.showBrain": "Show Brain tile",
   "settings.brainStatsUrl": "Brain stats URL",
   "widget.network": "Network",

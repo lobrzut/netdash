@@ -324,6 +324,7 @@
   "brain.activity": "Активність · 7 днів",
   "brain.lastSession": "Остання сесія",
   "brain.graph": "Граф",
+  "brain.openDashboard": "Відкрити dashboard",
   "settings.showBrain": "Показати плитку Brain",
   "settings.brainStatsUrl": "URL статистики Brain",
   "widget.network": "Мережа",

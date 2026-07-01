@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.144"
+VERSION = "1.3.145"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Kafelek Brain — link „Otwórz dashboard” (URL z ustawień statystyk, widoczny gdy Brain online)",
     "Auto-usuwanie nieaktywnych serwisów — NETDASH_STALE_REMOVE_DAYS lub Ustawienia → Skanowanie",
     "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
     "Wykrywanie serwisów na dowolnym porcie — NETDASH_SCAN_ALL_PORTS sonduje żywe hosty po ~190 portach usług",

@@ -2,7 +2,7 @@
 
 import ipaddress
 import re
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlunparse, urlparse
 
 _BYTES_REPR_RE = re.compile(r"b'([^']*)'|b\"([^\"]*)\"")
 
@@ -13,6 +13,23 @@ def ensure_str(value: str | bytes | None) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return str(value)
+
+
+def brain_dashboard_url(stats_url: str | None) -> str | None:
+    """Derive Brain UI base URL from the configured stats endpoint (e.g. …/stats → …/)."""
+    text = ensure_str(stats_url).strip()
+    if not text:
+        return None
+    try:
+        parsed = urlparse(text)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return None
+        path = parsed.path.rstrip("/")
+        if path.endswith("/stats"):
+            path = path[: -len("/stats")] or "/"
+        return urlunparse(parsed._replace(path=path or "/", params="", query="", fragment=""))
+    except Exception:
+        return None
 
 
 def sanitize_service_url(url: str | bytes | None) -> str:
