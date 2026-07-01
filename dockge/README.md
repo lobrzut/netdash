@@ -60,6 +60,27 @@ Recommended .env on 2 GB hosts (see [.env.example](../.env.example) — *PROFIL 
 
 After git pull, redeploy: docker compose -f dockge/compose.yaml up -d
 
+## Zbalansowany profil 2 GB VM (zalecany)
+
+Dla dedykowanej VM **2 GB RAM**, **1–2 vCPU**, limit kontenera **512M** w `dockge/compose.yaml`:
+
+- **4 GB RAM na VM to overkill** sam dla NetDash — wcześniejsze crashe wynikały z **floodu sieciowego** (skan /24, `SCAN_SAFE_MODE=false`), nie z braku pamięci.
+- Wklej blok **PROFIL ZBALANSOWANY 2 GB VM** z [.env.example](../.env.example) do `.env` — discovery włączone, `all_ports=false`, chunki `/28`, interwał 300 s.
+- `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.150` — Proxmox i QNAP zawsze w rotacji ARP.
+
+Redeploy: `docker compose -f dockge/compose.yaml up -d`
+
+## 4 GB+ Proxmox VM — agresywniejszy discovery
+
+Jeśli VM ma **≥4 GB RAM** i chcesz pełniejsze wykrywanie portów:
+
+1. Opcjonalnie podnieś limit kontenera do **1024M** w `dockge/compose.yaml`.
+2. Skopiuj **PROFIL 4 GB+ VM** z [.env.example](../.env.example).
+3. `NETDASH_AUTO_DISCOVERY_ALL_PORTS=true` (stopniowo, tylko żywe hosty) — nadal trzymaj `NETDASH_SCAN_SAFE_MODE=true`.
+
+Crashe przy ciężkim skanie to zwykle **obciążenie stosu sieciowego hosta** (`network_mode: host`), nie sam cgroup RAM — patrz `app/scanner.py`.
+
+Redeploy: `docker compose -f dockge/compose.yaml up -d`
 
 ## Requirements
 

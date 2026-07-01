@@ -31,14 +31,16 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M  # 2 GB Proxmox VM: leave headroom for OS + Docker + Dockge (1024M caused OOM on 2 GB hosts)
+          # 512M: safe default on 2 GB VMs (1024M + discovery can OOM the host).
+          # 4 GB+ Proxmox VM: raise to 1024M in this file or via Dockge stack edit.
+          memory: 512M
           cpus: "1.0"
     network_mode: host
     env_file: .env
     environment:
       NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
       NETDASH_LISTEN_PORT: "18787"
-      # ULTRA-SAFE 2 GB VM defaults — discovery OFF until you opt in via .env
+      # Conservative compose defaults (2 GB VM). On 4 GB+ enable discovery via .env — see .env.example
       NETDASH_DISCOVERY_ENABLED: ${NETDASH_DISCOVERY_ENABLED:-false}
       NETDASH_DISCOVERY_MODE: ${NETDASH_DISCOVERY_MODE:-adaptive}
       NETDASH_DISCOVERY_PROFILE: ${NETDASH_DISCOVERY_PROFILE:-weak}
