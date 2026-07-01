@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.144
+
+- **Auto-usuwanie nieaktywnych serwisów**: `NETDASH_STALE_REMOVE_DAYS` (0 = wyłączone) lub checkbox w **Ustawienia → Skanowanie**. Po każdym cyklu health check usuwa auto-wykryte wpisy offline dłużej niż N dni (wg `last_seen`); pomija przypięte i ręczne.
+- **UI**: checkbox + pole dni (domyślnie 7 po włączeniu w panelu).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.144`.
+
 ## v1.3.143
 
 - **Health check (LAN / porty)**: usĹ‚ugi na lokalnym IP nie sÄ… juĹĽ traktowane jako zawsze online â€” TCP/HTTP probe jak dla pozostaĹ‚ych hostĂłw.

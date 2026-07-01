@@ -577,10 +577,11 @@
               <p class="hint" data-i18n="settings.manualScanAdvancedDesc">Wybierz CIDR i uruchom skan na żądanie. Duże sieci (/24) wymagają potwierdzenia — discovery w tle jest bezpieczniejsze.</p>
               <button type="button" class="btn btn-secondary btn-sm" id="settings-manual-scan-btn" data-i18n="modal.scan.start">Rozpocznij skan</button>
             </details>
+            <label class="checkbox-row"><input type="checkbox" id="settings-stale-enabled" /><span data-i18n="settings.staleEnabled">Automatycznie usuń nieaktywne serwisy</span></label>
             <div class="field">
-              <label for="settings-stale-days" data-i18n="settings.staleDays">Usuń nieaktywne po (dni)</label>
-              <input type="number" id="settings-stale-days" min="0" max="365" placeholder="0 = nigdy" />
-              <span class="hint" data-i18n="settings.staleDaysHint">0 = zachowaj offline na stałe (tylko wyszarzone)</span>
+              <label for="settings-stale-days" data-i18n="settings.staleDays">Po ilu dniach offline</label>
+              <input type="number" id="settings-stale-days" min="1" max="365" placeholder="7" disabled />
+              <span class="hint" data-i18n="settings.staleDaysHint">Usuwa auto-wykryte serwisy offline dłużej niż podana liczba dni (bez przypiętych i ręcznych)</span>
             </div>
           </div>
         </details>

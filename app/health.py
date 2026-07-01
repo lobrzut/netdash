@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from sqlalchemy import select
@@ -141,6 +141,57 @@ async def apply_health_result(
         service.is_online = False
         if detail and (is_http_error_name(detail) or _HTTP_STATUS_RE.match(detail)):
             service.health_detail = detail[:128]
+
+
+def effective_stale_remove_days(db_days: int) -> int:
+    """UI/DB value wins when > 0; otherwise fall back to NETDASH_STALE_REMOVE_DAYS."""
+    if db_days and db_days > 0:
+        return db_days
+    return max(0, settings.stale_remove_days)
+
+
+def _stale_reference_time(service: Service) -> datetime | None:
+    """Last time the service was known online (fallback: last health probe)."""
+    ref = service.last_seen or service.last_checked
+    if ref is None:
+        return None
+    if ref.tzinfo is None:
+        return ref.replace(tzinfo=timezone.utc)
+    return ref
+
+
+def _is_stale_service_candidate(service: Service) -> bool:
+    if service.is_online:
+        return False
+    if service.pinned or service.customized:
+        return False
+    if not service.auto_discovered:
+        return False
+    return True
+
+
+async def purge_stale_services(db: AsyncSession, stale_days: int) -> int:
+    """Remove auto-discovered services offline longer than stale_days. 0 = disabled."""
+    if stale_days <= 0:
+        return 0
+    now = datetime.now(timezone.utc)
+    threshold = timedelta(days=stale_days)
+    result = await db.execute(select(Service))
+    to_delete: list[Service] = []
+    for service in result.scalars().all():
+        if not _is_stale_service_candidate(service):
+            continue
+        ref = _stale_reference_time(service)
+        if ref is None:
+            continue
+        if now - ref > threshold:
+            to_delete.append(service)
+    for service in to_delete:
+        await db.delete(service)
+    if to_delete:
+        await db.commit()
+        logger.info("Removed %s stale offline services (older than %s days)", len(to_delete), stale_days)
+    return len(to_delete)
 
 
 async def check_all_services(db: AsyncSession) -> int:

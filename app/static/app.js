@@ -4654,7 +4654,9 @@ function readSettingsFromForm() {
     full_scan_default: $('#settings-full-scan').checked,
     host_scan_ports: $('#settings-host-ports').value.trim() || '22,445,3389,5900',
     host_only_entries: $('#settings-host-only').checked,
-    stale_remove_days: parseInt($('#settings-stale-days').value, 10) || 0,
+    stale_remove_days: $('#settings-stale-enabled').checked
+      ? Math.max(1, parseInt($('#settings-stale-days').value, 10) || 7)
+      : 0,
     wol_broadcast_ip: $('#settings-wol-broadcast').value.trim() || '255.255.255.255',
     wol_port: parseInt($('#settings-wol-port').value, 10) || 9,
     sol_port: parseInt($('#settings-sol-port').value, 10) || 9,
@@ -4704,7 +4706,10 @@ function fillSettingsForm() {
   $('#settings-full-scan').checked = !!appSettings.full_scan_default;
   $('#settings-host-ports').value = appSettings.host_scan_ports || '22,445,3389,5900';
   $('#settings-host-only').checked = appSettings.host_only_entries !== false;
-  $('#settings-stale-days').value = appSettings.stale_remove_days ?? 0;
+  const staleDays = appSettings.stale_remove_days ?? 0;
+  $('#settings-stale-enabled').checked = staleDays > 0;
+  $('#settings-stale-days').value = staleDays > 0 ? staleDays : 7;
+  $('#settings-stale-days').disabled = staleDays <= 0;
   $('#settings-wol-broadcast').value = appSettings.wol_broadcast_ip || '255.255.255.255';
   $('#settings-wol-port').value = appSettings.wol_port ?? 9;
   $('#settings-sol-port').value = appSettings.sol_port ?? appSettings.wol_port ?? 9;
@@ -4734,6 +4739,15 @@ function fillSettingsForm() {
   refreshSettingsFaviconStatus();
   syncSettingsFaviconDetails();
 }
+
+$('#settings-stale-enabled')?.addEventListener('change', (e) => {
+  const on = e.target.checked;
+  const daysInput = $('#settings-stale-days');
+  if (daysInput) {
+    daysInput.disabled = !on;
+    if (on && !parseInt(daysInput.value, 10)) daysInput.value = '7';
+  }
+});
 
 function previewSettingsFromForm() {
   appSettings = { ...appSettings, ...readSettingsFromForm() };

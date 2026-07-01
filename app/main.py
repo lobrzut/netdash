@@ -38,7 +38,7 @@ from app.docker_update import (
 from app.updates import fetch_latest_release, is_newer_version, normalize_version
 from app.database import Base, async_session, engine, get_db
 from app.enrich import enrich_all_services, enrich_mac_addresses, enrich_service_icons, should_auto_wol
-from app.health import check_all_services
+from app.health import check_all_services, effective_stale_remove_days, purge_stale_services
 from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
@@ -287,6 +287,7 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
         app_settings = AppSettings(
             about_project=DEFAULT_ABOUT_PROJECT,
             scan_cidr_default=scan_default,
+            stale_remove_days=max(0, settings.stale_remove_days),
         )
         db.add(app_settings)
         await db.commit()
@@ -590,17 +591,24 @@ async def _health_check_loop():
                 settings_row = await _get_or_create_settings(db)
                 interval = max(15, min(900, settings_row.health_check_interval or 60))
                 enabled = settings_row.health_check_enabled
-            if enabled and not _scan_in_progress():
-                async with async_session() as db:
-                    count = await check_all_services(db)
-                    if first_pass and defer_secs:
-                        logger.info(
-                            "Startup health check completed for %s services (after %ss)",
-                            count,
-                            defer_secs,
-                        )
-                    else:
-                        logger.info("Health check completed for %s services", count)
+                stale_days = effective_stale_remove_days(settings_row.stale_remove_days or 0)
+            if not _scan_in_progress():
+                if enabled:
+                    async with async_session() as db:
+                        count = await check_all_services(db)
+                        if first_pass and defer_secs:
+                            logger.info(
+                                "Startup health check completed for %s services (after %ss)",
+                                count,
+                                defer_secs,
+                            )
+                        else:
+                            logger.info("Health check completed for %s services", count)
+                if stale_days > 0:
+                    async with async_session() as db:
+                        removed = await purge_stale_services(db, stale_days)
+                        if removed:
+                            logger.info("Stale service purge removed %s entries", removed)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -1690,8 +1698,7 @@ async def _finalize_scan(seen: set[tuple[str, int]]) -> None:
         app_settings = await _get_or_create_settings(db)
         result = await db.execute(select(Service))
         now = datetime.now(timezone.utc)
-        stale_days = app_settings.stale_remove_days or 0
-        to_delete: list[Service] = []
+        stale_days = effective_stale_remove_days(app_settings.stale_remove_days or 0)
 
         for service in result.scalars().all():
             key = (service.host, service.port)
@@ -1702,19 +1709,9 @@ async def _finalize_scan(seen: set[tuple[str, int]]) -> None:
                 continue
             service.is_online = False
             service.last_checked = now
-            if stale_days > 0 and service.last_seen:
-                last = service.last_seen
-                if last.tzinfo is None:
-                    last = last.replace(tzinfo=timezone.utc)
-                if now - last > timedelta(days=stale_days):
-                    to_delete.append(service)
 
-        for service in to_delete:
-            await db.delete(service)
-
+        await purge_stale_services(db, stale_days)
         await db.commit()
-        if to_delete:
-            logger.info("Removed %s stale services (older than %s days)", len(to_delete), stale_days)
 
 
 async def _update_scan_progress(job_id: int, phase: str, current: int, total: int, found: int | None = None):

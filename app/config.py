@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.143"
+VERSION = "1.3.144"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Auto-usuwanie nieaktywnych serwisów — NETDASH_STALE_REMOVE_DAYS lub Ustawienia → Skanowanie",
     "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
     "Wykrywanie serwisów na dowolnym porcie — NETDASH_SCAN_ALL_PORTS sonduje żywe hosty po ~190 portach usług",
     "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",
@@ -186,6 +187,8 @@ class Settings(BaseSettings):
     startup_health_defer_seconds: int | None = None
     # Consecutive failed health probes before marking a port service offline (anti-flap).
     health_offline_after_failures: int = 2
+    # Delete offline auto-discovered services after N days (0 = disabled). UI overrides when > 0.
+    stale_remove_days: int = 0
     # Seconds before first adaptive/ARP discovery cycle (portal ready first)
     discovery_startup_delay: int = 60
     # Ping/TCP sweep when arp-scan returns 0 hosts
@@ -444,6 +447,20 @@ class Settings(BaseSettings):
         if v is None or (isinstance(v, str) and not v.strip()):
             return None
         return max(0, int(v))
+
+    @field_validator("health_offline_after_failures", mode="before")
+    @classmethod
+    def _health_offline_after_failures(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 2
+        return max(1, int(v))
+
+    @field_validator("stale_remove_days", mode="before")
+    @classmethod
+    def _stale_remove_days(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 0
+        return max(0, min(365, int(v)))
 
     @field_validator("discovery_startup_delay", mode="before")
     @classmethod
