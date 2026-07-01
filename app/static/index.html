@@ -522,6 +522,12 @@
         <details class="settings-accordion" open>
           <summary data-i18n="settings.tab.discovery">Automatyczne discovery</summary>
           <div class="settings-accordion-body discovery-auto-body">
+            <label class="checkbox-row" id="settings-discovery-enabled-row">
+              <input type="checkbox" id="settings-discovery-enabled" checked />
+              <span data-i18n="settings.discoveryEnabled">Automatyczne skanowanie sieci</span>
+            </label>
+            <p class="hint" id="settings-discovery-manual-hint" data-i18n="settings.discoveryManualHint">Wyłączenie zatrzymuje discovery w tle. Serwisy dodasz ręcznie: Serwisy → Dodaj.</p>
+            <p class="hint hint-warning hidden" id="settings-discovery-env-locked-hint" data-i18n="settings.discoveryEnvLocked">Wymuszone przez NETDASH_DISCOVERY_ENABLED w .env — zmiana tutaj nie ma efektu.</p>
             <div class="discovery-status-card" id="discovery-status-card" role="status">
               <p class="discovery-status-detail" id="discovery-status-detail"></p>
             </div>

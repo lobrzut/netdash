@@ -202,6 +202,7 @@ class NetworkInfo(BaseModel):
     ping_available: bool = True
     scan_safe_mode: bool = True
     scan_disabled: bool = False
+    discovery_enabled: bool = True
     discovery_mode: str = "local"
     resource_profile: str = "safe"
     detected_cidrs: list[str] = Field(default_factory=list)
@@ -284,6 +285,9 @@ class AppSettingsOut(BaseModel):
     health_check_interval: int = 60
     gptwol_url: str | None = None
     stale_remove_days: int = 0
+    discovery_enabled: bool = True
+    discovery_env_locked: bool = False
+    discovery_effective: bool = True
     discovery_last_import_at: datetime | None = None
     discovery_last_import_source: str | None = None
     discovery_last_import_hosts: int | None = None
@@ -335,6 +339,7 @@ class AppSettingsUpdate(BaseModel):
     health_check_interval: int | None = None
     gptwol_url: str | None = None
     stale_remove_days: int | None = None
+    discovery_enabled: bool | None = None
 
     @field_validator("scan_cidr_default")
     @classmethod

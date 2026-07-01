@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.146
+
+- **Ustawienia → Automatyczne discovery**: przełącznik wyłączenia automatycznego skanowania sieci (bez restartu kontenera). Ręczne dodawanie serwisów (**Serwisy → Dodaj**) i skan ręczny nadal działają.
+- **API**: `discovery_enabled` w `PATCH /api/settings`; `discovery_env_locked` gdy `NETDASH_DISCOVERY_ENABLED` w .env ma pierwszeństwo.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.146`.
+
 ## v1.3.145
 
 - **Kafelek Brain**: dyskretny link „Otwórz dashboard” w nagłówku kafelka — widoczny tylko gdy Brain jest online; URL wyliczany z `brain_stats_url` w ustawieniach (np. `…/stats` → baza UI).

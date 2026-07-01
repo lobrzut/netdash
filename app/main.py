@@ -29,6 +29,7 @@ from app.auth import (
     verify_password,
 )
 from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, WHATS_NEW, settings
+from app.discovery_runtime import set_app_discovery_enabled
 from app.docker_update import (
     pull_and_restart,
     trigger_watchtower_update,
@@ -266,6 +267,7 @@ def _migrate_db(sync_conn):
             ("health_check_interval", "INTEGER DEFAULT 60"),
             ("gptwol_url", "VARCHAR(256)"),
             ("stale_remove_days", "INTEGER DEFAULT 0"),
+            ("discovery_enabled", "BOOLEAN DEFAULT 1"),
             ("discovery_last_import_at", "DATETIME"),
             ("discovery_last_import_source", "VARCHAR(128)"),
             ("discovery_last_import_hosts", "INTEGER"),
@@ -315,7 +317,36 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
         if changed:
             await db.commit()
             await db.refresh(app_settings)
+    _sync_discovery_runtime_from_db(app_settings)
     return app_settings
+
+
+def _sync_discovery_runtime_from_db(app_settings: AppSettings) -> None:
+    set_app_discovery_enabled(app_settings.discovery_enabled)
+
+
+def _settings_to_out(app_settings: AppSettings) -> AppSettingsOut:
+    out = AppSettingsOut.model_validate(app_settings)
+    return out.model_copy(
+        update={
+            "discovery_env_locked": settings.discovery_env_locked,
+            "discovery_effective": settings.effective_discovery_enabled,
+        }
+    )
+
+
+async def _apply_discovery_schedulers() -> None:
+    """Start/stop background discovery after a runtime settings change (no restart)."""
+    if not settings.effective_discovery_enabled:
+        await stop_discovery_scheduler()
+        await stop_arp_discovery_scheduler()
+        return
+    if settings.adaptive_discovery_enabled:
+        await stop_arp_discovery_scheduler()
+        start_discovery_scheduler()
+    elif settings.arp_discovery_enabled:
+        await stop_discovery_scheduler()
+        start_arp_discovery_scheduler()
 
 
 async def _ensure_local_host_service() -> None:
@@ -711,6 +742,7 @@ async def health(db: AsyncSession = Depends(get_db)):
         "startup_health_defer_seconds": settings.effective_startup_health_defer_seconds,
         "discovery_startup_delay": settings.effective_discovery_startup_delay,
         "discovery_enabled": settings.effective_discovery_enabled,
+        "discovery_env_locked": settings.discovery_env_locked,
         "startup_enrich_enabled": settings.effective_startup_enrich_enabled,
         "weak_dual_chunk": settings.weak_dual_chunk,
         "discovery_mode": settings.effective_discovery_mode,
@@ -887,6 +919,7 @@ async def network_info(
         ping_available=ping_ok,
         scan_safe_mode=settings.scan_safe_mode,
         scan_disabled=settings.scan_disabled,
+        discovery_enabled=settings.effective_discovery_enabled,
         discovery_mode=settings.effective_discovery_mode,
         resource_profile=settings.resource_profile,
         detected_cidrs=get_detected_cidrs(app_settings.scan_cidr_default),
@@ -1000,7 +1033,8 @@ async def network_scan_test(
 
 @app.get("/api/settings", response_model=AppSettingsOut)
 async def get_settings(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    return await _get_or_create_settings(db)
+    app_settings = await _get_or_create_settings(db)
+    return _settings_to_out(app_settings)
 
 
 @app.patch("/api/settings", response_model=AppSettingsOut)
@@ -1013,11 +1047,17 @@ async def update_settings(
     updates = data.model_dump(exclude_unset=True)
     if "custom_css" in updates:
         updates["custom_css"] = _sanitize_custom_css(updates["custom_css"])
+    if "discovery_enabled" in updates and settings.discovery_env_locked:
+        updates.pop("discovery_enabled")
+    discovery_changed = "discovery_enabled" in updates
     for field, value in updates.items():
         setattr(app_settings, field, value)
     await db.commit()
     await db.refresh(app_settings)
-    return app_settings
+    if discovery_changed:
+        _sync_discovery_runtime_from_db(app_settings)
+        await _apply_discovery_schedulers()
+    return _settings_to_out(app_settings)
 
 
 _brain_stats_cache: dict[str, object] = {"at": 0.0, "data": None, "url": None}
@@ -1242,7 +1282,7 @@ async def upload_logo(
     app_settings.use_custom_logo = True
     await db.commit()
     await db.refresh(app_settings)
-    return app_settings
+    return _settings_to_out(app_settings)
 
 
 @app.get("/api/settings/export", response_model=SettingsBackupOut)
@@ -1391,7 +1431,9 @@ async def import_settings(
 
     await db.commit()
     await db.refresh(app_settings)
-    return app_settings
+    _sync_discovery_runtime_from_db(app_settings)
+    await _apply_discovery_schedulers()
+    return _settings_to_out(app_settings)
 
 
 @app.post("/api/services/enrich")

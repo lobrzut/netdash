@@ -1120,12 +1120,18 @@ const DEFAULT_NETWORK = Object.freeze({
 
 const DISCOVERY_STALE_MS = 20 * 60 * 1000;
 
+function isDiscoveryEnabled() {
+  return appSettings?.discovery_enabled !== false;
+}
+
 function isAdaptiveDiscovery(netRes) {
+  if (!isDiscoveryEnabled()) return false;
   const net = resolveNetwork(netRes);
   return net.discovery_mode === 'adaptive' && net.scan_disabled !== true;
 }
 
 function isArpDiscovery(netRes) {
+  if (!isDiscoveryEnabled()) return false;
   const net = resolveNetwork(netRes);
   return net.discovery_mode === 'arp' && net.scan_disabled !== true;
 }
@@ -1136,6 +1142,7 @@ function isRemoteDiscovery(netRes) {
 }
 
 function isAutoDiscovery(netRes) {
+  if (!isDiscoveryEnabled()) return false;
   return isAdaptiveDiscovery(netRes) || isArpDiscovery(netRes) || isRemoteDiscovery(netRes);
 }
 
@@ -1246,6 +1253,16 @@ function updateDiscoverySettingsPanel(netRes, settings) {
   const cmd = $('#discovery-install-cmd');
   const card = $('#discovery-status-card');
   const arpIntro = $('#discovery-arp-intro');
+  const discoveryOff = !isDiscoveryEnabled();
+  $('#settings-discovery-enabled')?.toggleAttribute('disabled', !!settings?.discovery_env_locked);
+  $('#settings-discovery-env-locked-hint')?.classList.toggle('hidden', !settings?.discovery_env_locked);
+  $('#settings-auto-discovery-cidr')?.classList.toggle('hidden', discoveryOff || isRemoteDiscovery(netRes));
+  if (discoveryOff) {
+    if (detail) detail.textContent = t('settings.discoveryDisabledStatus');
+    if (arpIntro) arpIntro.classList.add('hidden');
+    if (card) card.classList.remove('discovery-status-card--ok');
+    return;
+  }
   if (!isAutoDiscovery(netRes)) return;
   const line = formatDiscoveryStatusLine(netRes, settings);
   if (detail) detail.textContent = line;
@@ -4661,6 +4678,7 @@ function readSettingsFromForm() {
     stale_remove_days: $('#settings-stale-enabled').checked
       ? Math.max(1, parseInt($('#settings-stale-days').value, 10) || 7)
       : 0,
+    discovery_enabled: $('#settings-discovery-enabled').checked,
     wol_broadcast_ip: $('#settings-wol-broadcast').value.trim() || '255.255.255.255',
     wol_port: parseInt($('#settings-wol-port').value, 10) || 9,
     sol_port: parseInt($('#settings-sol-port').value, 10) || 9,
@@ -4702,6 +4720,12 @@ function fillSettingsForm() {
   $('#settings-author-url').value = appSettings.author_url || '';
   $('#settings-about-project').value = appSettings.about_project || '';
   $('#settings-scan-cidr').value = appSettings.scan_cidr_default || '';
+  const discoveryOn = appSettings.discovery_env_locked
+    ? appSettings.discovery_effective !== false
+    : appSettings.discovery_enabled !== false;
+  $('#settings-discovery-enabled').checked = discoveryOn;
+  $('#settings-discovery-enabled')?.toggleAttribute('disabled', !!appSettings.discovery_env_locked);
+  $('#settings-discovery-env-locked-hint')?.classList.toggle('hidden', !appSettings.discovery_env_locked);
   updateDockerScanWarning(window.__netdashNetwork, appSettings);
   updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
   updateScanProfileUI(window.__netdashNetwork, appSettings);
@@ -4751,6 +4775,13 @@ $('#settings-stale-enabled')?.addEventListener('change', (e) => {
     daysInput.disabled = !on;
     if (on && !parseInt(daysInput.value, 10)) daysInput.value = '7';
   }
+});
+
+$('#settings-discovery-enabled')?.addEventListener('change', () => {
+  appSettings = { ...appSettings, discovery_enabled: $('#settings-discovery-enabled').checked };
+  updateDiscoverySettingsPanel(window.__netdashNetwork, appSettings);
+  updateDiscoveryStatusBar(window.__netdashNetwork, appSettings);
+  updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
 });
 
 function previewSettingsFromForm() {
@@ -5532,6 +5563,11 @@ $('#settings-save').addEventListener('click', async () => {
   applyTheme();
   refreshServiceViews();
   startHealthPolling();
+  try {
+    const netRes = await api('/api/network');
+    window.__netdashNetwork = netRes;
+    updateRemoteDiscoveryUI(netRes, appSettings);
+  } catch (_) { /* non-fatal */ }
   closeModal('settings-modal');
   settingsSnapshot = null;
 });

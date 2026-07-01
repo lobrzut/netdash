@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.145"
+VERSION = "1.3.146"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Ustawienia → Automatyczne discovery — przełącznik wyłączenia skanowania w tle (ręczne dodawanie serwisów nadal działa)",
     "Kafelek Brain — link „Otwórz dashboard” (URL z ustawień statystyk, widoczny gdy Brain online)",
     "Auto-usuwanie nieaktywnych serwisów — NETDASH_STALE_REMOVE_DAYS lub Ustawienia → Skanowanie",
     "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
@@ -580,11 +581,22 @@ class Settings(BaseSettings):
         return self.discovery_mode
 
     @property
+    def discovery_env_locked(self) -> bool:
+        """True when NETDASH_DISCOVERY_ENABLED is set — UI toggle cannot override."""
+        raw = os.environ.get("NETDASH_DISCOVERY_ENABLED")
+        return raw is not None and bool(str(raw).strip())
+
+    @property
     def effective_discovery_enabled(self) -> bool:
-        """Honour NETDASH_DISCOVERY_ENABLED; auto-off on <~2.1 GB RAM when env unset."""
+        """Honour NETDASH_DISCOVERY_ENABLED env; UI/DB toggle; auto-off on <~2.1 GB RAM when unset."""
         raw = os.environ.get("NETDASH_DISCOVERY_ENABLED")
         if raw is not None and str(raw).strip():
             return str(raw).strip().lower() in ("true", "1", "yes", "on")
+        from app.discovery_runtime import get_app_discovery_enabled
+
+        app_pref = get_app_discovery_enabled()
+        if app_pref is not None and not app_pref:
+            return False
         if not self.discovery_enabled:
             return False
         try:

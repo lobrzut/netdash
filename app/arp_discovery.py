@@ -434,6 +434,9 @@ async def run_arp_discovery_cycle() -> int:
     """Single ARP discovery cycle. Returns host count."""
     global _known_ips
 
+    if not settings.effective_discovery_enabled:
+        return _state.get("last_cycle_hosts") or 0
+
     if _state["running"]:
         logger.debug("ARP discovery cycle skipped — previous still running")
         return _state.get("last_cycle_hosts") or 0
@@ -523,6 +526,10 @@ async def _arp_discovery_loop() -> None:
         await asyncio.sleep(startup_delay)
 
     while True:
+        if not settings.effective_discovery_enabled:
+            _state["enabled"] = False
+            await asyncio.sleep(60)
+            continue
         try:
             await run_arp_discovery_cycle()
         except asyncio.CancelledError:
