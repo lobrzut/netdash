@@ -33,6 +33,7 @@ class Service(Base):
     has_login: Mapped[bool] = mapped_column(Boolean, default=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     is_online: Mapped[bool] = mapped_column(Boolean, default=True)
+    health_fail_streak: Mapped[int] = mapped_column(Integer, default=0)
     health_detail: Mapped[str | None] = mapped_column(String(128), nullable=True)
     last_seen: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_checked: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

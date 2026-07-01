@@ -211,6 +211,7 @@ def _migrate_db(sync_conn):
             sync_conn.execute(text("ALTER TABLE services ADD COLUMN icon_url VARCHAR(512)"))
         service_migrations = [
             ("is_online", "BOOLEAN DEFAULT 1"),
+            ("health_fail_streak", "INTEGER DEFAULT 0"),
             ("health_detail", "VARCHAR(128)"),
             ("last_checked", "DATETIME"),
             ("service_notes", "TEXT"),

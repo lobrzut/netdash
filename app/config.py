@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.142"
+VERSION = "1.3.143"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
     "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
@@ -184,6 +184,8 @@ class Settings(BaseSettings):
     startup_health_defer: bool | None = None
     # Seconds before first health check when defer enabled (None = 30 safe / 5 normal)
     startup_health_defer_seconds: int | None = None
+    # Consecutive failed health probes before marking a port service offline (anti-flap).
+    health_offline_after_failures: int = 2
     # Seconds before first adaptive/ARP discovery cycle (portal ready first)
     discovery_startup_delay: int = 60
     # Ping/TCP sweep when arp-scan returns 0 hosts

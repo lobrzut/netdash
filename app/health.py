@@ -58,38 +58,65 @@ async def _check_http_url(url: str) -> tuple[bool, str | None]:
         return False, None
 
 
+def _is_host_only(service: Service) -> bool:
+    port = service.port if service.port is not None else 0
+    protocol = (service.protocol or "http").lower()
+    return protocol == "host" or port == 0
+
+
+async def _check_tcp_port(host: str, port: int) -> bool:
+    if port < 1 or port > 65535:
+        return False
+    try:
+        conn = asyncio.open_connection(host, port)
+        _, writer = await asyncio.wait_for(conn, timeout=3.0)
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+        return False
+
+
 async def check_service_online(service: Service) -> tuple[bool, str | None]:
     host = (service.host or "").strip()
     if not host:
         return False, None
-    try:
-        local_ip = get_local_ip()
-    except Exception:
-        local_ip = None
-    if local_ip and host == local_ip:
-        return True, None
     protocol = (service.protocol or "http").lower()
     port = service.port if service.port is not None else 0
     url = sanitize_service_url((service.url or "").strip())
-    if service.has_login:
+
+    if _is_host_only(service):
+        if host in ("127.0.0.1", "localhost"):
+            return True, None
+        try:
+            local_ip = get_local_ip()
+        except Exception:
+            local_ip = None
+        if local_ip and host == local_ip:
+            return True, None
         from app.scanner import _ping_host
 
-        online = await _ping_host(host)
-        return online, None
+        return await _ping_host(host), None
+
+    if service.has_login:
+        if protocol in ("http", "https") and url:
+            return await _check_http_url(url)
+        if port > 0:
+            return await _check_tcp_port(host, port), None
+        from app.scanner import _ping_host
+
+        return await _ping_host(host), None
+
     if protocol in ("http", "https") and url:
         return await _check_http_url(url)
-    if protocol == "host" or port == 0:
-        from app.scanner import _ping_host
-
-        online = await _ping_host(host)
-        return online, None
-    if protocol in ("http", "https"):
+    if protocol in ("http", "https") and port > 0:
         scheme = "https" if port in (443, 8443, 9443, 6443, 4443) else "http"
         return await _check_http_url(f"{scheme}://{host}:{port}/")
+    if protocol == "tcp" and port > 0:
+        return await _check_tcp_port(host, port), None
     from app.scanner import _ping_host
 
-    online = await _ping_host(host)
-    return online, None
+    return await _ping_host(host), None
 
 
 async def apply_health_result(
@@ -99,13 +126,21 @@ async def apply_health_result(
     detail: str | None = None,
 ) -> None:
     now = datetime.now(timezone.utc)
-    service.is_online = online
+    threshold = max(1, settings.health_offline_after_failures)
     service.last_checked = now
     if online:
+        service.health_fail_streak = 0
+        service.is_online = True
         service.last_seen = now
         service.health_detail = None
-    elif detail and (is_http_error_name(detail) or _HTTP_STATUS_RE.match(detail)):
-        service.health_detail = detail[:128]
+        return
+
+    streak = (service.health_fail_streak or 0) + 1
+    service.health_fail_streak = streak
+    if streak >= threshold:
+        service.is_online = False
+        if detail and (is_http_error_name(detail) or _HTTP_STATUS_RE.match(detail)):
+            service.health_detail = detail[:128]
 
 
 async def check_all_services(db: AsyncSession) -> int:
