@@ -7,6 +7,7 @@ import unittest
 from app.config import settings
 from app.discovery_pipeline import (
     _hosts_needing_port_scan,
+    _pick_rotated_cidr,
     _select_cycle_cidr,
     _select_cycle_cidrs,
     _should_mark_missing_offline,
@@ -14,6 +15,7 @@ from app.discovery_pipeline import (
     format_status_line,
     get_profile_config,
 )
+from app.scanner import ScanError, validate_manual_scan_cidrs
 
 
 class ProfileDetectionTests(unittest.TestCase):
@@ -100,6 +102,52 @@ class ChunkSelectionTests(unittest.TestCase):
         finally:
             settings.scan_cidr = original_cidr
 
+    def test_normal_profile_chunks_when_always_chunk_enabled(self):
+        original = settings.auto_discovery_always_chunk
+        try:
+            settings.auto_discovery_always_chunk = True
+            profile = get_profile_config("normal")
+            import app.discovery_pipeline as dp
+
+            dp._chunk_index = 0
+            chunk = _select_cycle_cidr("192.168.1.0/24", profile)
+            self.assertTrue(chunk.endswith("/28"))
+        finally:
+            settings.auto_discovery_always_chunk = original
+
+    def test_cidr_rotation(self):
+        import app.discovery_pipeline as dp
+
+        dp._cidr_index = 0
+        first = _pick_rotated_cidr(["192.168.1.0/24", "192.168.10.0/24"])
+        second = _pick_rotated_cidr(["192.168.1.0/24", "192.168.10.0/24"])
+        self.assertEqual(first, "192.168.1.0/24")
+        self.assertEqual(second, "192.168.10.0/24")
+        dp._cidr_index = 0
+
+
+class ManualScanValidationTests(unittest.TestCase):
+    def test_rejects_wider_than_slash_24(self):
+        with self.assertRaises(ScanError) as ctx:
+            validate_manual_scan_cidrs(["192.168.0.0/23"])
+        self.assertEqual(ctx.exception.code, "manual_cidr_too_wide")
+
+    def test_rejects_too_many_hosts(self):
+        original_hosts = settings.manual_scan_max_hosts
+        original_safe = settings.scan_safe_mode
+        try:
+            settings.scan_safe_mode = False
+            settings.manual_scan_max_hosts = 32
+            with self.assertRaises(ScanError) as ctx:
+                validate_manual_scan_cidrs(["192.168.1.0/24"])
+            self.assertEqual(ctx.exception.code, "manual_too_many_hosts")
+        finally:
+            settings.manual_scan_max_hosts = original_hosts
+            settings.scan_safe_mode = original_safe
+
+    def test_allows_slash_28(self):
+        validate_manual_scan_cidrs(["192.168.1.144/28"])
+
 
 class OfflineMarkingTests(unittest.TestCase):
     def test_never_mass_offline_tcp_chunks(self):
@@ -116,6 +164,19 @@ class PortScanTargetTests(unittest.TestCase):
     def test_new_hosts_always_probed(self):
         targets = _hosts_needing_port_scan({"192.168.1.10", "192.168.1.11"}, {"192.168.1.11"})
         self.assertIn("192.168.1.11", targets)
+
+
+class SafeWebPortsTests(unittest.TestCase):
+    def test_safe_web_ports_includes_proxmox(self):
+        from app.scanner import SAFE_WEB_PORTS
+
+        self.assertIn(8006, SAFE_WEB_PORTS)
+
+    def test_safe_web_ports_includes_qnap(self):
+        from app.scanner import SAFE_WEB_PORTS
+
+        for port in (5000, 5001, 8080, 8081, 873, 2049):
+            self.assertIn(port, SAFE_WEB_PORTS, f"QNAP port {port} missing from SAFE_WEB_PORTS")
 
 
 if __name__ == "__main__":

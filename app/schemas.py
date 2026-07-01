@@ -209,6 +209,9 @@ class NetworkInfo(BaseModel):
     scan_safe_min_prefix: int = 28
     scan_max_hosts: int = 16
     scan_chunk_size: int = 4
+    manual_scan_max_hosts: int = 128
+    manual_scan_warn_prefix: int = 24
+    auto_discovery_all_ports: bool = True
     discovery_last_import_at: datetime | None = None
     discovery_last_import_source: str | None = None
     discovery_last_import_hosts: int | None = None

@@ -526,6 +526,11 @@
               <p class="discovery-status-detail" id="discovery-status-detail"></p>
             </div>
             <p class="hint discovery-arp-intro hidden" id="discovery-arp-intro" data-i18n="discovery.arpIntro"></p>
+            <div class="field" id="settings-auto-discovery-cidr">
+              <label for="settings-scan-cidr" data-i18n="settings.autoDiscoveryCidr">Sieci automatycznego discovery (CIDR)</label>
+              <textarea id="settings-scan-cidr" rows="3" data-i18n-placeholder="settings.autoDiscoveryCidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.10.0/24"></textarea>
+              <span class="hint" data-i18n="settings.autoDiscoveryCidrHint">Używane przez skan w tle (chunki /28, rotacja). Jedna sieć na linię lub przecinek.</span>
+            </div>
             <details class="discovery-install-details">
               <summary data-i18n="discovery.installHeadingOptional">Opcjonalny agent na innym hoście</summary>
               <p class="hint" data-i18n="discovery.installHintOptional"></p>
@@ -545,17 +550,14 @@
             <p class="hint hint-warning hidden" id="settings-remote-discovery-hint" data-i18n="discovery.remoteOnlyHint">Lokalny skan wyłączony na tym hoście — uruchom agenta zdalnego na maszynie z dostępem do LAN (deploy/agent).</p>
             <div class="scan-profile-card" id="settings-scan-profile-card">
               <div class="scan-profile-header">
-                <span data-i18n="settings.scanProfile.heading">Profil skanu</span>
+                <span data-i18n="settings.scanProfile.heading">Profil skanu ręcznego</span>
                 <span class="scan-profile-badge" id="settings-scan-profile-badge" data-profile="safe">Bezpieczny</span>
               </div>
               <p class="hint" id="settings-scan-profile-desc"></p>
               <p class="hint hint-warning" id="settings-scan-profile-weak-hint" data-i18n="settings.scanProfile.weakHardwareHint">Na słabym sprzęcie (RPi, stary PC, NAS, N100) zostaw tryb bezpieczny i mniejszy CIDR (/28 zamiast /24).</p>
             </div>
-            <div class="field">
-              <label for="settings-scan-cidr" data-i18n="settings.scanCidr">Domyślne sieci (CIDR)</label>
-              <textarea id="settings-scan-cidr" rows="3" data-i18n-placeholder="settings.scanCidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.0.0/24&#10;10.0.0.0/24"></textarea>
-              <span class="hint" data-i18n="settings.scanCidrHint">Jedna sieć na linię lub oddzielone przecinkiem. Obsługiwane maski /24–/22.</span>
-            </div>
+            <h3 class="settings-subheading" data-i18n="settings.manualScanHeading">Skan ręczny</h3>
+            <p class="hint" data-i18n="settings.manualScanIntro">Uruchamiany przyciskiem „Opcje skanu”. Ma twarde limity — nie zastępuje discovery w tle.</p>
             <p id="docker-scan-warning" class="hint hint-warning hidden" role="alert"></p>
             <label class="checkbox-row hidden" id="settings-full-scan-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
             <p class="hint hidden" id="settings-full-scan-hidden-note" data-i18n="settings.scanProfile.safeFullScanNote">Pełny skan jest wyłączony dopóki NETDASH_SCAN_SAFE_MODE=true.</p>
@@ -572,7 +574,7 @@
             <div id="scan-test-results" class="scan-test-results hidden" role="status"></div>
             <details class="settings-manual-advanced hidden" id="settings-manual-scan-advanced">
               <summary data-i18n="settings.manualScanAdvanced">Skan ręczny (zaawansowany)</summary>
-              <p class="hint" data-i18n="settings.manualScanAdvancedDesc">Ręczny skan TCP dostępny tylko na serwerze Docker (profil strong). Na QNAP discovery działa automatycznie w tle.</p>
+              <p class="hint" data-i18n="settings.manualScanAdvancedDesc">Wybierz CIDR i uruchom skan na żądanie. Duże sieci (/24) wymagają potwierdzenia — discovery w tle jest bezpieczniejsze.</p>
               <button type="button" class="btn btn-secondary btn-sm" id="settings-manual-scan-btn" data-i18n="modal.scan.start">Rozpocznij skan</button>
             </details>
             <div class="field">

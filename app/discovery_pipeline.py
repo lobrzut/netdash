@@ -23,6 +23,8 @@ from sqlalchemy import select
 from app.arp_discovery import (
     _detect_lan_interface,
     _merge_entries,
+    _parse_extra_hosts,
+    _probe_explicit_hosts_with_ports,
     _resolve_hostname,
     _run_arp_scan_only,
     _run_ip_neigh_fallback,
@@ -36,7 +38,6 @@ from app.scanner import (
     TCP_DISCOVERY_PRIMARY_PORTS,
     _check_port,
     _identify_service,
-    expand_cidrs_for_safe_mode,
     get_local_network,
     parse_cidr,
     resolve_scan_cidrs,
@@ -75,6 +76,7 @@ _task: asyncio.Task | None = None
 _known_ips: set[str] = set()
 _arp_zero_streak = 0
 _chunk_index = 0
+_cidr_index = 0
 _profile: str | None = None
 
 _state: dict[str, Any] = {
@@ -95,6 +97,9 @@ _state: dict[str, Any] = {
     "chunk_index": 0,
     "chunk_index_secondary": None,
     "chunk_total": 0,
+    "cidr_index": 0,
+    "cidr_total": 0,
+    "active_cidr": None,
 }
 
 
@@ -183,21 +188,28 @@ def _select_cycle_cidr(cidr: str, profile: ProfileConfig) -> str:
 
 
 def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
-    """Rotate /28 chunks on weak hosts (dual per cycle); scan full CIDR on normal/strong."""
+    """Rotate /28 chunks — auto mode never scans a full /24+ in one cycle."""
     global _chunk_index
-    wide = (settings.scan_cidr or cidr).strip()
+    wide = cidr.strip()
     try:
         wide_net = ipaddress.ip_network(wide, strict=False)
     except ValueError:
         return [cidr]
 
-    if wide_net.prefixlen >= profile.chunk_prefix:
+    chunk_pfx = (
+        settings.auto_discovery_chunk_prefix
+        if settings.auto_discovery_always_chunk
+        else profile.chunk_prefix
+    )
+    force_chunk = settings.auto_discovery_always_chunk or profile.name == "weak"
+
+    if not force_chunk or wide_net.prefixlen >= chunk_pfx:
         _state["chunk_total"] = 1
         _state["chunk_index"] = 1
         _state["chunk_index_secondary"] = None
         return [str(wide_net)]
 
-    all_chunks = [str(c) for c in wide_net.subnets(new_prefix=profile.chunk_prefix)]
+    all_chunks = [str(c) for c in wide_net.subnets(new_prefix=chunk_pfx)]
     if not all_chunks:
         return [wide]
 
@@ -257,6 +269,29 @@ def _should_mark_missing_offline(
     return False
 
 
+AUTO_PORT_PROBE_BATCH = 10
+
+
+async def _probe_extra_ports(
+    ip: str,
+    host_ports: list[int],
+    port_sem: asyncio.Semaphore,
+    profile: ProfileConfig,
+) -> list[int]:
+    """Gradual SERVICE_PORTS probe on a live host — avoids TCP floods."""
+    extra_ports = [p for p in SERVICE_PORTS if p not in host_ports]
+    if not extra_ports:
+        return host_ports
+    found = list(host_ports)
+    batch = max(4, profile.port_parallel)
+    for i in range(0, len(extra_ports), batch):
+        chunk = extra_ports[i : i + batch]
+        checks = await asyncio.gather(*(_check_port(ip, port, port_sem) for port in chunk))
+        found.extend(port for port, ok in zip(chunk, checks) if ok)
+        await asyncio.sleep(profile.tier_delay_sec * 0.15)
+    return found
+
+
 async def _tier1_tcp_discovery(
     cidr: str,
     profile: ProfileConfig,
@@ -287,10 +322,9 @@ async def _tier1_tcp_discovery(
                 return
 
             live.add(ip)
-            # Host is live — when scan_all_ports is on, deep-probe it on the full service-port
-            # list so services on non-standard ports are found. Only live hosts get this (a few
-            # dozen), gated by port_sem, so it stays throttled and won't flood the NAS.
-            if settings.scan_all_ports:
+            if settings.auto_discovery_all_ports:
+                host_ports = await _probe_extra_ports(ip, host_ports, port_sem, profile)
+            elif settings.scan_all_ports:
                 extra_ports = [p for p in SERVICE_PORTS if p not in host_ports]
                 extra_checks = await asyncio.gather(
                     *(_check_port(ip, port, port_sem) for port in extra_ports)
@@ -387,22 +421,77 @@ def _tier2_arp_enrich(
     return entries, stats
 
 
-async def _resolve_discovery_cidr() -> str:
+async def _tier0_extra_hosts(profile: ProfileConfig) -> tuple[set[str], dict[str, DiscoveryHostEntry], int]:
+    """Always probe NETDASH_ARP_EXTRA_HOSTS — not gated by /28 chunk rotation."""
+    from app.main import _upsert_service
+
+    extra_ips = _parse_extra_hosts()
+    if not extra_ips:
+        return set(), {}, 0
+
+    _state["current_tier"] = "extra-hosts"
+    entries_by_ip: dict[str, DiscoveryHostEntry] = {}
+    live: set[str] = set()
+    services_created = 0
+
+    extra_entries, open_ports_by_ip = await asyncio.to_thread(
+        _probe_explicit_hosts_with_ports, extra_ips, None
+    )
+    for entry in extra_entries:
+        entries_by_ip[entry.ip] = entry
+        live.add(entry.ip)
+
+    for ip, ports in open_ports_by_ip.items():
+        for port in ports:
+            try:
+                service = await _identify_service(ip, port)
+                await _upsert_service(service)
+                services_created += 1
+            except Exception:
+                logger.exception("Extra-host service upsert failed for %s:%s", ip, port)
+        await asyncio.sleep(profile.tier_delay_sec * 0.1)
+
+    if live:
+        logger.info(
+            "Tier 0 extra-hosts: %s host(s), %s service(s) — %s",
+            len(live),
+            services_created,
+            ", ".join(sorted(live)),
+        )
+    return live, entries_by_ip, services_created
+
+
+async def _resolve_discovery_cidrs() -> list[str]:
+    """All user-configured networks for background auto-discovery."""
     async with async_session() as db:
         result = await db.execute(select(AppSettings).limit(1))
         app_settings = result.scalar_one_or_none()
         scan_default = app_settings.scan_cidr_default if app_settings else None
     cidrs = resolve_scan_cidrs(None, scan_default)
-    base = cidrs[0] if cidrs else get_local_network()
-    if settings.scan_safe_mode:
-        try:
-            net = ipaddress.ip_network(base.strip(), strict=False)
-            if net.prefixlen < 28:
-                return str(net)
-        except ValueError:
-            pass
-    expanded = expand_cidrs_for_safe_mode([base])
-    return expanded[0] if expanded else base
+    if not cidrs:
+        cidrs = [get_local_network()]
+    return cidrs
+
+
+def _pick_rotated_cidr(cidrs: list[str]) -> str:
+    """Round-robin across user-defined CIDRs — one base network per cycle."""
+    global _cidr_index
+    if len(cidrs) == 1:
+        _state["cidr_total"] = 1
+        _state["cidr_index"] = 1
+        _state["active_cidr"] = cidrs[0]
+        return cidrs[0]
+    idx = _cidr_index % len(cidrs)
+    _cidr_index += 1
+    _state["cidr_total"] = len(cidrs)
+    _state["cidr_index"] = idx + 1
+    _state["active_cidr"] = cidrs[idx]
+    return cidrs[idx]
+
+
+async def _resolve_discovery_cidr() -> str:
+    cidrs = await _resolve_discovery_cidrs()
+    return _pick_rotated_cidr(cidrs)
 
 
 async def run_discovery_cycle() -> int:
@@ -461,8 +550,24 @@ async def run_discovery_cycle() -> int:
                     )
             await asyncio.sleep(profile.tier_delay_sec)
 
+        extra_live, extra_map, extra_services = await _tier0_extra_hosts(profile)
+        tcp_ips |= extra_live
+        services_created += extra_services
+        for ip, entry in extra_map.items():
+            existing = merged_map.get(ip)
+            if existing is None:
+                merged_map[ip] = entry
+            elif not existing.mac and entry.mac:
+                merged_map[ip] = DiscoveryHostEntry(
+                    ip=entry.ip,
+                    mac=entry.mac,
+                    hostname=entry.hostname or existing.hostname,
+                    online=True,
+                )
+
         entries = list(merged_map.values())
         tiers["tcp"] = len(tcp_ips)
+        tiers["extra_hosts"] = len(extra_live)
         tiers["arp_skipped"] = 1 if arp_skipped_any else 0
         tiers["arp_mac_added"] = sum(1 for e in entries if e.mac)
         tiers["services"] = services_created
@@ -579,6 +684,11 @@ def get_discovery_pipeline_status() -> dict[str, Any]:
         "chunk_index": _state.get("chunk_index"),
         "chunk_index_secondary": _state.get("chunk_index_secondary"),
         "chunk_total": _state.get("chunk_total"),
+        "cidr_index": _state.get("cidr_index"),
+        "cidr_total": _state.get("cidr_total"),
+        "active_cidr": _state.get("active_cidr"),
+        "auto_all_ports": settings.auto_discovery_all_ports,
+        "always_chunk": settings.auto_discovery_always_chunk,
         "tcp_ports": TCP_DISCOVERY_PRIMARY_PORTS,
     }
 

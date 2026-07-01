@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.140"
+VERSION = "1.3.141"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
     "Wykrywanie serwisów na dowolnym porcie — NETDASH_SCAN_ALL_PORTS sonduje żywe hosty po ~190 portach usług",
     "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",
     "Sejf API: klucze nie nakładają się już w wąskim widgecie; notatki jako czytelne wiersze",
@@ -142,6 +143,17 @@ class Settings(BaseSettings):
     # Probe every LIVE host on the full service-port list (scanner.SERVICE_PORTS) so services
     # on non-standard ports are auto-discovered. Heavier but stays safe (only live hosts).
     scan_all_ports: bool = False
+    # Background auto-discovery: gradual all-port probe on live hosts only (throttled batches).
+    auto_discovery_all_ports: bool = True
+    # Auto-discovery: never scan a full /24 (or wider) in one cycle — rotate /28 chunks.
+    auto_discovery_always_chunk: bool = True
+    auto_discovery_chunk_prefix: int = 28
+    # Manual scan hard limits — apply even when NETDASH_SCAN_SAFE_MODE=false (stability).
+    manual_scan_max_hosts: int = 128
+    manual_scan_min_prefix: int = 24
+    manual_scan_warn_prefix: int = 24
+    manual_scan_max_concurrency: int = 32
+    manual_scan_batch_delay: float = 0.15
     # local = manual TCP scan; adaptive = tiered ping→ARP→ports (default QNAP);
     # arp = legacy background arp-scan; remote = deploy/agent
     discovery_mode: str = "local"
@@ -266,6 +278,66 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)
+
+    @field_validator("auto_discovery_all_ports", mode="before")
+    @classmethod
+    def _auto_discovery_all_ports(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("auto_discovery_always_chunk", mode="before")
+    @classmethod
+    def _auto_discovery_always_chunk(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("auto_discovery_chunk_prefix", mode="before")
+    @classmethod
+    def _auto_discovery_chunk_prefix(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 28
+        return max(24, min(30, int(v)))
+
+    @field_validator("manual_scan_max_hosts", mode="before")
+    @classmethod
+    def _manual_scan_max_hosts(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 128
+        return max(8, int(v))
+
+    @field_validator("manual_scan_min_prefix", mode="before")
+    @classmethod
+    def _manual_scan_min_prefix(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 24
+        return max(16, min(32, int(v)))
+
+    @field_validator("manual_scan_warn_prefix", mode="before")
+    @classmethod
+    def _manual_scan_warn_prefix(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 24
+        return max(16, min(32, int(v)))
+
+    @field_validator("manual_scan_max_concurrency", mode="before")
+    @classmethod
+    def _manual_scan_max_concurrency(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 32
+        return max(4, int(v))
+
+    @field_validator("manual_scan_batch_delay", mode="before")
+    @classmethod
+    def _manual_scan_batch_delay(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 0.15
+        return max(0.05, float(v))
 
     @field_validator("discovery_mode", mode="before")
     @classmethod
@@ -430,7 +502,10 @@ class Settings(BaseSettings):
 
     @property
     def effective_scan_concurrency(self) -> int:
-        return self.scan_safe_concurrency if self.scan_safe_mode else self.scan_concurrency
+        base = self.scan_safe_concurrency if self.scan_safe_mode else self.scan_concurrency
+        if not self.scan_safe_mode:
+            return min(base, self.manual_scan_max_concurrency)
+        return base
 
     @property
     def effective_scan_max_hosts(self) -> int:

@@ -44,7 +44,7 @@ docker compose -f dockge/compose.yaml up -d
 
 6. **Verify:** `curl -s http://127.0.0.1:18787/api/health` → open `http://<vm-ip>:18787`, login `admin` / `changeme`, change password.
 
-7. **Tuning (dedicated VM):** in `.env` set `NETDASH_SCAN_SAFE_MODE=false` for faster full `/24` scans. On GitHub **v1.3.140+**, optional `NETDASH_SCAN_ALL_PORTS=true` for uncommon service ports (CPU-heavy).
+7. **Tuning (dedicated VM):** keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs. Set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or **Settings → Automatic discovery**. Auto-discovery (`NETDASH_DISCOVERY_MODE=adaptive`, default in `dockge/compose.yaml`) scans in `/28` chunks with gradual all-port probing on live hosts. Manual scan via **Scan options** has hard limits — avoid `NETDASH_SCAN_SAFE_MODE=false` on `/24` unless you accept network load.
 
 ## Requirements
 

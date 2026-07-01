@@ -1,5 +1,5 @@
 # Opcjonalny profil: test Dockera lokalnie (bridge, bez network_mode: host).
-# Słaby sprzęt: deploy.resources 512M/1 CPU, safe mode domyślnie true, CIDR /28.
+# Słaby sprzęt: deploy.resources 1024M/1 CPU, safe mode domyślnie true, CIDR /28.
 # Skan LAN wymaga NETDASH_SCAN_CIDR — ustaw w .env lub w panelu Ustawienia.
 # Użycie: docker compose -f docker-compose.dev.yml up -d --build
 
@@ -15,7 +15,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
           cpus: "1.0"
     environment:
       NETDASH_SECRET_KEY: ${NETDASH_SECRET_KEY:?Set NETDASH_SECRET_KEY in .env}

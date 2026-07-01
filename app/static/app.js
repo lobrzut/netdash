@@ -1145,13 +1145,11 @@ function isWeakDiscoveryProfile(netRes) {
 }
 
 function canUseManualScan(netRes) {
-  if (isRemoteDiscovery(netRes)) return false;
-  if (isAdaptiveDiscovery(netRes)) return !isWeakDiscoveryProfile(netRes);
-  return true;
+  return !isRemoteDiscovery(netRes);
 }
 
 function shouldHideQuickScan(netRes) {
-  return isAutoDiscovery(netRes) || isRemoteDiscovery(netRes);
+  return isRemoteDiscovery(netRes);
 }
 
 function formatRelativeAgo(when) {
@@ -1279,8 +1277,8 @@ function updateRemoteDiscoveryUI(netRes, settings) {
     const auto = isAutoDiscovery(netRes);
     const manual = canUseManualScan(netRes);
     const hideQuick = shouldHideQuickScan(netRes);
-    const hideManualOptions = remote || adaptive;
-    document.querySelector('.scan-actions')?.classList.toggle('hidden', remote || (adaptive && !manual));
+    const hideManualOptions = remote;
+    document.querySelector('.scan-actions')?.classList.toggle('hidden', remote);
     $('#scan-btn')?.classList.toggle('hidden', hideQuick);
     $('#empty-scan-btn')?.classList.toggle('hidden', hideQuick);
     $('#scan-options-btn')?.classList.toggle('hidden', hideManualOptions);
@@ -1307,6 +1305,7 @@ function updateScanButtonsState(netRes) {
   $('#settings-adaptive-scan-hint')?.classList.toggle('hidden', !adaptive);
   $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp || adaptive);
   $('#settings-manual-scan-advanced')?.classList.toggle('hidden', !manual);
+  $('#settings-auto-discovery-cidr')?.classList.toggle('hidden', remote);
   $('.scan-test-row')?.classList.toggle('hidden', adaptive);
   $('#settings-full-scan-row')?.classList.toggle('hidden', !!netRes?.scan_safe_mode);
   $('#settings-scan-profile-card')?.classList.toggle('hidden', remote || adaptive);
@@ -1380,14 +1379,23 @@ function cidrPrefixLen(cidr) {
 function isWideScanCidr(cidr, netRes) {
   if (!cidr) return false;
   const minPrefix = netRes?.scan_safe_min_prefix ?? SCAN_SAFE_MIN_PREFIX;
+  if (netRes?.scan_safe_mode && cidrPrefixLen(cidr) < minPrefix) return true;
+  const warnPrefix = netRes?.manual_scan_warn_prefix ?? 24;
+  return cidrPrefixLen(cidr) < warnPrefix;
+}
+
+function isManualScanCidrTooWide(cidr, netRes) {
+  if (!cidr) return false;
+  const minPrefix = netRes?.manual_scan_warn_prefix ?? 24;
   return cidrPrefixLen(cidr) < minPrefix;
 }
 
-function scanNeedsConfirm(netRes) {
+function scanNeedsConfirm(netRes, cidrLabel) {
   const net = resolveNetwork(netRes);
   if (net.scan_safe_mode && net.docker_bridge) return true;
   if (localStorage.getItem(SCAN_CONFIRM_SKIP_KEY) === '1') return false;
   if (net.scan_safe_mode) return true;
+  if (cidrLabel && isManualScanCidrTooWide(cidrLabel, netRes)) return true;
   return net.docker_bridge === true && net.ping_available === false;
 }
 
@@ -1410,7 +1418,7 @@ function resolvePendingScanStart(accepted) {
 }
 
 function confirmScanStart(netRes, cidrLabel) {
-  if (!scanNeedsConfirm(netRes)) {
+  if (!scanNeedsConfirm(netRes, cidrLabel)) {
     console.log('[NetDash] scan: confirm pominięty (scanNeedsConfirm=false)');
     return Promise.resolve(true);
   }
@@ -1420,9 +1428,13 @@ function confirmScanStart(netRes, cidrLabel) {
     pendingScanStart = { resolve, gen };
     const cidrEl = $('#scan-confirm-cidr');
     if (cidrEl) {
-      cidrEl.textContent = cidrLabel
+      let text = cidrLabel
         ? t('modal.scan.selectedCidr', { cidr: cidrLabel })
         : '';
+      if (cidrLabel && isManualScanCidrTooWide(cidrLabel, netRes) && !netRes?.scan_safe_mode) {
+        text += ` ${t('scan.confirmWideCidr')}`;
+      }
+      cidrEl.textContent = text;
     }
     const skipEl = $('#scan-confirm-skip');
     if (skipEl) skipEl.checked = false;
@@ -4363,6 +4375,7 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   if (netRes?.scan_safe_mode && isWideScanCidr(resolvedCidr, netRes)) {
     if (isRemoteDiscovery(netRes)) return;
     showScanError(t('discovery.useAgentInstead'));
+    openScanModal();
     return;
   }
   const networkLabel = resolvedCidr || t('scan.localNetwork');
@@ -4412,11 +4425,12 @@ async function startScan(cidr, fullScan = false, opts = {}) {
 
 async function oneClickScan() {
   const netRes = window.__netdashNetwork;
-  if (isAutoDiscovery(netRes)) return;
+  if (isRemoteDiscovery(netRes)) return;
   const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
   if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
     showScanError(t('discovery.useAgentInstead'));
+    openScanModal();
     return;
   }
   void logScanUiAttempt(cidr, 'ui-one-click');
@@ -4433,13 +4447,14 @@ function updateScanModalUI(netRes, settings) {
   if (descEl) {
     descEl.textContent = adaptive
       ? t('modal.scan.descAdaptive')
-      : t('modal.scan.desc');
+      : t('modal.scan.descManual');
   }
   const warning = $('#scan-modal-adaptive-warning');
   if (warning) {
     let msg = '';
     if (adaptive) msg = t('modal.scan.adaptiveWarning');
     else if (safe) msg = t('modal.scan.safeModeWarning');
+    else msg = t('modal.scan.manualWideWarning');
     warning.textContent = msg;
     warning.classList.toggle('hidden', !msg);
   }
@@ -4449,6 +4464,16 @@ function updateScanModalUI(netRes, settings) {
     fullNote.textContent = safe ? t('settings.scanProfile.safeFullScanNote') : '';
     fullNote.classList.toggle('hidden', !safe);
   }
+}
+
+function openSettingsDiscoveryTab() {
+  fillSettingsForm();
+  clearPasswordForm();
+  settingsSnapshot = { ...appSettings };
+  updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
+  switchSettingsTab('discovery');
+  updateSettingsFooter('discovery');
+  openModal('settings-modal');
 }
 
 function openSettingsScanTab() {
@@ -4486,7 +4511,7 @@ function bindScanUi() {
     const settingsLink = e.target.closest('#empty-settings-scan-link, #discovery-settings-scan-link');
     if (settingsLink) {
       e.preventDefault();
-      openSettingsScanTab();
+      openSettingsDiscoveryTab();
       return;
     }
     const manualBtn = e.target.closest('#settings-manual-scan-btn');

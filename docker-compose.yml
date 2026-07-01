@@ -18,7 +18,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1024M
           cpus: "1.0"
     network_mode: host
     env_file: .env

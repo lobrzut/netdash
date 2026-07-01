@@ -23,10 +23,11 @@ WEB_PORTS = [
 ]
 
 # Safe mode: minimal ports — QNAP kernel can OOM/crash on TCP floods even with container mem_limit.
-SAFE_WEB_PORTS = [80, 443, 8080, 5000, 18787]
+# Include QNAP DSM/admin (5000/5001, 8080/8081), file shares (873 rsync, 2049 NFS), and common apps (8787).
+SAFE_WEB_PORTS = [80, 443, 5000, 5001, 8006, 8080, 8081, 873, 2049, 8787, 18787]
 
 # Primary TCP discovery ports — Tier 1 adaptive discovery (any open = host live).
-TCP_DISCOVERY_PRIMARY_PORTS = [22, 80, 443, 8006, 8080, 3000, 5000, 8000, 8443, 9000, 18787]
+TCP_DISCOVERY_PRIMARY_PORTS = [22, 80, 443, 8006, 8080, 8081, 3000, 5000, 5001, 8000, 8443, 9000, 18787]
 
 # Optional bonus probe for NETDASH_ARP_EXTRA_HOSTS (not required for discovery).
 EXTRA_HOST_PROBE_PORTS = list(TCP_DISCOVERY_PRIMARY_PORTS)
@@ -112,6 +113,11 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     80: ("HTTP", "globe", "Web"),
     443: ("HTTPS", "lock", "Web"),
     445: ("SMB", "folder", "Pliki"),
+    873: ("Rsync", "sync", "Pliki"),
+    111: ("RPC / Portmapper", "network", "Sieć"),
+    139: ("NetBIOS", "network", "Sieć"),
+    2049: ("NFS", "folder", "Pliki"),
+    49152: ("QNAP (dynamic)", "nas", "NAS"),
     515: ("Drukarka (LPD)", "printer", "Drukarki"),
     554: ("Kamera (RTSP)", "camera", "Kamery"),
     631: ("Drukarka (IPP)", "printer", "Drukarki"),
@@ -121,7 +127,9 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     3389: ("RDP", "monitor", "Zdalny dostęp"),
     5900: ("VNC", "monitor", "Zdalny dostęp"),
     4200: ("Angular Dev", "code", "Development"),
-    5000: ("Flask / API", "api", "API"),
+    5000: ("QNAP HTTP", "nas", "NAS"),
+    5001: ("QNAP HTTPS", "nas", "NAS"),
+    8081: ("QNAP HTTPS Alt", "nas", "NAS"),
     5432: ("PostgreSQL", "database", "Baza danych"),
     5672: ("RabbitMQ", "queue", "Kolejka"),
     6379: ("Redis", "database", "Cache"),
@@ -585,6 +593,53 @@ def validate_cidrs_for_safe_mode(cidrs: list[str]) -> None:
                 "lub NETDASH_SCAN_SAFE_MODE=false (ryzyko).",
                 code="cidr_too_wide",
             )
+
+
+def count_hosts_in_cidrs(cidrs: list[str]) -> int:
+    total = 0
+    for cidr in cidrs:
+        network = ipaddress.ip_network(cidr.strip(), strict=False)
+        total += max(0, int(network.num_addresses) - 2)
+    return total
+
+
+def cidr_min_prefix(cidr: str) -> int:
+    return ipaddress.ip_network(cidr.strip(), strict=False).prefixlen
+
+
+def is_wide_cidr(cidr: str, *, warn_prefix: int | None = None) -> bool:
+    pfx = warn_prefix if warn_prefix is not None else settings.manual_scan_warn_prefix
+    return cidr_min_prefix(cidr) < pfx
+
+
+def validate_manual_scan_cidrs(cidrs: list[str]) -> None:
+    """Hard limits for user-triggered manual scans — always enforced."""
+    if not cidrs:
+        raise ScanError("Nie podano sieci do skanowania.", code="cidr_missing")
+    min_pfx = settings.manual_scan_min_prefix
+    for cidr in cidrs:
+        network = ipaddress.ip_network(cidr.strip(), strict=False)
+        if network.prefixlen < min_pfx:
+            raise ScanError(
+                f"Skan ręczny: zakres {cidr} jest zbyt szeroki (min /{min_pfx}). "
+                f"Użyj mniejszego CIDR (np. /28) lub włącz automatyczne discovery w tle.",
+                code="manual_cidr_too_wide",
+            )
+    validate_cidrs_for_safe_mode(cidrs)
+    host_count = count_hosts_in_cidrs(cidrs)
+    cap = settings.manual_scan_max_hosts
+    if host_count > cap:
+        raise ScanError(
+            f"Skan ręczny: {host_count} hostów przekracza limit {cap}. "
+            f"Zawęź CIDR lub użyj automatycznego discovery (skanuje w chunkach).",
+            code="manual_too_many_hosts",
+        )
+
+
+def effective_manual_scan_max_hosts() -> int:
+    if settings.scan_safe_mode:
+        return min(settings.manual_scan_max_hosts, settings.scan_safe_max_hosts)
+    return settings.manual_scan_max_hosts
 
 
 def parse_host_scan_ports(ports_str: str | None) -> list[int]:
@@ -1330,6 +1385,7 @@ async def scan_network(
     host_only_entries: bool = True,
     progress_callback: ProgressCallback | None = None,
     service_callback: ServiceCallback | None = None,
+    manual_scan: bool = False,
 ) -> list[DiscoveredService]:
     if settings.scan_all_ports:
         extra = host_scan_ports if host_scan_ports is not None else (
@@ -1378,6 +1434,10 @@ async def scan_network(
         for host, port in pairs:
             await scan_one(host, port)
             await asyncio.sleep(settings.scan_batch_delay * 0.5)
+    elif manual_scan:
+        for host, port in pairs:
+            await scan_one(host, port)
+            await asyncio.sleep(settings.manual_scan_batch_delay)
     else:
         await asyncio.gather(*(scan_one(host, port) for host, port in pairs))
     if progress_callback:
@@ -1431,6 +1491,7 @@ async def scan_networks(
     host_only_entries: bool = True,
     progress_callback: ProgressCallback | None = None,
     service_callback: ServiceCallback | None = None,
+    manual_scan: bool = False,
 ) -> list[DiscoveredService]:
     unique: dict[tuple[str, int], DiscoveredService] = {}
     scan_cidrs = expand_cidrs_for_safe_mode(cidrs)
@@ -1446,6 +1507,7 @@ async def scan_networks(
             host_only_entries=host_only_entries,
             progress_callback=progress_callback,
             service_callback=service_callback,
+            manual_scan=manual_scan,
         )
         for service in discovered:
             unique[(service.host, service.port)] = service

@@ -46,6 +46,7 @@ from app.url_utils import sanitize_service_url
 from app.scanner import (
     expand_cidrs_for_safe_mode,
     validate_cidrs_for_safe_mode,
+    validate_manual_scan_cidrs,
     DiscoveredService,
     ScanError,
     _fallback_service_name,
@@ -703,6 +704,10 @@ async def health(db: AsyncSession = Depends(get_db)):
         "scan_safe_min_prefix": settings.scan_safe_min_prefix,
         "scan_max_hosts": settings.effective_scan_max_hosts,
         "scan_chunk_size": settings.effective_scan_batch_size,
+        "auto_discovery_all_ports": settings.auto_discovery_all_ports,
+        "auto_discovery_always_chunk": settings.auto_discovery_always_chunk,
+        "manual_scan_max_hosts": settings.manual_scan_max_hosts,
+        "manual_scan_warn_prefix": settings.manual_scan_warn_prefix,
         "discovery_last_import_at": app_settings.discovery_last_import_at,
         "discovery_last_import_source": app_settings.discovery_last_import_source,
         "discovery_last_import_hosts": app_settings.discovery_last_import_hosts,
@@ -875,6 +880,9 @@ async def network_info(
         scan_safe_min_prefix=settings.scan_safe_min_prefix,
         scan_max_hosts=settings.effective_scan_max_hosts,
         scan_chunk_size=settings.effective_scan_batch_size,
+        manual_scan_max_hosts=settings.manual_scan_max_hosts,
+        manual_scan_warn_prefix=settings.manual_scan_warn_prefix,
+        auto_discovery_all_ports=settings.auto_discovery_all_ports,
         discovery_last_import_at=app_settings.discovery_last_import_at,
         discovery_last_import_source=app_settings.discovery_last_import_source,
         discovery_last_import_hosts=app_settings.discovery_last_import_hosts,
@@ -1779,6 +1787,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
                 host_only_entries=host_only,
                 progress_callback=on_progress,
                 service_callback=on_service,
+                manual_scan=True,
             ),
             timeout=scan_timeout,
         )
@@ -1986,9 +1995,9 @@ async def start_scan(
         )
 
     try:
-        validate_cidrs_for_safe_mode(cidrs)
+        validate_manual_scan_cidrs(cidrs)
     except ScanError as exc:
-        logger.warning("POST /api/scan rejected wide CIDR in safe mode: %s", exc)
+        logger.warning("POST /api/scan rejected: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     requested_label = format_cidr_list(cidrs)
