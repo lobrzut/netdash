@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.140-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.142-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -9,7 +9,7 @@
 
 **Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
 
-> **QNAP NAS:** QNAP deployment is **deprecated** (host instability, incomplete port scans). Use **Ubuntu VM on Proxmox + Dockge** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** and **[dockge/README.md](dockge/README.md)**.
+> **Recommended deploy:** **Ubuntu VM on Proxmox + [Dockge](dockge/README.md)** — not QNAP. A **2 GB RAM** VM is sufficient for NetDash alone (512M container limit). QNAP is **deprecated** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
 
 ## Quick start (Docker, no git)
 
@@ -21,11 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-
 
 Open **http://<server-ip>:18787** and sign in with **`admin` / `changeme`**, then change the password in **Settings → Password**.
 
-> **Port note:** NetDash uses **18787** by default. Set `NETDASH_PORT` in `.env` to change it. If you are migrating an older install on 8787, set `NETDASH_PORT=8787`.
-
-**Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
-
-> **QNAP NAS:** QNAP deployment is **deprecated** (host instability, incomplete port scans). Use **Ubuntu VM on Proxmox + Dockge** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** and **[dockge/README.md](dockge/README.md)**.
+> **Port note:** NetDash uses **18787** by default. Set `NETDASH_LISTEN_PORT` in `.env` to change it. If you are migrating an older install on 8787, set `NETDASH_LISTEN_PORT=8787`.
 
 Windows (Docker Desktop): `irm https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.ps1 | iex` — see [deploy/docker-simple/](deploy/docker-simple/).
 
@@ -82,9 +78,18 @@ See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.
 
 ## What's new
 
+### v1.3.142
+
+- **`NETDASH_DISCOVERY_ENABLED` kill switch** — master off for background TCP discovery; auto-disabled on hosts with &lt;~2.1 GB RAM. Nuclear-safe **2 GB VM** defaults in `dockge/compose.yaml` (512M limit, discovery off, enrich off).
+- **Watchtower** — `nickfedor/watchtower:1.7.1` in Dockge compose (Docker 29+ / API 1.44+). Balanced deploy: `bash dockge/deploy-balanced.sh`.
+
+### v1.3.141
+
+- **Two scan modes** — **automatic** (adaptive background, `/28` chunks, `NETDASH_AUTO_DISCOVERY_ALL_PORTS`) vs **manual** (Scan options button, hard limits, Stop). QNAP/Proxmox port probes fixed (8006, DSM 5000/5001/8080/8081).
+
 ### v1.3.140
 
-- **Discover services on any port** — set `NETDASH_SCAN_ALL_PORTS=true` and every host found live is deep-probed against a comprehensive ~190-port service list, so services on non-standard ports (`8123`, `32400`, `9090`, …) are discovered automatically. Only live hosts are deep-probed, so it stays safe on a NAS. On by default in the QNAP compose.
+- **Discover services on any port** — `NETDASH_AUTO_DISCOVERY_ALL_PORTS=true` (auto, gradual) or `NETDASH_SCAN_ALL_PORTS=true` (manual) deep-probes live hosts against ~190 service ports (`8123`, `32400`, `9090`, …).
 
 ### v1.3.137 to 1.3.139
 
@@ -117,7 +122,8 @@ See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.
 
 ### Deployment
 
-- **QNAP via Dockge** (Container Station stays as the Docker engine) — see [`deploy/qnap/README.md`](deploy/qnap/README.md).
+- **Recommended:** Proxmox Ubuntu VM + Dockge — **[dockge/README.md](dockge/README.md)** (2 GB RAM sufficient; balanced profile: `dockge/deploy-balanced.sh`).
+- **QNAP:** deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
 
 Full version history: **[CHANGELOG.md](CHANGELOG.md)**.
 
@@ -188,8 +194,8 @@ NetDash has **two scan modes**:
 
 | Mode | Trigger | Purpose |
 |------|---------|---------|
-| **Automatic discovery** | Background (`NETDASH_DISCOVERY_MODE=adaptive`) | Low-priority, throttled scan of networks from **Settings → Automatic discovery** (or `NETDASH_SCAN_CIDR`). Rotates `/28` chunks; probes ~190 service ports on **live hosts only**, gradually. |
-| **Manual scan** | **Scan options** button | On-demand scan of a CIDR you choose. Hard limits apply even when safe mode is off (`NETDASH_MANUAL_SCAN_MAX_HOSTS`, max `/24`). **Stop** button cancels the job. |
+| **Automatic discovery** | Background (`NETDASH_DISCOVERY_MODE=adaptive`) | Low-priority, throttled scan from **Settings → Automatic discovery** (or `NETDASH_SCAN_CIDR`). Rotates `/28` chunks; optional gradual all-port probe via `NETDASH_AUTO_DISCOVERY_ALL_PORTS` (off by default on 2 GB VMs). Disable entirely with `NETDASH_DISCOVERY_ENABLED=false`. |
+| **Manual scan** | **Scan options** button | On-demand CIDR scan. Hard limits (`NETDASH_MANUAL_SCAN_MAX_HOSTS`, max `/24`). Optional `NETDASH_SCAN_ALL_PORTS=true` for full port list. **Stop** button cancels the job. |
 
 1. Sign in.
 2. For manual scan: click **Scan options**, pick a CIDR (e.g. `192.168.1.144/28`), confirm.
@@ -198,9 +204,9 @@ NetDash has **two scan modes**:
 
 > **Docker note:** without `network_mode: host`, the container scans its own bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/macOS, disable host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings → Automatic discovery.
 
-## Low-resource hardware profile (RPi, older PC, N100, NAS, QNAP)
+## Low-resource hardware profile (RPi, older PC, N100, 2 GB VM)
 
-NetDash is designed to run on low-resource homelab hardware. By default, it enables safe scan mode (`NETDASH_SCAN_SAFE_MODE=true`) with lower concurrency, a shorter port list, and host limits. Official compose files also limit the container to **512 MB RAM** and **1 CPU**.
+NetDash is designed to run on low-resource homelab hardware. A **2 GB Proxmox VM** is enough for NetDash solo (512M container limit in `dockge/compose.yaml`). Safe scan mode (`NETDASH_SCAN_SAFE_MODE=true`) is on by default with lower concurrency, a shorter port list, and host limits.
 
 | Problem | Recommendation |
 |---------|----------------|
@@ -208,16 +214,18 @@ NetDash is designed to run on low-resource homelab hardware. By default, it enab
 | Need full LAN coverage | Set `NETDASH_SCAN_CIDR=192.168.1.0/24` and `NETDASH_DISCOVERY_MODE=adaptive` — background scan covers the /24 over time |
 | Manual scan on strong hardware | Keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs; use `/28` manual scans or accept confirmation for `/24` |
 | Scans are too slow on strong hardware | Tune `NETDASH_DISCOVERY_INTERVAL` or `NETDASH_DISCOVERY_PROFILE=strong` — do not disable chunking on weak hosts |
-| Full port scan needed | `NETDASH_AUTO_DISCOVERY_ALL_PORTS=true` (auto, gradual) or `NETDASH_SCAN_ALL_PORTS=true` (manual only) |
+| Full port scan needed | `NETDASH_AUTO_DISCOVERY_ALL_PORTS=true` (auto, gradual — 4 GB+ VM) or `NETDASH_SCAN_ALL_PORTS=true` (manual only) |
+| Discovery overloads weak host | `NETDASH_DISCOVERY_ENABLED=false` or use ultra-safe profile in `.env.example` |
 | Health checks consume too many resources | Increase health-check interval (for example 120s) or disable it |
 
-Example `.env` for Proxmox VM (recommended):
+Example `.env` for Proxmox VM 2 GB (balanced — or run `bash dockge/deploy-balanced.sh`):
 
 ```env
+NETDASH_DISCOVERY_ENABLED=true
 NETDASH_SCAN_SAFE_MODE=true
 NETDASH_DISCOVERY_MODE=adaptive
 NETDASH_SCAN_CIDR=192.168.1.0/24
-NETDASH_AUTO_DISCOVERY_ALL_PORTS=true
+NETDASH_AUTO_DISCOVERY_ALL_PORTS=false
 NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK=true
 ```
 
@@ -230,7 +238,7 @@ NETDASH_SCAN_CIDR=192.168.1.0/28
 
 Check profile output: `curl -s http://127.0.0.1:18787/api/health` → `scan_safe_mode`, `resource_profile`, `auto_discovery_all_ports`.
 
-Deployment details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · QNAP: **[deploy/qnap/README.md](deploy/qnap/README.md)**.
+Deployment details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · Dockge: **[dockge/README.md](dockge/README.md)** · QNAP (deprecated): **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
 
 ## Deployment profiles
 
@@ -287,9 +295,10 @@ sudo systemctl enable --now netdash
 | `NETDASH_DEFAULT_ADMIN_PASSWORD` | Admin password from env (`changeme` by default — change after first login) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | Sync admin password from env on every start (`true` by default; set to `false` after changing in UI) |
 | `NETDASH_SCAN_CIDR` | Networks for automatic discovery (and Docker bridge LAN override) |
+| `NETDASH_DISCOVERY_ENABLED` | Master switch for background TCP discovery (`false` by default in Dockge compose) |
 | `NETDASH_DISCOVERY_MODE` | `adaptive` (background TCP discovery), `arp`, `local`, or `remote` |
 | `NETDASH_SCAN_SAFE_MODE` | Safe manual scan limits (`true` by default) |
-| `NETDASH_AUTO_DISCOVERY_ALL_PORTS` | Gradual ~190-port probe on live hosts in auto mode (`true` by default) |
+| `NETDASH_AUTO_DISCOVERY_ALL_PORTS` | Gradual ~190-port probe on live hosts in auto mode (`false` by default on 2 GB VMs) |
 | `NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK` | Never scan full /24 in one auto cycle (`true` by default) |
 | `NETDASH_MANUAL_SCAN_MAX_HOSTS` | Hard cap for manual scan host count (default `128`) |
 | `NETDASH_BUILD_DATE` | Optional build date for About panel |
@@ -314,9 +323,7 @@ netdash/
 │   ├── vault.py      # Key encryption
 │   └── static/       # Frontend
 ├── deploy/
-**Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
-
-> **QNAP NAS:** QNAP deployment is **deprecated** (host instability, incomplete port scans). Use **Ubuntu VM on Proxmox + Dockge** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** and **[dockge/README.md](dockge/README.md)**.
+├── dockge/           # Proxmox + Dockge (recommended)
 ├── docker-compose.yml
 ├── Dockerfile
 └── run.py

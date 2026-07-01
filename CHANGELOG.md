@@ -2,8 +2,21 @@
 
 ## v1.3.142
 
-- **Ultra-safe 2 GB VM (Proxmox + Dockge)**: `NETDASH_DISCOVERY_ENABLED` — master kill switch; auto-off na hostach &lt;~2.1 GB RAM gdy env nie ustawiony. Profil weak: 4 TCP równolegle, interwał 600 s, jeden /28 na cykl (dual chunk tylko z `NETDASH_WEAK_DUAL_CHUNK=true`). `auto_discovery_all_ports` domyślnie **false**. Startup enrich i discovery odroczone (180 s / 300 s w compose). `dockge/compose.yaml` domyślnie discovery OFF.
+- **`NETDASH_DISCOVERY_ENABLED` — kill switch**: master switch dla TCP discovery w tle; auto-off na hostach &lt;~2.1 GB RAM gdy env nie ustawiony. `dockge/compose.yaml` domyślnie discovery **OFF** (`false`).
+- **Profil weak (tuning)**: 4 TCP równolegle, interwał 600 s, jeden `/28` na cykl (dual chunk tylko z `NETDASH_WEAK_DUAL_CHUNK=true`).
+- **Nuclear-safe 2 GB VM**: limit kontenera **512M**, `NETDASH_AUTO_DISCOVERY_ALL_PORTS=false`, `NETDASH_STARTUP_ENRICH_ENABLED=false`, discovery odroczone (180 s / 300 s w compose). Profile w `.env.example`: ultra-safe, zbalansowany 2 GB, 4 GB+.
+- **Watchtower (Docker 29+)**: `dockge/compose.yaml` używa `nickfedor/watchtower:1.7.1` (utrzymywany fork, Docker API 1.44+) zamiast zarchiwizowanego `containrrr/watchtower`.
+- **CI**: fix Ruff F401 (nieużywany import) — blokował publikację obrazu GHCR.
 - **Obraz**: `ghcr.io/lobrzut/netdash:1.3.142`.
+
+## v1.3.141
+
+- **Dwa tryby skanu**: **automatyczny** (`NETDASH_DISCOVERY_MODE=adaptive`, w tle, throttled, chunki `/28`) vs **ręczny** (przycisk „Opcje skanu", twarde limity). Osobne env: `NETDASH_AUTO_DISCOVERY_ALL_PORTS` (auto, stopniowo ~190 portów na żywych hostach) vs `NETDASH_SCAN_ALL_PORTS` (tylko skan ręczny).
+- **Chunking**: `NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK=true` domyślnie — nigdy pełny `/24` w jednym cyklu auto.
+- **Limity skanu ręcznego**: `NETDASH_MANUAL_SCAN_MAX_HOSTS` (128), `NETDASH_MANUAL_SCAN_MIN_PREFIX` (24), przycisk **Zatrzymaj** w UI.
+- **QNAP / Proxmox port fixes**: `SAFE_WEB_PORTS` i `TCP_DISCOVERY_PRIMARY_PORTS` rozszerzone o 5000/5001, **8006** (Proxmox), 8080/8081 (QNAP DSM), 873, 2049; fingerprinty QNAP w `SERVICE_PORTS` (5000, 5001, 8081, 49152).
+- **UI i18n**: rozdzielenie trybów auto vs manual w panelu skanu (PL/EN/DE/UK).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.141`.
 
 ## v1.3.140
 

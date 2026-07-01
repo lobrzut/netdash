@@ -65,7 +65,8 @@ After git pull, redeploy: docker compose -f dockge/compose.yaml up -d
 Dla dedykowanej VM **2 GB RAM**, **1–2 vCPU**, limit kontenera **512M** w `dockge/compose.yaml`:
 
 - **4 GB RAM na VM to overkill** sam dla NetDash — wcześniejsze crashe wynikały z **floodu sieciowego** (skan /24, `SCAN_SAFE_MODE=false`), nie z braku pamięci.
-- Wklej blok **PROFIL ZBALANSOWANY 2 GB VM** z [.env.example](../.env.example) do `.env` — discovery włączone, `all_ports=false`, chunki `/28`, interwał 300 s.
+- Szybki deploy: `bash dockge/deploy-balanced.sh` (wkleja profil zbalansowany do `.env` i startuje stack).
+- Ręcznie: blok **PROFIL ZBALANSOWANY 2 GB VM** z [.env.example](../.env.example) — discovery włączone, `all_ports=false`, chunki `/28`, interwał 300 s.
 - `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.150` — Proxmox i QNAP zawsze w rotacji ARP.
 
 Redeploy: `docker compose -f dockge/compose.yaml up -d`
@@ -169,7 +170,7 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 | **Linux only** | `network_mode: host` on Docker Desktop (Windows/Mac) does not expose your LAN; use native `python run.py` or `docker-compose.dev.yml` with `NETDASH_SCAN_CIDR`. |
 | **Data** | Bind mount `./data:/app/data` — SQLite `./data/netdash.db`, uploaded icons/logos `./data/uploads/`. Back up `/opt/stacks/netdash/data/`. |
 | **Build date** | Optional in `.env`: `NETDASH_BUILD_DATE=2026-06-11` (About panel; passed as Docker build arg). |
-| **Updates** | Watchtower runs with the stack (polls GHCR daily, updates NetDash via label). Manual: `docker compose pull && docker compose up -d`. Build from git: `git pull && docker compose up -d --build`. Set `WATCHTOWER_LABEL_ENABLE=false` on watchtower to update all containers on the host. QNAP: [docs/QNAP.md](../docs/QNAP.md). |
+| **Updates** | Watchtower (`nickfedor/watchtower:1.7.1` — Docker 29+) polls GHCR daily, updates NetDash via label. Manual: `docker compose pull && docker compose up -d`. Balanced redeploy: `bash dockge/deploy-balanced.sh`. Build from git: `git pull && docker compose up -d --build`. Set `WATCHTOWER_LABEL_ENABLE=false` on watchtower to update all containers on the host. |
 | **Secrets** | Never commit `.env`. Dockge stores compose on disk; keep `.env` gitignored. |
 
 Full deployment guide: **[DEPLOYMENT.md](../DEPLOYMENT.md)**

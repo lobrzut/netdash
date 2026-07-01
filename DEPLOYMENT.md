@@ -1,15 +1,15 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja lokalna workspace: **1.3.130** (GitHub `main`: **1.3.140+** — zsynchronizuj przez `git pull`)
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.142**
 
-> **QNAP:** deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**. Nowe wdrożenia: **Dockge na Ubuntu VM** → **[dockge/README.md](dockge/README.md)**.
+> **Zalecane wdrożenie:** **Dockge na Ubuntu VM (Proxmox)** — nie QNAP. VM **2 GB RAM** wystarczy dla samego NetDash. QNAP: deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** → **[dockge/README.md](dockge/README.md)**.
 
 ## Najprostsze ścieżki (bez git na serwerze)
 
 | Cel | Co zrobić |
 |-----|-----------|
 | **Linux + Docker** | `curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh \| bash` |
-| **Dockge / Proxmox VM** | Clone repo → dockge/compose.yaml — **[dockge/README.md](dockge/README.md)** |
+| **Dockge / Proxmox VM** | Clone do `/opt/stacks/netdash` → `dockge/compose.yaml` — **[dockge/README.md](dockge/README.md)** · szybki start: `bash dockge/deploy-balanced.sh` |
 | **QNAP (legacy)** | **Deprecated** — archiwum: [deploy/qnap/](deploy/qnap/) · [DEPRECATION-QNAP.md](DEPRECATION-QNAP.md) |
 | **Windows Docker Desktop** | `irm …/deploy/docker-simple/install.ps1 \| iex` — patrz **[deploy/docker-simple/](deploy/docker-simple/)** |
 
@@ -70,12 +70,13 @@ curl -s http://127.0.0.1:18787/api/health
 
 Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 
-### Słaby sprzęt (homelab — RPi, stary PC, N100, NAS, QNAP)
+### Słaby sprzęt (homelab — RPi, stary PC, N100, VM 2 GB)
 
-Filozofia projektu: **działa na słabym sprzęcie**. Wszystkie oficjalne pliki compose ustawiają:
+Filozofia projektu: **działa na słabym sprzęcie**. VM **2 GB RAM** wystarczy dla NetDash solo. `dockge/compose.yaml` ustawia:
 
+- `NETDASH_DISCOVERY_ENABLED=false` (włącz w `.env` po stabilnym starcie)
 - `NETDASH_SCAN_SAFE_MODE=true` (domyślnie też w kodzie aplikacji)
-- `mem_limit: 512m`, `cpu_count: 1` (+ `deploy.resources.limits` w Compose v2/v3)
+- `mem_limit: 512M`, `cpu_count: 1`
 
 | Zmienna | Zalecenie na słabym hoście |
 |---------|----------------------------|
@@ -93,9 +94,9 @@ curl -s http://127.0.0.1:18787/api/health | jq '{version, scan_safe_mode, resour
 
 Użyj **[deploy/docker-simple/](deploy/docker-simple/)** — compose bez `build:`, tylko pull z GHCR.
 
-Auto-update (opcjonalnie): `docker compose --profile auto-update up -d` lub plik `docker-compose.autoupdate.yml`.
+Auto-update (opcjonalnie): Watchtower w `dockge/compose.yaml` — obraz **`nickfedor/watchtower:1.7.1`** (fork dla Docker 29+, API 1.44+). Starsze compose (`docker-compose.yml`, QNAP) mogą nadal używać `containrrr/watchtower`.
 
-**QNAP:** **[deploy/qnap/README.md](deploy/qnap/README.md)** (krótko) · **[docs/QNAP.md](docs/QNAP.md)** (pełny przewodnik).
+**QNAP:** deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** · archiwum: [deploy/qnap/](deploy/qnap/).
 
 ---
 
@@ -154,7 +155,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.130",...}
+curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.142",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```
