@@ -550,6 +550,8 @@ def get_arp_discovery_status() -> dict[str, Any]:
 def start_arp_discovery_scheduler() -> asyncio.Task | None:
     """Start background ARP discovery if discovery_mode=arp."""
     global _arp_task
+    if not settings.effective_discovery_enabled:
+        return None
     if settings.scan_disabled or settings.discovery_mode != "arp":
         return None
     if _arp_task and not _arp_task.done():

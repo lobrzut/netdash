@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.142
+
+- **Ultra-safe 2 GB VM (Proxmox + Dockge)**: `NETDASH_DISCOVERY_ENABLED` — master kill switch; auto-off na hostach &lt;~2.1 GB RAM gdy env nie ustawiony. Profil weak: 4 TCP równolegle, interwał 600 s, jeden /28 na cykl (dual chunk tylko z `NETDASH_WEAK_DUAL_CHUNK=true`). `auto_discovery_all_ports` domyślnie **false**. Startup enrich i discovery odroczone (180 s / 300 s w compose). `dockge/compose.yaml` domyślnie discovery OFF.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.142`.
+
 ## v1.3.140
 
 - **Wykrywanie serwisów na nietypowych portach (`NETDASH_SCAN_ALL_PORTS=true`)**: dotąd adaptive discovery sondowało hosty tylko po 11 portach (`TCP_DISCOVERY_PRIMARY_PORTS`), a tryb safe po ~6 — serwis na np. `8123`, `32400`, `9090` nigdy nie był znajdowany w tle. Teraz, gdy host zostanie wykryty jako żywy, jest **głęboko sondowany po pełnej liście ~190 portów usług** (`scanner.SERVICE_PORTS`). Tylko żywe hosty (kilkadziesiąt), bramkowane semaforem — bez floodu sweepa /24, więc bezpieczne na QNAP. Działa też w skanie ręcznym. W YAML-u QNAP włączone domyślnie. Zweryfikowane: skan znalazł usługę na porcie 8123.

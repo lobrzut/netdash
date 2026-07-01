@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.141"
+VERSION = "1.3.142"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
     "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
@@ -144,7 +144,13 @@ class Settings(BaseSettings):
     # on non-standard ports are auto-discovered. Heavier but stays safe (only live hosts).
     scan_all_ports: bool = False
     # Background auto-discovery: gradual all-port probe on live hosts only (throttled batches).
-    auto_discovery_all_ports: bool = True
+    auto_discovery_all_ports: bool = False
+    # Weak profile: scan two /28 chunks per cycle (heavier — off by default on 2 GB hosts).
+    weak_dual_chunk: bool = False
+    # Master kill switch for all background discovery schedulers (adaptive + ARP).
+    discovery_enabled: bool = True
+    # Startup MAC/icon enrichment pings many hosts — disable on ultra-safe / low-memory deploys.
+    startup_enrich_enabled: bool = True
     # Auto-discovery: never scan a full /24 (or wider) in one cycle — rotate /28 chunks.
     auto_discovery_always_chunk: bool = True
     auto_discovery_chunk_prefix: int = 28
@@ -282,6 +288,33 @@ class Settings(BaseSettings):
     @field_validator("auto_discovery_all_ports", mode="before")
     @classmethod
     def _auto_discovery_all_ports(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("weak_dual_chunk", mode="before")
+    @classmethod
+    def _weak_dual_chunk(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return False
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("discovery_enabled", mode="before")
+    @classmethod
+    def _discovery_enabled(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("startup_enrich_enabled", mode="before")
+    @classmethod
+    def _startup_enrich_enabled(cls, v: object) -> bool:
         if v is None or (isinstance(v, str) and not v.strip()):
             return True
         if isinstance(v, str):
@@ -527,12 +560,40 @@ class Settings(BaseSettings):
         return self.discovery_mode
 
     @property
+    def effective_discovery_enabled(self) -> bool:
+        """Honour NETDASH_DISCOVERY_ENABLED; auto-off on <~2.1 GB RAM when env unset."""
+        raw = os.environ.get("NETDASH_DISCOVERY_ENABLED")
+        if raw is not None and str(raw).strip():
+            return str(raw).strip().lower() in ("true", "1", "yes", "on")
+        if not self.discovery_enabled:
+            return False
+        try:
+            with open("/proc/meminfo", encoding="utf-8") as fh:
+                for line in fh:
+                    if line.startswith("MemTotal:"):
+                        mem_kb = int(line.split()[1])
+                        if mem_kb < 2_100_000:
+                            return False
+                        break
+        except OSError:
+            pass
+        return True
+
+    @property
     def adaptive_discovery_enabled(self) -> bool:
-        return not self.scan_disabled and self.discovery_mode == "adaptive"
+        return (
+            self.effective_discovery_enabled
+            and not self.scan_disabled
+            and self.discovery_mode == "adaptive"
+        )
 
     @property
     def arp_discovery_enabled(self) -> bool:
-        return not self.scan_disabled and self.discovery_mode == "arp"
+        return (
+            self.effective_discovery_enabled
+            and not self.scan_disabled
+            and self.discovery_mode == "arp"
+        )
 
     @property
     def auto_discovery_enabled(self) -> bool:
@@ -548,11 +609,23 @@ class Settings(BaseSettings):
     def effective_startup_health_defer_seconds(self) -> int:
         if self.startup_health_defer_seconds is not None:
             return self.startup_health_defer_seconds
-        return 30 if self.scan_safe_mode else 5
+        return 90 if self.scan_safe_mode else 5
+
+    @property
+    def effective_discovery_startup_delay(self) -> int:
+        if self.discovery_startup_delay != 60:
+            return self.discovery_startup_delay
+        return 180 if self.scan_safe_mode else 60
+
+    @property
+    def effective_startup_enrich_enabled(self) -> bool:
+        if not self.startup_enrich_enabled:
+            return False
+        return self.effective_discovery_enabled
 
     @property
     def health_check_concurrency(self) -> int:
-        return 4 if self.scan_safe_mode else 10
+        return 2 if self.scan_safe_mode else 10
 
     @property
     def scan_identify_concurrency(self) -> int:

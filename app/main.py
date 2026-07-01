@@ -539,7 +539,10 @@ async def init_db():
 
 async def _deferred_startup_enrich():
     """MAC/icon enrichment can ping 100+ hosts — run after portal is up."""
-    await asyncio.sleep(2)
+    if not settings.effective_startup_enrich_enabled:
+        logger.info("Startup enrich skipped (NETDASH_STARTUP_ENRICH_ENABLED=false or discovery off)")
+        return
+    await asyncio.sleep(5)
     try:
         mac_count = await enrich_mac_addresses()
         svc_count = await enrich_all_services()
@@ -698,7 +701,10 @@ async def health(db: AsyncSession = Depends(get_db)):
         "scan_disabled": settings.scan_disabled,
         "startup_health_defer": settings.effective_startup_health_defer,
         "startup_health_defer_seconds": settings.effective_startup_health_defer_seconds,
-        "discovery_startup_delay": settings.discovery_startup_delay,
+        "discovery_startup_delay": settings.effective_discovery_startup_delay,
+        "discovery_enabled": settings.effective_discovery_enabled,
+        "startup_enrich_enabled": settings.effective_startup_enrich_enabled,
+        "weak_dual_chunk": settings.weak_dual_chunk,
         "discovery_mode": settings.effective_discovery_mode,
         "resource_profile": settings.resource_profile,
         "scan_safe_min_prefix": settings.scan_safe_min_prefix,

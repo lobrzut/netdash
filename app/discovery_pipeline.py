@@ -115,7 +115,7 @@ class ProfileConfig:
 
 
 _PROFILES: dict[str, ProfileConfig] = {
-    "weak": ProfileConfig("weak", 300, 8, 4, 2.0, 16, 28),
+    "weak": ProfileConfig("weak", 600, 4, 2, 3.0, 8, 28),
     "normal": ProfileConfig("normal", 180, 16, 8, 1.0, 256, 24),
     "strong": ProfileConfig("strong", 120, 32, 16, 0.5, 256, 24),
 }
@@ -216,7 +216,7 @@ def _select_cycle_cidrs(cidr: str, profile: ProfileConfig) -> list[str]:
     chunk_total = len(all_chunks)
     primary_idx = _chunk_index % chunk_total
 
-    if profile.name == "weak" and chunk_total > 1:
+    if profile.name == "weak" and chunk_total > 1 and settings.weak_dual_chunk:
         secondary_idx = (primary_idx + chunk_total // 2) % chunk_total
         indices = [primary_idx]
         if secondary_idx != primary_idx:
@@ -283,12 +283,13 @@ async def _probe_extra_ports(
     if not extra_ports:
         return host_ports
     found = list(host_ports)
-    batch = max(4, profile.port_parallel)
+    batch = max(2, profile.port_parallel)
+    pause = profile.tier_delay_sec * (0.5 if settings.auto_discovery_all_ports else 0.15)
     for i in range(0, len(extra_ports), batch):
         chunk = extra_ports[i : i + batch]
         checks = await asyncio.gather(*(_check_port(ip, port, port_sem) for port in chunk))
         found.extend(port for port, ok in zip(chunk, checks) if ok)
-        await asyncio.sleep(profile.tier_delay_sec * 0.15)
+        await asyncio.sleep(pause)
     return found
 
 
@@ -641,7 +642,13 @@ async def _discovery_loop() -> None:
     _state["profile"] = profile.name
     _state["interval_sec"] = interval
 
-    startup_delay = max(0, settings.discovery_startup_delay)
+    startup_delay = max(0, settings.effective_discovery_startup_delay)
+    if not settings.effective_discovery_enabled:
+        logger.info(
+            "TCP-first discovery disabled (NETDASH_DISCOVERY_ENABLED=false or low-memory auto-off)"
+        )
+        _state["enabled"] = False
+        return
     logger.info(
         "TCP-first discovery started (profile=%s, interval=%ss, first_cycle_in=%ss, cidr=%s)",
         profile.name,
@@ -689,12 +696,17 @@ def get_discovery_pipeline_status() -> dict[str, Any]:
         "active_cidr": _state.get("active_cidr"),
         "auto_all_ports": settings.auto_discovery_all_ports,
         "always_chunk": settings.auto_discovery_always_chunk,
+        "weak_dual_chunk": settings.weak_dual_chunk,
+        "discovery_enabled": settings.effective_discovery_enabled,
         "tcp_ports": TCP_DISCOVERY_PRIMARY_PORTS,
     }
 
 
 def start_discovery_scheduler() -> asyncio.Task | None:
     global _task
+    if not settings.effective_discovery_enabled:
+        logger.info("Adaptive discovery scheduler not started — discovery disabled")
+        return None
     if settings.scan_disabled or settings.discovery_mode != "adaptive":
         return None
     if _task and not _task.done():

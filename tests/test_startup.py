@@ -15,7 +15,7 @@ class StartupDeferTests(unittest.TestCase):
             settings.startup_health_defer = None
             settings.scan_safe_mode = True
             self.assertTrue(settings.effective_startup_health_defer)
-            self.assertEqual(settings.effective_startup_health_defer_seconds, 30)
+            self.assertEqual(settings.effective_startup_health_defer_seconds, 90)
 
             settings.scan_safe_mode = False
             self.assertFalse(settings.effective_startup_health_defer)

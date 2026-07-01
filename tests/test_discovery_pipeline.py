@@ -29,10 +29,10 @@ class ProfileDetectionTests(unittest.TestCase):
 
     def test_profile_config_weak(self):
         cfg = get_profile_config("weak")
-        self.assertEqual(cfg.tcp_parallel, 8)
-        self.assertEqual(cfg.port_parallel, 4)
-        self.assertEqual(cfg.interval_sec, 300)
-        self.assertEqual(cfg.max_hosts, 16)
+        self.assertEqual(cfg.tcp_parallel, 4)
+        self.assertEqual(cfg.port_parallel, 2)
+        self.assertEqual(cfg.interval_sec, 600)
+        self.assertEqual(cfg.max_hosts, 8)
 
 
 class StatusLineTests(unittest.TestCase):
@@ -79,8 +79,10 @@ class ChunkSelectionTests(unittest.TestCase):
 
     def test_weak_rotates_dual_chunks_per_cycle(self):
         original_cidr = settings.scan_cidr
+        original_dual = settings.weak_dual_chunk
         try:
             settings.scan_cidr = "192.168.1.0/24"
+            settings.weak_dual_chunk = True
             profile = get_profile_config("weak")
             import app.discovery_pipeline as dp
 
@@ -101,6 +103,22 @@ class ChunkSelectionTests(unittest.TestCase):
             dp._chunk_index = 0
         finally:
             settings.scan_cidr = original_cidr
+            settings.weak_dual_chunk = original_dual
+
+    def test_weak_single_chunk_when_dual_disabled(self):
+        original_dual = settings.weak_dual_chunk
+        try:
+            settings.weak_dual_chunk = False
+            profile = get_profile_config("weak")
+            import app.discovery_pipeline as dp
+
+            dp._chunk_index = 0
+            cidrs = _select_cycle_cidrs("192.168.1.0/24", profile)
+            self.assertEqual(len(cidrs), 1)
+            self.assertTrue(cidrs[0].endswith("/28"))
+            dp._chunk_index = 0
+        finally:
+            settings.weak_dual_chunk = original_dual
 
     def test_normal_profile_chunks_when_always_chunk_enabled(self):
         original = settings.auto_discovery_always_chunk
