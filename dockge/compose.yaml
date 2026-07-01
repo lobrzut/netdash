@@ -31,7 +31,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 512M  # 2 GB Proxmox VM: leave headroom for OS + Docker + Dockge (1024M caused OOM on 2 GB hosts)
           cpus: "1.0"
     network_mode: host
     env_file: .env
@@ -39,11 +39,12 @@ services:
       NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
       NETDASH_LISTEN_PORT: "18787"
       NETDASH_DISCOVERY_MODE: ${NETDASH_DISCOVERY_MODE:-adaptive}
+      # 2 GB VM / weak host: NETDASH_DISCOVERY_PROFILE=weak in .env, or longer interval (e.g. 600s) in UI
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:-changeme}
       NETDASH_SYNC_ADMIN_PASSWORD: ${NETDASH_SYNC_ADMIN_PASSWORD:-true}
       NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
-      NETDASH_AUTO_DISCOVERY_ALL_PORTS: ${NETDASH_AUTO_DISCOVERY_ALL_PORTS:-true}
+      NETDASH_AUTO_DISCOVERY_ALL_PORTS: ${NETDASH_AUTO_DISCOVERY_ALL_PORTS:-false}
       NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK: ${NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK:-true}
       # Set LAN in .env: NETDASH_SCAN_CIDR=192.168.1.0/24 (or UI → Automatic discovery)
       # Keep SCAN_SAFE_MODE=true on shared VLANs — manual /24 with false can overload the network

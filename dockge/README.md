@@ -46,6 +46,21 @@ docker compose -f dockge/compose.yaml up -d
 
 7. **Tuning (dedicated VM):** keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs. Set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or **Settings → Automatic discovery**. Auto-discovery (`NETDASH_DISCOVERY_MODE=adaptive`, default in `dockge/compose.yaml`) scans in `/28` chunks with gradual all-port probing on live hosts. Manual scan via **Scan options** has hard limits — avoid `NETDASH_SCAN_SAFE_MODE=false` on `/24` unless you accept network load.
 
+## 2 GB Proxmox VM — memory and discovery
+
+On a **2 GB RAM** Ubuntu VM (OS + Docker + Dockge + NetDash), a **1024M** container limit together with **NETDASH_AUTO_DISCOVERY_ALL_PORTS=true** can push the host into **OOM** and kernel panics (observed on v1.3.141).
+
+**Defaults in dockge/compose.yaml (v1.3.142+):** memory: 512M, NETDASH_AUTO_DISCOVERY_ALL_PORTS=false, NETDASH_DISCOVERY_MODE=adaptive.
+
+Recommended .env on 2 GB hosts (see [.env.example](../.env.example) — *PROFIL 2 GB VM*):
+
+- NETDASH_DISCOVERY_PROFILE=weak **or** NETDASH_DISCOVERY_INTERVAL=600
+- Keep NETDASH_AUTO_DISCOVERY_ALL_PORTS=false unless you have more RAM
+- NETDASH_SCAN_SAFE_MODE=true and a bounded NETDASH_SCAN_CIDR
+
+After git pull, redeploy: docker compose -f dockge/compose.yaml up -d
+
+
 ## Requirements
 
 - Linux with Docker 20+ and Compose v2 (same as Dockge itself)
