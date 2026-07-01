@@ -1,6 +1,50 @@
-# NetDash on Dockge
+# NetDash on Dockge (Proxmox Ubuntu VM — recommended)
 
-One-click deploy of [NetDash](https://github.com/lobrzut/netdash) via [Dockge](https://github.com/louislam/dockge) on a **Linux** Docker host.
+One-click deploy of [NetDash](https://github.com/lobrzut/netdash) via [Dockge](https://github.com/louislam/dockge) on a **Linux** Docker host. This replaces the deprecated [QNAP path](../DEPRECATION-QNAP.md).
+
+## Proxmox Ubuntu VM — step by step
+
+1. **Create VM** in Proxmox: Ubuntu Server 24.04 LTS, 2 vCPU, 2 GB RAM, 16 GB disk, bridged `vmbr0` to LAN.
+2. **Install Docker** on the VM:
+
+```bash
+sudo apt update && sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo usermod -aG docker $USER   # re-login
+```
+
+3. **Install Dockge** (optional but recommended):
+
+```bash
+sudo mkdir -p /opt/stacks /opt/dockge
+cd /opt/dockge
+curl -fsSL https://raw.githubusercontent.com/louislam/dockge/master/compose.yaml -o compose.yaml
+sudo docker compose up -d
+```
+
+Dockge UI: `http://<vm-ip>:5001`
+
+4. **Clone NetDash** into stacks directory:
+
+```bash
+git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
+cd /opt/stacks/netdash
+cp .env.example .env
+nano .env   # set NETDASH_SECRET_KEY (≥32 chars)
+```
+
+5. **Deploy** — Dockge → **Scan Stacks Folder** → stack **netdash** → **Deploy**, or CLI:
+
+```bash
+docker compose -f dockge/compose.yaml up -d
+```
+
+6. **Verify:** `curl -s http://127.0.0.1:18787/api/health` → open `http://<vm-ip>:18787`, login `admin` / `changeme`, change password.
+
+7. **Tuning (dedicated VM):** in `.env` set `NETDASH_SCAN_SAFE_MODE=false` for faster full `/24` scans. On GitHub **v1.3.140+**, optional `NETDASH_SCAN_ALL_PORTS=true` for uncommon service ports (CPU-heavy).
 
 ## Requirements
 
@@ -89,7 +133,7 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 | **Linux only** | `network_mode: host` on Docker Desktop (Windows/Mac) does not expose your LAN; use native `python run.py` or `docker-compose.dev.yml` with `NETDASH_SCAN_CIDR`. |
 | **Data** | Bind mount `./data:/app/data` — SQLite `./data/netdash.db`, uploaded icons/logos `./data/uploads/`. Back up `/opt/stacks/netdash/data/`. |
 | **Build date** | Optional in `.env`: `NETDASH_BUILD_DATE=2026-06-11` (About panel; passed as Docker build arg). |
-| **Updates** | `docker compose pull && docker compose up -d` (GHCR) or `git pull && docker compose up -d --build`. Optional Watchtower: `docker compose --profile auto-update up -d`. QNAP: [docs/QNAP.md](../docs/QNAP.md). |
+| **Updates** | Watchtower runs with the stack (polls GHCR daily, updates NetDash via label). Manual: `docker compose pull && docker compose up -d`. Build from git: `git pull && docker compose up -d --build`. Set `WATCHTOWER_LABEL_ENABLE=false` on watchtower to update all containers on the host. QNAP: [docs/QNAP.md](../docs/QNAP.md). |
 | **Secrets** | Never commit `.env`. Dockge stores compose on disk; keep `.env` gitignored. |
 
 Full deployment guide: **[DEPLOYMENT.md](../DEPLOYMENT.md)**

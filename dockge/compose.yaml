@@ -1,140 +1,71 @@
-# NetDash — Dockge stack compose
-
+# NetDash — Dockge / Proxmox Ubuntu VM (standard Linux deploy)
 # Repository: https://github.com/lobrzut/netdash
-
 #
-
-# Deploy (recommended):
-
-#   1. git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
-
-#   2. cp .env.example .env  &&  edit .env (secrets)
-
-#   3. Dockge → Scan Stacks Folder → stack "netdash" → Deploy
-
+# Deploy (stack root = cloned repo, e.g. /opt/stacks/netdash):
+#   git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
+#   cd /opt/stacks/netdash && cp .env.example .env   # edit secrets
+#   docker compose -f dockge/compose.yaml up -d
 #
-
-# GHCR image (no git on host):
-
-#   docker compose pull && docker compose up -d
-
+# Dockge: clone to stacks dir → Scan Stacks Folder → deploy stack "netdash"
+# Optional: cp dockge/compose.yaml compose.yaml  (Dockge default filename at stack root)
 #
-
-# Auto-update (opt-in, admin consent via profile):
-
-#   docker compose --profile auto-update up -d
-
+# GHCR image (no local build):
+#   docker compose -f dockge/compose.yaml pull && docker compose -f dockge/compose.yaml up -d
 #
-
-# IMPORTANT — Linux host only:
-
-#   network_mode: host is required for LAN scanning (ping/ARP on your /24).
-
-#   Do NOT add a ports: section — Docker refuses to start (host + ports conflict).
-
-#   On Windows/Mac Docker Desktop, host mode does not work; use docker-compose.dev.yml instead.
-
-
+# Auto-update: Watchtower starts with every docker compose up -d.
+# Only containers with label com.centurylinklabs.watchtower.enable=true are updated (netdash).
+# To update ALL containers on this host, set WATCHTOWER_LABEL_ENABLE=false on watchtower.
+#
+# Linux host only: network_mode: host is required for LAN scan.
+# Do NOT add ports: — Docker refuses host network + port mapping.
 
 services:
-
   netdash:
-
-    image: ghcr.io/lobrzut/netdash:${NETDASH_IMAGE_TAG:-latest}
-
+    image: ghcr.io/lobrzut/netdash:
     build:
-
       context: .
-
       args:
-
-        NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
-
+        NETDASH_BUILD_DATE: 
     container_name: netdash
-
     restart: always
-
-    # Słaby sprzęt homelab: limit RAM/CPU; safe scan domyślnie (Compose v2+).
-
     deploy:
-
       resources:
-
         limits:
-
           memory: 512M
-
           cpus: "1.0"
-
     network_mode: host
-
     env_file: .env
-
     environment:
-
-      NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
-
+      NETDASH_BUILD_DATE: 
       NETDASH_LISTEN_PORT: "18787"
-
-      NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
-
+      NETDASH_DEFAULT_ADMIN_USER: 
+      NETDASH_DEFAULT_ADMIN_PASSWORD: 
+      NETDASH_SYNC_ADMIN_PASSWORD: 
+      NETDASH_SCAN_SAFE_MODE: 
+      # Dedicated VM with spare CPU: NETDASH_SCAN_SAFE_MODE=false for full /24 scans
+      # v1.3.140+: NETDASH_SCAN_ALL_PORTS=true — ~190 ports on live hosts (not for weak NAS)
     volumes:
-
-      # SQLite (netdash.db) + uploaded icons/logos (data/uploads/)
-
       - ./data:/app/data
-
-      # Optional: in-app "Aktualizuj teraz" — mount docker.sock (see docs/QNAP.md)
-
-      # - /var/run/docker.sock:/var/run/docker.sock
-
     cap_add:
-
       - NET_RAW
-
     labels:
-
       com.centurylinklabs.watchtower.enable: "true"
-
     healthcheck:
-
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:18787/api/health || exit 1"]
-
       interval: 30s
-
       timeout: 10s
-
       retries: 3
-
       start_period: 40s
 
-
-
   watchtower:
-
     image: containrrr/watchtower:1.7.1
-
     container_name: netdash-watchtower
-
     restart: unless-stopped
-
-    profiles:
-
-      - auto-update
-
     volumes:
-
       - /var/run/docker.sock:/var/run/docker.sock
-
     environment:
-
-      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
-
+      WATCHTOWER_POLL_INTERVAL: 
       WATCHTOWER_CLEANUP: "true"
-
       WATCHTOWER_LABEL_ENABLE: "true"
-
       WATCHTOWER_INCLUDE_RESTARTING: "true"
-
       WATCHTOWER_ROLLING_RESTART: "true"
-

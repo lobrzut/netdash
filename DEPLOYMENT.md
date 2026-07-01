@@ -1,13 +1,16 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.130**
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja lokalna workspace: **1.3.130** (GitHub `main`: **1.3.140+** — zsynchronizuj przez `git pull`)
+
+> **QNAP:** deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**. Nowe wdrożenia: **Dockge na Ubuntu VM** → **[dockge/README.md](dockge/README.md)**.
 
 ## Najprostsze ścieżki (bez git na serwerze)
 
 | Cel | Co zrobić |
 |-----|-----------|
 | **Linux + Docker** | `curl -fsSL https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.sh \| bash` |
-| **QNAP (Dockge)** | Import URL → [`deploy/qnap/compose.url`](deploy/qnap/compose.url) — szczegóły: **[deploy/qnap/README.md](deploy/qnap/README.md)** |
+| **Dockge / Proxmox VM** | Clone repo → dockge/compose.yaml — **[dockge/README.md](dockge/README.md)** |
+| **QNAP (legacy)** | **Deprecated** — archiwum: [deploy/qnap/](deploy/qnap/) · [DEPRECATION-QNAP.md](DEPRECATION-QNAP.md) |
 | **Windows Docker Desktop** | `irm …/deploy/docker-simple/install.ps1 \| iex` — patrz **[deploy/docker-simple/](deploy/docker-simple/)** |
 
 Obraz: `ghcr.io/lobrzut/netdash:latest` (GHCR, bez budowania lokalnie).

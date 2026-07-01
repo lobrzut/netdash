@@ -1,6 +1,10 @@
 # NetDash na QNAP — przez Dockge
 
-Wdrożenie [NetDash](https://github.com/lobrzut/netdash) na **QNAP** zarządzane przez **[Dockge](https://github.com/louislam/dockge)**. Container Station zostaje jako silnik Dockera; Dockge daje edytowalny UI do compose (czego Container Station nie pozwala po deployu).
+> **DEPRECATED (2026-07):** QNAP deployment is no longer supported — high NAS load, incomplete port scans, Container Station limits. **Recommended:** Ubuntu VM on Proxmox + Dockge → **[DEPRECATION-QNAP.md](../../DEPRECATION-QNAP.md)** · **[dockge/README.md](../../dockge/README.md)**.
+
+Deploying [NetDash](https://github.com/lobrzut/netdash) on **QNAP** via **[Dockge](https://github.com/louislam/dockge)** (archive / existing installs). Container Station remains the Docker engine; Dockge provides an editable compose UI.
+
+> **Container Station cannot edit compose after deploy.** The steps below remain for existing installations and reference only.
 
 Pełny przewodnik: **[docs/QNAP.md](../../docs/QNAP.md)**.
 

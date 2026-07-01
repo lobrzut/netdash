@@ -9,6 +9,8 @@
 
 **Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
 
+> **QNAP NAS:** QNAP deployment is **deprecated** (host instability, incomplete port scans). Use **Ubuntu VM on Proxmox + Dockge** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** and **[dockge/README.md](dockge/README.md)**.
+
 ## Quick start (Docker, no git)
 
 Run this on any Linux host with Docker:
@@ -21,11 +23,9 @@ Open **http://<server-ip>:18787** and sign in with **`admin` / `changeme`**, the
 
 > **Port note:** NetDash uses **18787** by default. Set `NETDASH_PORT` in `.env` to change it. If you are migrating an older install on 8787, set `NETDASH_PORT=8787`.
 
-| Platform | Guide |
-|----------|-------|
-| **Linux (Docker)** | [`deploy/docker-simple/`](deploy/docker-simple/) — `install.sh`, GHCR-based compose |
-| **QNAP NAS** | [`deploy/qnap/README.md`](deploy/qnap/README.md) — wdrożenie przez Dockge |
-| **Full guide** | [DEPLOYMENT.md](DEPLOYMENT.md) |
+**Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
+
+> **QNAP NAS:** QNAP deployment is **deprecated** (host instability, incomplete port scans). Use **Ubuntu VM on Proxmox + Dockge** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** and **[dockge/README.md](dockge/README.md)**.
 
 Windows (Docker Desktop): `irm https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.ps1 | iex` — see [deploy/docker-simple/](deploy/docker-simple/).
 
@@ -290,9 +290,9 @@ netdash/
 │   ├── vault.py      # Key encryption
 │   └── static/       # Frontend
 ├── deploy/
-│   ├── docker-simple/  # GHCR-only compose + install.sh
-│   └── qnap/           # QNAP (Dockge)
-├── dockge/           # Dockge compose stack + deployment guide
+**Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
+
+> **QNAP NAS:** QNAP deployment is **deprecated** (host instability, incomplete port scans). Use **Ubuntu VM on Proxmox + Dockge** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** and **[dockge/README.md](dockge/README.md)**.
 ├── docker-compose.yml
 ├── Dockerfile
 └── run.py
