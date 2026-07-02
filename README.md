@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.147-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.148-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)

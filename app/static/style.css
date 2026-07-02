@@ -4609,7 +4609,13 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
   border-radius: 4px;
 }
 
-@media (hover: none) {
+/* Touch / coarse-pointer devices (phones, tablets) have no hover, so the
+   per-tile action toolbars (WOL/SOL, pin, edit, notes) would stay hidden and
+   taps would fall through to the tile's open-service handler. Reveal them and
+   raise them above the card watermark so they are reliably tappable. We match
+   BOTH (hover: none) and (pointer: coarse) because some Android browsers/
+   webviews falsely report hover capability on touchscreens. */
+@media (hover: none), (pointer: coarse) {
   .pinned-unpin-btn,
   body[data-dashboard-layout="medium"] .pinned-medium-toolbar,
   body[data-dashboard-layout="compact-big"] .pinned-chip-toolbar {
@@ -5184,11 +5190,13 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
 
 .service-card:focus-within .service-delete { opacity: 1; }
 
-@media (hover: none) {
+@media (hover: none), (pointer: coarse) {
   .service-actions {
     opacity: 1;
     transform: none;
     pointer-events: auto;
+    position: relative;
+    z-index: 2;
   }
 }
 

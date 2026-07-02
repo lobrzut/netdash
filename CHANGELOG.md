@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.148
+
+- **Mobile/dotyk — przyciski WOL/SOL na kaflach**: na smartfonie/tablecie stuknięcie w ikonę ⚡ (WOL) lub 💤 (SOL) na kaflu usługi otwierało usługę zamiast uruchamiać akcję. Pasek akcji kafla był pokazywany tylko na `:hover` (desktop), więc na ekranach dotykowych był niewidoczny/nietykalny, a tap „przechodził" do nawigacji kafla.
+- **Fix (CSS)**: reguły odsłaniające paski akcji rozszerzone z `@media (hover: none)` na `@media (hover: none), (pointer: coarse)` — łapie też przeglądarki mobilne fałszywie zgłaszające obsługę hover. Dotyczy wszystkich układów pulpitu (siatka usług, przypięte: compact/compact-big/medium/classic). Dodatkowo `.service-actions` na dotyku dostaje `position: relative; z-index: 2`, aby przyciski były nad znakiem wodnym kafla (pewny hit-test).
+- **Zachowanie na mobile**: przyciski WOL/SOL (oraz pin/edycja/notatki) są zawsze widoczne i klikalne; stuknięcie w nie uruchamia akcję i **nie** otwiera usługi (`stopPropagation`); stuknięcie w pozostałą część kafla nadal otwiera usługę. Desktop bez zmian (hover jak dotychczas).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.148`.
+
 ## v1.3.147
 
 - **Skrypty SOL (Linux/Windows/macOS)**: `AA:BB:CC:DD:EE:FF` w linii Usage to był tylko przykład — skrypty teraz **automatycznie wykrywają MAC** interfejsu domyślnego (Linux: `ip route get` → sysfs; Windows: adapter z domyślną bramą; macOS: `route get default` → `ifconfig`). Opcjonalny argument `[MAC-opcjonalny]` nadal nadpisuje wykrycie.
