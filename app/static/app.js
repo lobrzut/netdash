@@ -5047,13 +5047,91 @@ function getSolScriptMac(overrideMac) {
   return normalizeSolMac(raw);
 }
 
+function solScriptMacComment(mac) {
+  if (mac) {
+    return `# MAC: ${mac} (z NetDash — dopasowany do tego serwisu)`;
+  }
+  return '# MAC: auto-wykrycie interfejsu domyślnego (opcjonalny 1. argument nadpisuje)';
+}
+
+function solScriptUsageBash(mac) {
+  if (mac) {
+    return `# Usage: sudo bash install-netdash-sol.sh  # MAC wbudowany: ${mac}`;
+  }
+  return '# Usage: sudo bash install-netdash-sol.sh [MAC-opcjonalny]  # bez argumentu: wykryj automatycznie';
+}
+
+function solScriptUsagePs1(mac) {
+  if (mac) {
+    return `# Usage: .\\install-netdash-sol.ps1  # MAC wbudowany: ${mac}`;
+  }
+  return '# Usage: .\\install-netdash-sol.ps1  # MAC wykrywany automatycznie przy starcie';
+}
+
+function solLinuxDetectMacBash() {
+  return `detect_primary_mac() {
+  local dev mac operstate
+  if command -v ip >/dev/null 2>&1; then
+    dev=$(ip -o route get 8.8.8.8 2>/dev/null | sed -n 's/.* dev \\([^ ]*\\).*/\\1/p' | head -1)
+    if [[ -n "$dev" && -f "/sys/class/net/$dev/address" ]]; then
+      mac=$(tr '[:lower:]' '[:upper:]' < "/sys/class/net/$dev/address" | tr -d '\\n')
+      if [[ -n "$mac" && "$mac" != "00:00:00:00:00:00" ]]; then
+        echo "$mac"
+        return 0
+      fi
+    fi
+  fi
+  for path in /sys/class/net/*/address; do
+    [[ -e "$path" ]] || continue
+    dev=$(basename "$(dirname "$path")")
+    [[ "$dev" == "lo" ]] && continue
+    operstate=""
+    [[ -f "/sys/class/net/$dev/operstate" ]] && operstate=$(cat "/sys/class/net/$dev/operstate" 2>/dev/null || true)
+    [[ -n "$operstate" && "$operstate" != "up" && "$operstate" != "unknown" ]] && continue
+    mac=$(tr '[:lower:]' '[:upper:]' < "$path" | tr -d '\\n')
+    [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
+    echo "$mac"
+    return 0
+  done
+  return 1
+}`;
+}
+
+function solMacosDetectMacBash() {
+  return `detect_primary_mac() {
+  local dev mac
+  if command -v route >/dev/null 2>&1; then
+    dev=$(route -n get default 2>/dev/null | awk '/interface:/{print $2; exit}')
+    if [[ -n "$dev" ]]; then
+      mac=$(ifconfig "$dev" 2>/dev/null | awk '/ether/{print toupper($2); exit}')
+      if [[ -n "$mac" && "$mac" != "00:00:00:00:00:00" ]]; then
+        echo "$mac"
+        return 0
+      fi
+    fi
+  fi
+  for dev in $(ifconfig -l 2>/dev/null); do
+    [[ "$dev" == "lo0" ]] && continue
+    mac=$(ifconfig "$dev" 2>/dev/null | awk '/ether/{print toupper($2); exit}')
+    [[ -z "$mac" || "$mac" == "00:00:00:00:00:00" ]] && continue
+    status=$(ifconfig "$dev" 2>/dev/null | awk '/status: active/{found=1} END{print found+0}')
+    [[ "$status" != "1" ]] && continue
+    echo "$mac"
+    return 0
+  done
+  return 1
+}`;
+}
+
 function pythonSolListenerBody(port, mac) {
   const macComment = mac
     ? `Target MAC ${mac} (packet uses reversed byte order)`
-    : 'Auto-detect: match any local interface MAC';
+    : 'Auto-detect primary interface MAC (fallback: any local interface)';
   return `#!/usr/bin/env python3
 """NetDash Sleep-on-LAN UDP listener — ${macComment}"""
 import glob
+import os
+import re
 import socket
 import subprocess
 import sys
@@ -5064,19 +5142,74 @@ TARGET_MAC = ${mac ? `"${mac}"` : '""'}
 def normalize(mac):
     return mac.replace("-", ":").upper()
 
+def read_iface_mac(iface):
+    if iface in ("lo", "lo0"):
+        return None
+    path = f"/sys/class/net/{iface}/address"
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            value = fh.read().strip()
+        if value and value.lower() != "00:00:00:00:00:00":
+            return normalize(value)
+    except OSError:
+        pass
+    return None
+
+def primary_mac():
+    try:
+        out = subprocess.check_output(
+            ["ip", "-o", "route", "get", "8.8.8.8"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+        match = re.search(r" dev (\\S+)", out)
+        if match:
+            mac = read_iface_mac(match.group(1))
+            if mac:
+                return mac
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        pass
+    if sys.platform == "darwin":
+        try:
+            out = subprocess.check_output(
+                ["route", "-n", "get", "default"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            )
+            dev = None
+            for line in out.splitlines():
+                if "interface:" in line:
+                    dev = line.split(":", 1)[1].strip()
+                    break
+            if dev:
+                out2 = subprocess.check_output(
+                    ["ifconfig", dev],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                )
+                for line in out2.splitlines():
+                    parts = line.strip().split()
+                    if len(parts) >= 2 and parts[0] == "ether":
+                        return normalize(parts[1])
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            pass
+    return ""
+
 def local_macs():
     macs = []
-    for path in glob.glob("/sys/class/net/*/address"):
+    primary = primary_mac()
+    if primary:
+        macs.append(primary)
+    for path in sorted(glob.glob("/sys/class/net/*/address")):
         iface = path.split("/")[4]
-        if iface == "lo":
-            continue
-        try:
-            with open(path, encoding="utf-8") as fh:
-                value = fh.read().strip()
-            if value and value != "00:00:00:00:00:00":
-                macs.append(normalize(value))
-        except OSError:
-            pass
+        mac = read_iface_mac(iface)
+        if mac and mac not in macs:
+            macs.append(mac)
     return macs
 
 def extract_mac(data):
@@ -5125,20 +5258,28 @@ if __name__ == "__main__":
 
 function generateLinuxSolScript(port, mac) {
   const macArg = mac || '';
-  const macComment = mac
-    ? `# MAC: ${mac} (NetDash sends reversed bytes in magic packet)`
-    : '# MAC: auto-detect primary interface (or pass as 1st argument)';
   return `#!/bin/bash
 # NetDash Sleep-on-LAN installer (Linux)
 # UDP port: ${port}
-${macComment}
-# Usage: sudo bash install-netdash-sol.sh [AA:BB:CC:DD:EE:FF]
-# Requires: python3, systemd. Allow UDP ${port} from NetDash server subnet.
+${solScriptMacComment(mac)}
+${solScriptUsageBash(mac)}
+# Requires: python3, systemd, ip. Allow UDP ${port} from NetDash server subnet.
 
 set -euo pipefail
 SOL_PORT=${port}
 MAC_ARG="\$1"
 [[ -z "\$MAC_ARG" ]] && MAC_ARG="${macArg}"
+
+${solLinuxDetectMacBash()}
+
+if [[ -z "\$MAC_ARG" ]]; then
+  MAC_ARG=$(detect_primary_mac || true)
+  if [[ -n "\$MAC_ARG" ]]; then
+    echo "Auto-detected MAC: \$MAC_ARG"
+  else
+    echo "Warning: could not detect MAC — listener will match any local interface" >&2
+  fi
+fi
 INSTALL_DIR="/opt/netdash-sol"
 SERVICE_NAME="netdash-sol"
 
@@ -5209,11 +5350,31 @@ function windowsSolListenerBody(port, mac) {
 $SolPort = ${port}
 $TargetMac = ${macPs}
 
+function Get-PrimaryMac {
+  $routes = Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue |
+    Where-Object { $_.NextHop -ne '0.0.0.0' } |
+    Sort-Object RouteMetric, InterfaceMetric
+  foreach ($route in $routes) {
+    $adapter = Get-NetAdapter -InterfaceIndex $route.InterfaceIndex -Physical -ErrorAction SilentlyContinue |
+      Where-Object { $_.Status -eq 'Up' }
+    if ($adapter -and $adapter.MacAddress) {
+      $mac = Normalize-Mac $adapter.MacAddress
+      if ($mac) { return $mac }
+    }
+  }
+  return $null
+}
+
 function Get-LocalMacs {
+  $list = @()
+  $primary = Get-PrimaryMac
+  if ($primary) { $list += $primary }
   Get-NetAdapter -Physical -ErrorAction SilentlyContinue |
     Where-Object Status -eq 'Up' |
     ForEach-Object { Normalize-Mac $_.MacAddress } |
-    Where-Object { $_ }
+    Where-Object { $_ } |
+    ForEach-Object { if ($list -notcontains $_) { $list += $_ } }
+  return $list
 }
 
 function Get-PacketMac([byte[]]$Data) {
@@ -5245,6 +5406,10 @@ public class PowerProfile {
 }
 
 $udp = New-Object System.Net.Sockets.UdpClient $SolPort
+if (-not $TargetMac) {
+  $TargetMac = Get-PrimaryMac
+  if ($TargetMac) { Write-Host "Auto-detected MAC: $TargetMac" }
+}
 Write-Host "NetDash SOL listening on UDP $SolPort"
 while ($true) {
   $remote = New-Object System.Net.IPEndPoint ([System.Net.IPAddress]::Any, 0)
@@ -5259,15 +5424,12 @@ while ($true) {
 }
 
 function generateWindowsSolScript(port, mac) {
-  const macNote = mac
-    ? `# MAC: ${mac}`
-    : '# MAC: auto-detect from active adapters';
   return `# NetDash Sleep-on-LAN installer (Windows)
 # UDP port: ${port}
-${macNote}
-# Usage: run PowerShell as Administrator:
+${solScriptMacComment(mac)}
+${solScriptUsagePs1(mac)}
+# Run PowerShell as Administrator:
 #   Set-ExecutionPolicy Bypass -Scope Process -Force
-#   .\\install-netdash-sol.ps1
 # Registers a logon scheduled task and opens Windows Firewall for UDP ${port}.
 
 #Requires -RunAsAdministrator
@@ -5298,20 +5460,28 @@ Write-Host "NetDash SOL installed — UDP $SolPort, task $TaskName"
 
 function generateMacosSolScript(port, mac) {
   const macArg = mac || '';
-  const macComment = mac
-    ? `# MAC: ${mac}`
-    : '# MAC: auto-detect (or pass as 1st argument)';
   return `#!/bin/bash
 # NetDash Sleep-on-LAN installer (macOS)
 # UDP port: ${port}
-${macComment}
-# Usage: sudo bash install-netdash-sol.sh [AA:BB:CC:DD:EE:FF]
+${solScriptMacComment(mac)}
+${solScriptUsageBash(mac)}
 # Requires: python3. Allow UDP ${port} in System Settings → Network → Firewall.
 
 set -euo pipefail
 SOL_PORT=${port}
 MAC_ARG="\$1"
 [[ -z "\$MAC_ARG" ]] && MAC_ARG="${macArg}"
+
+${solMacosDetectMacBash()}
+
+if [[ -z "\$MAC_ARG" ]]; then
+  MAC_ARG=$(detect_primary_mac || true)
+  if [[ -n "\$MAC_ARG" ]]; then
+    echo "Auto-detected MAC: \$MAC_ARG"
+  else
+    echo "Warning: could not detect MAC — listener will match any local interface" >&2
+  fi
+fi
 INSTALL_DIR="/usr/local/libexec/netdash-sol"
 PLIST="/Library/LaunchDaemons/com.netdash.sol.plist"
 LABEL="com.netdash.sol"
@@ -5640,7 +5810,9 @@ $('#service-notes-sol-help')?.addEventListener('click', () => {
   openSolSetupHelp();
 });
 $('#service-notes-sol-script')?.addEventListener('click', () => {
-  const mac = normalizeSolMac($('#service-notes-mac')?.value);
+  const id = $('#service-notes-id')?.value;
+  const svc = id ? services.find((s) => String(s.id) === id) : null;
+  const mac = normalizeSolMac($('#service-notes-mac')?.value) || normalizeSolMac(svc?.mac_address);
   const defaultSol = appSettings.sol_port ?? appSettings.wol_port ?? 9;
   const solPortRaw = $('#service-notes-sol-port')?.value.trim();
   const port = solPortRaw ? parseInt(solPortRaw, 10) : defaultSol;

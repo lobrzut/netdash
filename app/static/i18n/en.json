@@ -387,7 +387,7 @@
   "settings.solHelp.macosFirewall": "System Settings → Network → Firewall: allow the SOL agent application.",
   "modal.solHelpLink": "How to enable SOL on the host?",
   "settings.sol.scripts.title": "SOL host install scripts",
-  "settings.sol.scripts.hint": "Run the selected script on the target machine (as root / administrator). It listens on the SOL UDP port from NetDash settings and suspends the host when a reversed-MAC magic packet is received.",
+  "settings.sol.scripts.hint": "Run the selected script on the target machine (as root / administrator). MAC is auto-detected — no manual entry needed. It listens on the SOL UDP port from NetDash settings and suspends the host when a reversed-MAC magic packet is received.",
   "settings.sol.scripts.serviceHint": "Script tailored to this service's MAC. Run it on the target host.",
   "settings.sol.scripts.copy": "Copy to clipboard",
   "settings.sol.scripts.download": "Download script",

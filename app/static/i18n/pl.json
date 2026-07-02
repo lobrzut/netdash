@@ -394,7 +394,7 @@
   "settings.solHelp.macosFirewall": "Ustawienia systemowe → Sieć → Zapora: zezwól na aplikację agenta SOL.",
   "modal.solHelpLink": "Jak włączyć SOL na hoście?",
   "settings.sol.scripts.title": "Skrypty instalacji SOL na hoście",
-  "settings.sol.scripts.hint": "Uruchom wybrany skrypt na komputerze docelowym (jako root / administrator). Nasłuchuje na porcie UDP SOL z ustawień NetDash i uśpia host po odebraniu pakietu z odwróconym MAC.",
+  "settings.sol.scripts.hint": "Uruchom wybrany skrypt na komputerze docelowym (jako root / administrator). MAC jest wykrywany automatycznie — bez ręcznego wpisywania. Nasłuchuje na porcie UDP SOL z ustawień NetDash i uśpia host po odebraniu pakietu z odwróconym MAC.",
   "settings.sol.scripts.serviceHint": "Skrypt dopasowany do MAC tego serwisu. Uruchom na hoście docelowym.",
   "settings.sol.scripts.copy": "Kopiuj do schowka",
   "settings.sol.scripts.download": "Pobierz skrypt",

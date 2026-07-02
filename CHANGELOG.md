@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.147
+
+- **Skrypty SOL (Linux/Windows/macOS)**: `AA:BB:CC:DD:EE:FF` w linii Usage to był tylko przykład — skrypty teraz **automatycznie wykrywają MAC** interfejsu domyślnego (Linux: `ip route get` → sysfs; Windows: adapter z domyślną bramą; macOS: `route get default` → `ifconfig`). Opcjonalny argument `[MAC-opcjonalny]` nadal nadpisuje wykrycie.
+- **Skrypt z poziomu serwisu**: gdy NetDash zna MAC (ARP/discovery), jest **wbudowany w wygenerowany skrypt** zamiast placeholdera.
+- **i18n**: zaktualizowane podpowiedzi w panelu skryptów SOL (pl/en).
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.147`.
+
 ## v1.3.146
 
 - **Ustawienia → Automatyczne discovery**: przełącznik wyłączenia automatycznego skanowania sieci (bez restartu kontenera). Ręczne dodawanie serwisów (**Serwisy → Dodaj**) i skan ręczny nadal działają.

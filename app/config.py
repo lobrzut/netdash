@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.146"
+VERSION = "1.3.147"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
     "Ustawienia → Automatyczne discovery — przełącznik wyłączenia skanowania w tle (ręczne dodawanie serwisów nadal działa)",
