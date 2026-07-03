@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.149
+
+- **Tryb IPS-friendly / stealth (anty-blokada Symantec SEP)**: IPS na komputerach w LAN (np. Symantec Endpoint Protection) blokowały źródłowe IP NetDash na 600 s (`The client will block traffic from IP address … for the next 600 seconds`), bo widziały wiele **różnych** portów sondowanych na **tym samym** hoście w krótkim oknie czasu. Największym wyzwalaczem było probowanie ~190 portów usług (`SCAN_ALL_PORTS` / `AUTO_DISCOVERY_ALL_PORTS`) na jednym żywym hoście naraz.
+- **Root cause**: `scan_network` budował pary `(host, port)` w kolejności host-major i odpalał wszystko przez jeden globalny semafor — pierwszych ~32 równoległych sond trafiało w **jeden** host na 32 różnych portach jednocześnie. Analogicznie `discovery_pipeline._tier1_tcp_discovery` zbierał wszystkie porty hosta naraz.
+- **Fix**: nowy `_probe_host_ports()` sonduje porty **jednego hosta** łagodnie — limit równoległości na host (domyślnie **1 port naraz**), **losowa kolejność** i **odstęp z jitterem** między sondami tego samego hosta. Skan wielu hostów równolegle działa dalej (każdy host łagodnie), więc discovery pozostaje skuteczne. Health check też serializuje sondy do tego samego hosta.
+- **Nowe env (domyślnie ON)**: `NETDASH_IPS_FRIENDLY=true`, `NETDASH_PORT_PARALLEL_PER_HOST=1`, `NETDASH_PORTS_PER_HOST_DELAY=0.3`, `NETDASH_PORTS_PER_HOST_JITTER=0.2`, `NETDASH_SCAN_RANDOMIZE_PORTS=true`. Jeśli SEP nadal blokuje — zwiększ `PORTS_PER_HOST_DELAY` (np. 0.6–1.0). `NETDASH_IPS_FRIENDLY=false` przywraca stare, szybkie zachowanie.
+- **Dlaczego łagodniejsze skanery nie wyzwalają IPS**: sondują mniej portów, dodają opóźnienia na host, losują kolejność albo robią ICMP/ARP-first — nie generują burzy wielu portów na jeden host w oknie detekcji. NetDash robi teraz to samo.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.149`.
+
 ## v1.3.148
 
 - **Mobile/dotyk — przyciski WOL/SOL na kaflach**: na smartfonie/tablecie stuknięcie w ikonę ⚡ (WOL) lub 💤 (SOL) na kaflu usługi otwierało usługę zamiast uruchamiać akcję. Pasek akcji kafla był pokazywany tylko na `:hover` (desktop), więc na ekranach dotykowych był niewidoczny/nietykalny, a tap „przechodził" do nawigacji kafla.

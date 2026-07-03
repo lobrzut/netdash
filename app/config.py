@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.148"
+VERSION = "1.3.149"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Tryb IPS-friendly (stealth) — skan rozkłada porty jednego hosta w czasie (1 port/raz, losowa kolejność, odstęp z jitterem), więc nie wyzwala blokad IPS/Symantec SEP („blokuje ruch z IP…”). Domyślnie włączony: NETDASH_IPS_FRIENDLY, NETDASH_PORTS_PER_HOST_DELAY, NETDASH_PORT_PARALLEL_PER_HOST",
     "Ustawienia → Automatyczne discovery — przełącznik wyłączenia skanowania w tle (ręczne dodawanie serwisów nadal działa)",
     "Kafelek Brain — link „Otwórz dashboard” (URL z ustawień statystyk, widoczny gdy Brain online)",
     "Auto-usuwanie nieaktywnych serwisów — NETDASH_STALE_REMOVE_DAYS lub Ustawienia → Skanowanie",
@@ -220,6 +221,21 @@ class Settings(BaseSettings):
     watchtower_api_token: str = ""
     # Network info tile: WAN/GeoIP lookup via ip-api.com. Tile is opt-in in Settings.
     network_wan_lookup: bool = True
+    # IPS-friendly (stealth) scanning — ON by default. Endpoint IPS (Symantec SEP, Windows
+    # firewall port-scan detection, etc.) block a source IP when it hits many DISTINCT ports on
+    # the SAME host within a short window. NetDash's biggest trigger is probing ~190 service
+    # ports on one live host within seconds. When enabled, each host's ports are probed with
+    # limited per-host parallelism, in randomized order, with a jittered delay between probes —
+    # so no single host ever sees a burst of many ports. Cross-host parallelism is unaffected.
+    ips_friendly: bool = True
+    # Max simultaneous port probes to a SINGLE host (1 = strictly one connection at a time).
+    port_parallel_per_host: int = 1
+    # Delay (seconds) between consecutive port probes to the SAME host (jittered, see below).
+    ports_per_host_delay: float = 0.3
+    # Extra random jitter (0..N s) added to each same-host probe delay — hides a fixed rate.
+    ports_per_host_jitter: float = 0.2
+    # Randomize the order a host's ports are probed (sequential 22,23,25… sweeps are easy to flag).
+    scan_randomize_ports: bool = True
 
     class Config:
         env_prefix = "NETDASH_"
@@ -510,6 +526,45 @@ class Settings(BaseSettings):
             return 4
         return int(v)
 
+    @field_validator("ips_friendly", mode="before")
+    @classmethod
+    def _ips_friendly(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("scan_randomize_ports", mode="before")
+    @classmethod
+    def _scan_randomize_ports(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("port_parallel_per_host", mode="before")
+    @classmethod
+    def _port_parallel_per_host(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 1
+        return max(1, int(v))
+
+    @field_validator("ports_per_host_delay", mode="before")
+    @classmethod
+    def _ports_per_host_delay(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 0.3
+        return max(0.0, float(v))
+
+    @field_validator("ports_per_host_jitter", mode="before")
+    @classmethod
+    def _ports_per_host_jitter(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 0.2
+        return max(0.0, float(v))
+
     @field_validator("sync_admin_password", mode="before")
     @classmethod
     def _sync_admin_password(cls, v: object) -> bool:
@@ -564,6 +619,21 @@ class Settings(BaseSettings):
     @property
     def effective_scan_max_hosts(self) -> int:
         return self.scan_safe_max_hosts if self.scan_safe_mode else self.scan_max_hosts
+
+    @property
+    def effective_port_parallel_per_host(self) -> int:
+        """Concurrent probes allowed to a single host. IPS-friendly caps this (default 1);
+        when disabled, fall back to broad concurrency so behaviour matches pre-1.3.149."""
+        if not self.ips_friendly:
+            return max(1, self.effective_scan_concurrency)
+        return max(1, self.port_parallel_per_host)
+
+    @property
+    def effective_ports_per_host_delay(self) -> float:
+        """Delay between consecutive probes to the same host — 0 when IPS-friendly is off."""
+        if not self.ips_friendly:
+            return 0.0
+        return max(0.0, self.ports_per_host_delay)
 
     @property
     def effective_scan_max_duration(self) -> float:

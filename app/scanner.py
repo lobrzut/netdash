@@ -2,6 +2,7 @@ import asyncio
 import ipaddress
 import logging
 import platform
+import random
 import re
 import socket
 from dataclasses import dataclass
@@ -983,16 +984,83 @@ async def discover_live_hosts_quick(
     return sorted(live)
 
 
+async def _check_port_raw(host: str, port: int) -> bool:
+    """Single TCP-connect probe with no concurrency gate (caller controls pacing)."""
+    try:
+        conn = asyncio.open_connection(host, port)
+        _, writer = await asyncio.wait_for(conn, timeout=settings.scan_timeout)
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+        return False
+
+
 async def _check_port(host: str, port: int, sem: asyncio.Semaphore) -> bool:
     async with sem:
-        try:
-            conn = asyncio.open_connection(host, port)
-            _, writer = await asyncio.wait_for(conn, timeout=settings.scan_timeout)
-            writer.close()
-            await writer.wait_closed()
-            return True
-        except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
-            return False
+        return await _check_port_raw(host, port)
+
+
+async def _probe_host_ports(
+    host: str,
+    ports: list[int],
+    *,
+    global_sem: asyncio.Semaphore | None = None,
+    stop_on_first: bool = False,
+) -> list[int]:
+    """Probe `ports` on ONE host without tripping endpoint IPS (Symantec SEP etc.).
+
+    In IPS-friendly mode (default) a host's ports are checked with limited per-host
+    parallelism (NETDASH_PORT_PARALLEL_PER_HOST, default 1), in randomized order
+    (NETDASH_SCAN_RANDOMIZE_PORTS), with a jittered delay between probes
+    (NETDASH_PORTS_PER_HOST_DELAY + NETDASH_PORTS_PER_HOST_JITTER). This spreads a
+    host's port probes over time so an IPS never sees a burst of many DISTINCT ports
+    from us and blocks NetDash's source IP as a "port scan".
+
+    Cross-host parallelism is controlled by the caller — many hosts can still be
+    probed at once, each one gently. `global_sem`, when given, caps total in-flight
+    connections. `stop_on_first` returns as soon as one open port is found (host
+    liveness checks) and always probes serially.
+    """
+    if not ports:
+        return []
+    order = list(dict.fromkeys(ports))
+    if settings.ips_friendly and settings.scan_randomize_ports:
+        random.shuffle(order)
+
+    per_host = max(1, settings.effective_port_parallel_per_host)
+    delay = settings.effective_ports_per_host_delay
+    jitter = settings.ports_per_host_jitter if settings.ips_friendly else 0.0
+    host_sem = asyncio.Semaphore(per_host)
+    found: list[int] = []
+    stop = asyncio.Event()
+
+    async def probe(port: int) -> None:
+        if stop_on_first and stop.is_set():
+            return
+        async with host_sem:
+            if stop_on_first and stop.is_set():
+                return
+            if delay > 0:
+                await asyncio.sleep(delay + (random.random() * jitter if jitter > 0 else 0.0))
+            ok = (
+                await _check_port(host, port, global_sem)
+                if global_sem is not None
+                else await _check_port_raw(host, port)
+            )
+            if ok:
+                found.append(port)
+                if stop_on_first:
+                    stop.set()
+
+    if per_host <= 1 or stop_on_first:
+        for port in order:
+            if stop_on_first and stop.is_set():
+                break
+            await probe(port)
+    else:
+        await asyncio.gather(*(probe(port) for port in order))
+    return found
 
 
 def tcp_port_open_sync(ip: str, port: int, *, timeout: float | None = None) -> str:
@@ -1419,27 +1487,36 @@ async def scan_network(
     open_ports: list[tuple[str, int]] = []
     total = len(live_hosts) * len(ports)
     done = 0
-    pairs = [(host, port) for host in live_hosts for port in ports]
 
-    async def scan_one(host: str, port: int):
+    # IPS-friendly: probe each host's ports gently (spread over time / limited per-host
+    # parallelism) instead of firing every (host, port) pair at once. The old host-major
+    # gather slammed the first live host with dozens of distinct ports simultaneously —
+    # exactly what Symantec SEP & co. flag as a port scan.
+    async def scan_host(host: str) -> None:
         nonlocal done
-        if await _check_port(host, port, sem):
+        found = await _probe_host_ports(host, ports, global_sem=sem)
+        for port in found:
             open_ports.append((host, port))
-        done += 1
+        done += len(ports)
         await _scan_batch_pause(done)
-        if progress_callback and done % 50 == 0:
-            await progress_callback("ports", done, total)
+        if progress_callback:
+            await progress_callback("ports", min(done, total), total)
 
     if settings.scan_safe_mode:
-        for host, port in pairs:
-            await scan_one(host, port)
-            await asyncio.sleep(settings.scan_batch_delay * 0.5)
-    elif manual_scan:
-        for host, port in pairs:
-            await scan_one(host, port)
-            await asyncio.sleep(settings.manual_scan_batch_delay)
+        for host in live_hosts:
+            await scan_host(host)
+            await asyncio.sleep(settings.scan_batch_delay)
     else:
-        await asyncio.gather(*(scan_one(host, port) for host, port in pairs))
+        host_sem = asyncio.Semaphore(max(1, settings.effective_scan_concurrency))
+        inter_host_delay = settings.manual_scan_batch_delay if manual_scan else 0.0
+
+        async def scan_host_guarded(host: str) -> None:
+            async with host_sem:
+                await scan_host(host)
+                if inter_host_delay:
+                    await asyncio.sleep(inter_host_delay)
+
+        await asyncio.gather(*(scan_host_guarded(host) for host in live_hosts))
     if progress_callback:
         await progress_callback("ports", total, total)
 

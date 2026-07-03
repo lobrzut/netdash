@@ -38,6 +38,7 @@ from app.scanner import (
     TCP_DISCOVERY_PRIMARY_PORTS,
     _check_port,
     _identify_service,
+    _probe_host_ports,
     get_local_network,
     parse_cidr,
     resolve_scan_cidrs,
@@ -283,6 +284,11 @@ async def _probe_extra_ports(
     if not extra_ports:
         return host_ports
     found = list(host_ports)
+    if settings.ips_friendly:
+        # Spread the ~180 extra ports over time (1 port/host at a time, jittered) so endpoint
+        # IPS (Symantec SEP etc.) never sees a many-port burst from us and blocks our IP.
+        found.extend(await _probe_host_ports(ip, extra_ports, global_sem=port_sem))
+        return found
     batch = max(2, profile.port_parallel)
     pause = profile.tier_delay_sec * (0.5 if settings.auto_discovery_all_ports else 0.15)
     for i in range(0, len(extra_ports), batch):
@@ -313,12 +319,11 @@ async def _tier1_tcp_discovery(
     async def probe_host(ip: str) -> None:
         nonlocal services_created
         async with ip_sem:
-            checks = await asyncio.gather(
-                *(_check_port(ip, port, port_sem) for port in TCP_DISCOVERY_PRIMARY_PORTS)
+            # IPS-friendly per-host probing (1 port at a time, jittered) so we never burst
+            # many distinct ports at one host — the classic port-scan signature IPS blocks.
+            host_ports = await _probe_host_ports(
+                ip, list(TCP_DISCOVERY_PRIMARY_PORTS), global_sem=port_sem
             )
-            host_ports = [
-                port for port, ok in zip(TCP_DISCOVERY_PRIMARY_PORTS, checks) if ok
-            ]
             if not host_ports:
                 return
 
@@ -327,12 +332,8 @@ async def _tier1_tcp_discovery(
                 host_ports = await _probe_extra_ports(ip, host_ports, port_sem, profile)
             elif settings.scan_all_ports:
                 extra_ports = [p for p in SERVICE_PORTS if p not in host_ports]
-                extra_checks = await asyncio.gather(
-                    *(_check_port(ip, port, port_sem) for port in extra_ports)
-                )
-                host_ports = host_ports + [
-                    port for port, ok in zip(extra_ports, extra_checks) if ok
-                ]
+                extra_open = await _probe_host_ports(ip, extra_ports, global_sem=port_sem)
+                host_ports = host_ports + extra_open
 
             open_ports_by_ip[ip] = host_ports
             logger.info("TCP discovery: %s live ports=%s", ip, host_ports)
@@ -706,6 +707,9 @@ def get_discovery_pipeline_status() -> dict[str, Any]:
         "weak_dual_chunk": settings.weak_dual_chunk,
         "discovery_enabled": settings.effective_discovery_enabled,
         "tcp_ports": TCP_DISCOVERY_PRIMARY_PORTS,
+        "ips_friendly": settings.ips_friendly,
+        "port_parallel_per_host": settings.effective_port_parallel_per_host,
+        "ports_per_host_delay": settings.effective_ports_per_host_delay,
     }
 
 

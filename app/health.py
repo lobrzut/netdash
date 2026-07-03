@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import random
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -201,15 +202,36 @@ async def check_all_services(db: AsyncSession) -> int:
         return 0
 
     sem = asyncio.Semaphore(settings.health_check_concurrency)
+    # IPS-friendly: serialize probes to the SAME host (+jittered delay) so several services
+    # sharing one host aren't probed as a simultaneous multi-port burst (IPS port-scan flag).
+    host_gates: dict[str, asyncio.Semaphore] = {}
+    per_host = max(1, settings.effective_port_parallel_per_host)
+    delay = settings.effective_ports_per_host_delay
+    jitter = settings.ports_per_host_jitter if settings.ips_friendly else 0.0
+
+    def _host_gate(host: str) -> asyncio.Semaphore | None:
+        if not settings.ips_friendly:
+            return None
+        return host_gates.setdefault(host, asyncio.Semaphore(per_host))
+
+    async def _run(svc: Service) -> None:
+        try:
+            online, detail = await check_service_online(svc)
+            await apply_health_result(db, svc, online, detail)
+        except Exception:
+            logger.warning("Health check failed for service %s (%s)", svc.id, svc.host, exc_info=True)
+            await apply_health_result(db, svc, False)
 
     async def check_one(svc: Service):
         async with sem:
-            try:
-                online, detail = await check_service_online(svc)
-                await apply_health_result(db, svc, online, detail)
-            except Exception:
-                logger.warning("Health check failed for service %s (%s)", svc.id, svc.host, exc_info=True)
-                await apply_health_result(db, svc, False)
+            gate = _host_gate((svc.host or "").strip())
+            if gate is None:
+                await _run(svc)
+                return
+            async with gate:
+                if delay > 0:
+                    await asyncio.sleep(delay + (random.random() * jitter if jitter > 0 else 0.0))
+                await _run(svc)
 
     await asyncio.gather(*(check_one(s) for s in services))
     await db.commit()
