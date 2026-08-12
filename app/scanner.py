@@ -646,9 +646,27 @@ def chunk_cidrs_for_manual_work(cidrs: list[str], *, prefix: int | None = None) 
     return out or list(cidrs)
 
 
-def compute_manual_scan_timeout(cidrs: list[str]) -> float:
-    """Scaled wall-clock timeout for a manual scan covering ``cidrs``."""
-    return settings.manual_scan_timeout_for_hosts(count_hosts_in_cidrs(cidrs))
+def compute_manual_scan_timeout(
+    cidrs: list[str],
+    *,
+    full_scan: bool = False,
+    ports_count: int | None = None,
+) -> float:
+    """Scaled wall-clock timeout for a manual scan covering ``cidrs``.
+
+    Factors in port-profile size and IPS-friendly per-port delays so popular /24
+    scans are not cut off at the discovery-only floor (1800 s).
+    """
+    n_ports = (
+        ports_count
+        if ports_count is not None
+        else len(resolve_manual_scan_ports(full_scan=full_scan))
+    )
+    return settings.manual_scan_timeout_for_hosts(
+        count_hosts_in_cidrs(cidrs),
+        ports_count=n_ports,
+        full_scan=full_scan,
+    )
 
 
 def validate_cidrs_for_safe_mode(cidrs: list[str], *, for_manual: bool = False) -> None:
@@ -1732,26 +1750,27 @@ async def scan_network(
         )
 
     if progress_callback:
-        await progress_callback("ports", 0, len(live_hosts) * len(ports))
+        await progress_callback("ports", 0, max(1, len(live_hosts)))
 
     sem = asyncio.Semaphore(settings.effective_scan_concurrency)
     open_ports: list[tuple[str, int]] = []
-    total = len(live_hosts) * len(ports)
-    done = 0
+    host_total = len(live_hosts)
+    hosts_done = 0
 
     # IPS-friendly: probe each host's ports gently (spread over time / limited per-host
     # parallelism) instead of firing every (host, port) pair at once. The old host-major
     # gather slammed the first live host with dozens of distinct ports simultaneously —
     # exactly what Symantec SEP & co. flag as a port scan.
+    # Popular/safe ports are probed ONLY on live hosts (never on every IP in the CIDR).
     async def scan_host(host: str) -> None:
-        nonlocal done
+        nonlocal hosts_done
         found = await _probe_host_ports(host, ports, global_sem=sem)
         for port in found:
             open_ports.append((host, port))
-        done += len(ports)
-        await _scan_batch_pause(done)
+        hosts_done += 1
+        await _scan_batch_pause(hosts_done)
         if progress_callback:
-            await progress_callback("ports", min(done, total), total)
+            await progress_callback("ports", hosts_done, max(1, host_total))
         await asyncio.sleep(0)
 
     # Manual + safe mode: always sequential hosts so API stays responsive on /24.
@@ -1774,7 +1793,7 @@ async def scan_network(
 
         await asyncio.gather(*(scan_host_guarded(host) for host in live_hosts))
     if progress_callback:
-        await progress_callback("ports", total, total)
+        await progress_callback("ports", max(1, host_total), max(1, host_total))
 
     identify_sem = asyncio.Semaphore(settings.scan_identify_concurrency)
     unique: dict[tuple[str, int], DiscoveredService] = {}

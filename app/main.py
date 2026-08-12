@@ -65,6 +65,7 @@ from app.scanner import (
     is_likely_docker_bridge,
     normalize_scan_cidr_list,
     probe_single_host_port,
+    resolve_manual_scan_ports,
     resolve_scan_cidrs,
     parse_host_scan_ports,
     scan_networks,
@@ -1918,12 +1919,14 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         host_only = app_settings.host_only_entries is not False
         known_hosts = await _collect_known_scan_hosts(db)
 
-    scan_timeout = compute_manual_scan_timeout(cidrs)
+    scan_timeout = compute_manual_scan_timeout(cidrs, full_scan=full_scan)
     logger.info(
-        "Scan %s timeout budget=%ss (hosts≈%s)",
+        "Scan %s timeout budget=%ss (hosts≈%s full_scan=%s ports≈%s)",
         job_id,
         int(scan_timeout),
         count_hosts_in_cidrs(cidrs),
+        full_scan,
+        len(resolve_manual_scan_ports(full_scan=full_scan)),
     )
     try:
         discovered = await asyncio.wait_for(
@@ -1983,19 +1986,41 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
             full_scan,
         )
     except asyncio.TimeoutError:
-        msg = (
-            f"Skanowanie przekroczyło limit czasu ({int(scan_timeout)} s). "
-            "Na słabym sprzęcie użyj mniejszego CIDR (/28), zwiększ NETDASH_MANUAL_SCAN_MAX_DURATION "
-            "/ NETDASH_MANUAL_SCAN_TIMEOUT_PER_HOST, albo wyłącz pełny skan portów."
-        )
-        logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
-        async with async_session() as db:
-            result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
-            job = result.scalar_one()
-            job.status = "failed"
-            job.error_message = msg
-            job.finished_at = datetime.now(timezone.utc)
-            await db.commit()
+        # Services already streamed via on_service are persisted — treat as partial success.
+        if found_count > 0:
+            msg = (
+                f"Skan zakończony limitem czasu ({int(scan_timeout)} s) — zapisano {found_count} wyników. "
+                "Możesz uruchomić ponownie (Popularne porty tylko na żywych hostach) albo zawęzić CIDR."
+            )
+            logger.warning(
+                "Scan %s timed out for %s after saving %s result(s) — marking completed",
+                job_id,
+                format_cidr_list(cidrs),
+                found_count,
+            )
+            async with async_session() as db:
+                result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+                job = result.scalar_one()
+                job.status = "completed"
+                job.found_count = found_count
+                job.error_message = msg
+                job.progress_phase = "done"
+                job.finished_at = datetime.now(timezone.utc)
+                await db.commit()
+        else:
+            msg = (
+                f"Skanowanie przekroczyło limit czasu ({int(scan_timeout)} s) bez wyników. "
+                "Na słabym sprzęcie użyj mniejszego CIDR (/28), zwiększ NETDASH_MANUAL_SCAN_MAX_DURATION "
+                "/ NETDASH_MANUAL_SCAN_TIMEOUT_CAP, albo wybierz Podstawowe porty zamiast Popularnych."
+            )
+            logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
+            async with async_session() as db:
+                result = await db.execute(select(ScanJob).where(ScanJob.id == job_id))
+                job = result.scalar_one()
+                job.status = "failed"
+                job.error_message = msg
+                job.finished_at = datetime.now(timezone.utc)
+                await db.commit()
     except ScanError as exc:
         logger.warning("Scan %s rejected: %s", job_id, exc)
         async with async_session() as db:
@@ -2259,7 +2284,7 @@ async def start_scan(
             settings.scan_safe_mode,
             settings.effective_scan_concurrency,
             settings.effective_manual_scan_max_hosts,
-            int(compute_manual_scan_timeout(scan_cidrs)),
+            int(compute_manual_scan_timeout(scan_cidrs, full_scan=full_scan)),
             docker_br,
         )
     else:

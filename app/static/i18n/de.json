@@ -565,6 +565,7 @@
   "modal.close": "Schließen",
   "scan.phase.ping": "Hosts werden erkannt",
   "scan.phase.ports": "Ports werden gescannt",
+  "scan.phase.portsLive": "Ports auf aktiven Hosts {current}/{total}",
   "scan.phase.identify": "Dienste werden identifiziert",
   "scan.phase.done": "Abgeschlossen",
   "scan.phase.default": "Scan läuft",

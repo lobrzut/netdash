@@ -4197,16 +4197,21 @@ const SCAN_PHASE_KEYS = {
 function formatScanStatus(status) {
   const phase = t(SCAN_PHASE_KEYS[status.progress_phase] || 'scan.phase.default');
   const network = status.cidr || t('scan.localNetwork');
-  if (status.found_count > 0) {
-    return `${phase} · ${network} · ${t('scan.foundCount', { count: status.found_count })}`;
+  const found = status.found_count > 0
+    ? ` · ${t('scan.foundCount', { count: status.found_count })}`
+    : '';
+  if (status.progress_total > 0 && status.progress_phase === 'ports') {
+    return `${t('scan.phase.portsLive', {
+      current: status.progress_current,
+      total: status.progress_total,
+    })} · ${network}${found}`;
   }
   if (status.progress_total > 0 && status.progress_phase === 'ping') {
     const pct = Math.round((status.progress_current / status.progress_total) * 100);
-    return `${phase} · ${pct}% · ${network}`;
+    return `${phase} · ${pct}% · ${network}${found}`;
   }
-  if (status.progress_total > 0 && status.progress_phase === 'ports') {
-    const pct = Math.round((status.progress_current / status.progress_total) * 100);
-    return `${phase} · ${pct}% · ${network}`;
+  if (status.found_count > 0) {
+    return `${phase} · ${network}${found}`;
   }
   return `${phase} · ${network}`;
 }
@@ -4388,6 +4393,8 @@ async function pollScanProgress(jobId) {
         else showToast(hint, 'info');
       } else {
         showToast(t('scan.completed', { count: status.found_count }), 'success');
+        // Soft timeout / partial note — info toast, not scary red banner.
+        if (status.error_message) showToast(status.error_message, 'info');
       }
       return true;
     }

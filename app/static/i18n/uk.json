@@ -561,6 +561,7 @@
   "modal.close": "Закрити",
   "scan.phase.ping": "Виявлення хостів",
   "scan.phase.ports": "Сканування портів",
+  "scan.phase.portsLive": "Порти на живих хостах {current}/{total}",
   "scan.phase.identify": "Ідентифікація сервісів",
   "scan.phase.done": "Завершено",
   "scan.phase.default": "Сканування",

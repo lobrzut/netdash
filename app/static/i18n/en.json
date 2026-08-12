@@ -626,6 +626,7 @@
   "modal.close": "Close",
   "scan.phase.ping": "Discovering hosts",
   "scan.phase.ports": "Scanning ports",
+  "scan.phase.portsLive": "Ports on live hosts {current}/{total}",
   "scan.phase.identify": "Identifying services",
   "scan.phase.done": "Completed",
   "scan.phase.default": "Scanning",

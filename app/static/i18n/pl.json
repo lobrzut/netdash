@@ -633,6 +633,7 @@
   "modal.close": "Zamknij",
   "scan.phase.ping": "Wykrywanie hostów",
   "scan.phase.ports": "Skanowanie portów",
+  "scan.phase.portsLive": "Porty na żywych hostach {current}/{total}",
   "scan.phase.identify": "Identyfikacja serwisów",
   "scan.phase.done": "Zakończono",
   "scan.phase.default": "Skanowanie",

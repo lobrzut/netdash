@@ -6,9 +6,11 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.154"
+VERSION = "1.3.155"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Timeout skanu popularnego /24 — budżet = hosty×porty×(delay+jitter) + overhead, cap 7200 s; porty tylko na żywych hostach",
+    "Postęp skanu: „Porty na żywych hostach 12/30”; limit czasu z zapisanymi wynikami = sukces częściowy (nie czerwony błąd)",
     "Ukierunkowany skan — w Opcjach skanu: IP + port → sprawdź i dodaj (np. qBittorrent :6363) bez skanu całej sieci",
     "Popularne porty (zalecane) — Skanuj sieć obejmuje homelab/*arr/media (6363, Plex, Jellyfin, HA, Immich); Podstawowe = krótka lista; nie 1–65535",
     "NETDASH_SCAN_PORT_PROFILE=safe|popular|all_listed — domyślnie safe; SCAN_ALL_PORTS=true = pełna lista usług (~190)",
@@ -182,10 +184,10 @@ class Settings(BaseSettings):
     manual_scan_batch_delay: float = 0.15
     # Manual /24 with IPS-friendly delays needs more wall time than background /28 chunks.
     manual_scan_max_duration: float = 1800.0
-    # Extra seconds per host on top of base duration (TCP discovery + IPS delays).
+    # Extra seconds per CIDR host for discovery (ping/TCP liveness) — not the popular-port phase.
     manual_scan_timeout_per_host: float = 6.0
-    # Hard cap for scaled manual scan timeout (seconds).
-    manual_scan_timeout_cap: float = 3600.0
+    # Hard cap for scaled manual scan timeout (seconds). Popular+/IPS can need ~2h on dense /24.
+    manual_scan_timeout_cap: float = 7200.0
     # Internally split wide manual CIDRs into /28 work units (one job still covers full /24).
     manual_scan_internal_chunk: bool = True
     manual_scan_work_chunk_prefix: int = 28
@@ -464,7 +466,7 @@ class Settings(BaseSettings):
     @classmethod
     def _manual_scan_timeout_cap(cls, v: object) -> float:
         if v is None or (isinstance(v, str) and not v.strip()):
-            return 3600.0
+            return 7200.0
         return max(120.0, float(v))
 
     @field_validator("manual_scan_internal_chunk", mode="before")
@@ -746,12 +748,43 @@ class Settings(BaseSettings):
             return max(self.manual_scan_max_duration, self.effective_scan_max_duration)
         return self.effective_scan_max_duration
 
-    def manual_scan_timeout_for_hosts(self, host_count: int) -> float:
-        """Wall-clock budget for one manual scan job — scales with CIDR size."""
+    def manual_scan_timeout_for_hosts(
+        self,
+        host_count: int,
+        *,
+        ports_count: int = 0,
+        full_scan: bool = False,
+    ) -> float:
+        """Wall-clock budget for one manual scan job.
+
+        Scales with CIDR size and (when known) ports × IPS delay. Popular port lists
+        with IPS-friendly 1-port-at-a-time probing need far more than the discovery
+        floor alone — a dense /24 can take well over 30 minutes.
+        """
         base = self.effective_manual_scan_max_duration
         hosts = max(0, int(host_count))
-        scaled = max(base, hosts * max(0.0, self.manual_scan_timeout_per_host))
-        return min(scaled, max(base, self.manual_scan_timeout_cap))
+        ports = max(0, int(ports_count))
+        discovery = hosts * max(0.0, self.manual_scan_timeout_per_host)
+        if ports > 0:
+            delay = self.effective_ports_per_host_delay
+            jitter = self.ports_per_host_jitter if self.ips_friendly else 0.0
+            # delay + avg jitter + TCP attempt; hosts are sequential in safe/manual mode.
+            per_port = delay + (jitter * 0.5) + min(max(0.2, self.scan_timeout), 0.8)
+            parallel = max(1, self.effective_port_parallel_per_host)
+            # Conservative upper bound: budget as if every CIDR host were live
+            # (actual scan only probes live hosts — timeout must not under-shoot).
+            port_phase = hosts * ports * (per_port / parallel)
+            if not self.scan_safe_mode:
+                # Non-safe mode may probe several hosts concurrently.
+                port_phase /= max(1, min(8, self.effective_scan_concurrency))
+            overhead = 180.0
+            scaled = max(base, discovery + port_phase + overhead)
+        else:
+            scaled = max(base, discovery)
+        cap = self.manual_scan_timeout_cap
+        if full_scan or ports >= 30:
+            cap = max(cap, 7200.0)
+        return min(scaled, max(base, cap))
 
     @property
     def effective_port_parallel_per_host(self) -> int:

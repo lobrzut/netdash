@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.155
+
+- **Timeout skanu popularnego /24** — budżet = `hosty × porty × (delay+jitter+TCP)` + discovery + overhead; cap domyślnie **7200 s** (`NETDASH_MANUAL_SCAN_TIMEOUT_CAP`). Stary floor 1800 s urywał skan w trakcie fazy portów przy IPS-friendly.
+- **Potwierdzenie** — popularne porty (~45) sondowane **tylko na żywych hostach** (faza ping/TCP discovery → faza portów); martwe IP z /24 nie dostają pełnej listy.
+- **UI** — postęp „Porty na żywych hostach 12/30”; limit czasu z już zapisanymi wynikami = **sukces częściowy** (toast info), nie czerwony błąd „failed”.
+- **Obraz**: ghcr.io/lobrzut/netdash:1.3.155.
+
 ## v1.3.154
 
 - **Ukierunkowany skan** — w Opcjach skanu: IP + port (+ protokół auto/http/https/tcp) → POST /api/scan/probe → fingerprint (PORT_SIGNATURES / HTTP title, np. qBittorrent) → upsert do Serwisów. Bez skanu całej sieci.
