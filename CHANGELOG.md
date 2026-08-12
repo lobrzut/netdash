@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.156
+
+- **Fix: ręczne dodanie / probe nie gubi serwisu** — `POST /api/services` robi upsert po `(host, port)` zamiast tworzyć duplikat (np. URL z `/` vs bez). GET listy scala istniejące bliźniaki.
+- **Fix: probe MultipleResultsFound** — przy dwóch wierszach na ten sam endpoint skan ukierunkowany kończył się HTTP 500; teraz wybiera keeper (customized → pinned → najstarszy) i usuwa resztę.
+- **Probe = customized** — `POST /api/scan/probe?add` oznacza wiersz jako ręczny, więc `stale_remove` go nie kasuje.
+- **UI** — po dodaniu/probe: toast, reset filtrów (kategoria/szukaj/offline), przejście do Serwisów (wcześniej sukces przy aktywnej innej kategorii = „nie ma na liście”).
+- **Obraz**: ghcr.io/lobrzut/netdash:1.3.156.
+
 ## v1.3.155
 
 - **Timeout skanu popularnego /24** — budżet = `hosty × porty × (delay+jitter+TCP)` + discovery + overhead; cap domyślnie **7200 s** (`NETDASH_MANUAL_SCAN_TIMEOUT_CAP`). Stary floor 1800 s urywał skan w trakcie fazy portów przy IPS-friendly.

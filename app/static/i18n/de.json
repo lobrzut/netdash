@@ -351,6 +351,7 @@
   "settings.showNetwork": "Netzwerk-Kachel anzeigen",
   "toast.unpinned": "Vom Dashboard gelöst",
   "toast.copied": "In Zwischenablage kopiert",
+  "toast.serviceSaved": "Dienst gespeichert: {name}",
   "action.wolFailed": "WoL fehlgeschlagen",
   "action.sleepSent": "SOL-Paket gesendet",
   "action.sleepFailed": "SOL fehlgeschlagen",

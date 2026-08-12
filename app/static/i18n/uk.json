@@ -346,6 +346,7 @@
   "settings.showNetwork": "Показати плитку Мережа",
   "toast.unpinned": "Відкріплено з панелі",
   "toast.copied": "Скопійовано в буфер",
+  "toast.serviceSaved": "Збережено сервіс: {name}",
   "action.wolFailed": "Не вдалося надіслати WoL",
   "action.sleepSent": "SOL пакет надіслано",
   "action.sleepFailed": "Не вдалося надіслати SOL",

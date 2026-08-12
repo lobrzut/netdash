@@ -45,7 +45,8 @@ from app.health import check_all_services, effective_stale_remove_days, purge_st
 from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
-from app.url_utils import brain_dashboard_url, sanitize_service_url
+from app.service_endpoints import pick_endpoint_service
+from app.url_utils import brain_dashboard_url, normalize_endpoint_url, sanitize_service_url
 from app.scanner import (
     expand_cidrs_for_safe_mode,
     validate_manual_scan_cidrs,
@@ -1558,12 +1559,30 @@ async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(ge
     services = result.scalars().all()
     dirty = False
     for svc in services:
-        clean = sanitize_service_url(svc.url)
+        clean = normalize_endpoint_url(svc.url) or sanitize_service_url(svc.url)
         if clean and svc.url != clean:
             svc.url = clean
             dirty = True
     if dirty:
         await db.commit()
+    # Collapse accidental host:port duplicates (e.g. trailing-slash twin from older builds).
+    by_endpoint: dict[tuple[str, int], list[Service]] = {}
+    for svc in services:
+        by_endpoint.setdefault((svc.host, svc.port), []).append(svc)
+    collapsed = False
+    survivors: list[Service] = []
+    for group in by_endpoint.values():
+        if len(group) <= 1:
+            survivors.extend(group)
+            continue
+        keeper = await _collapse_endpoint_duplicates(db, group)
+        if keeper:
+            survivors.append(keeper)
+            collapsed = True
+    if collapsed:
+        await db.commit()
+        result = await db.execute(select(Service).order_by(Service.pinned.desc(), Service.name))
+        services = result.scalars().all()
     out: list[ServiceOut] = []
     for svc in services:
         row = ServiceOut.model_validate(svc)
@@ -1579,6 +1598,57 @@ async def list_services(db: AsyncSession = Depends(get_db), _: User = Depends(ge
     return out
 
 
+def _pick_endpoint_service(matches: list[Service]) -> Service | None:
+    """Prefer customized / pinned / oldest id when duplicate host:port rows exist."""
+    return pick_endpoint_service(matches)
+
+
+async def _find_services_by_endpoint(
+    db: AsyncSession,
+    host: str,
+    port: int,
+) -> list[Service]:
+    result = await db.execute(
+        select(Service).where(Service.host == host, Service.port == port).order_by(Service.id)
+    )
+    return list(result.scalars().all())
+
+
+async def _collapse_endpoint_duplicates(
+    db: AsyncSession,
+    matches: list[Service],
+    *,
+    prefer_id: int | None = None,
+) -> Service | None:
+    """Keep one row for host:port; delete extras. Caller must commit."""
+    if not matches:
+        return None
+    keeper = None
+    if prefer_id is not None:
+        keeper = next((s for s in matches if s.id == prefer_id), None)
+    if keeper is None:
+        keeper = _pick_endpoint_service(matches)
+    if keeper is None:
+        return None
+    for dup in matches:
+        if dup.id == keeper.id:
+            continue
+        if dup.customized:
+            keeper.customized = True
+        if dup.pinned:
+            keeper.pinned = True
+        if dup.has_login:
+            keeper.has_login = True
+        if dup.mac_address and not keeper.mac_address:
+            keeper.mac_address = dup.mac_address
+        if dup.service_notes and not keeper.service_notes:
+            keeper.service_notes = dup.service_notes
+        if dup.icon_url and not keeper.icon_url:
+            keeper.icon_url = dup.icon_url
+        await db.delete(dup)
+    return keeper
+
+
 @app.post("/api/services", response_model=ServiceOut)
 async def create_service(
     data: ServiceCreate,
@@ -1587,25 +1657,55 @@ async def create_service(
 ):
     from urllib.parse import urlparse
 
-    parsed = urlparse(data.url)
+    url = normalize_endpoint_url(data.url) or (data.url or "").strip()
+    parsed = urlparse(url)
     host = parsed.hostname or "localhost"
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    service = Service(
-        name=data.name,
-        url=data.url,
-        host=host,
-        port=port,
-        protocol=parsed.scheme or "http",
-        category=data.category,
-        icon=data.icon,
-        icon_url=data.icon_url,
-        description=data.description,
-        auto_discovered=False,
-        customized=True,
-        has_login=data.has_login,
-        pinned=data.pinned,
-    )
-    db.add(service)
+    protocol = parsed.scheme or "http"
+
+    matches = await _find_services_by_endpoint(db, host, port)
+    service = await _collapse_endpoint_duplicates(db, matches) if matches else None
+    now = datetime.now(timezone.utc)
+
+    if service:
+        # Manual add/edit of an existing endpoint — never create a second row.
+        service.name = data.name
+        service.url = url
+        service.host = host
+        service.port = port
+        service.protocol = protocol
+        service.category = data.category
+        service.icon = data.icon
+        if data.icon_url is not None:
+            service.icon_url = data.icon_url
+        if data.description is not None:
+            service.description = data.description
+        service.has_login = data.has_login
+        service.pinned = data.pinned
+        service.customized = True
+        service.auto_discovered = False
+        service.is_online = True
+        service.last_seen = now
+    else:
+        service = Service(
+            name=data.name,
+            url=url,
+            host=host,
+            port=port,
+            protocol=protocol,
+            category=data.category,
+            icon=data.icon,
+            icon_url=data.icon_url,
+            description=data.description,
+            auto_discovered=False,
+            customized=True,
+            has_login=data.has_login,
+            pinned=data.pinned,
+            is_online=True,
+            last_seen=now,
+        )
+        db.add(service)
+
     await db.commit()
     await db.refresh(service)
     return service
@@ -1722,7 +1822,9 @@ async def update_service(
             value = normalize_mac(value)
         setattr(service, field, value)
     if "url" in updates and updates["url"]:
-        parsed = urlparse(updates["url"])
+        clean_url = normalize_endpoint_url(updates["url"]) or updates["url"]
+        service.url = clean_url
+        parsed = urlparse(clean_url)
         if parsed.hostname:
             service.host = parsed.hostname
         if parsed.port:
@@ -1733,6 +1835,14 @@ async def update_service(
             service.port = 80
         if parsed.scheme:
             service.protocol = parsed.scheme
+        # Avoid leaving a second row on the same endpoint after an edit.
+        others = [
+            s
+            for s in await _find_services_by_endpoint(db, service.host, service.port)
+            if s.id != service.id
+        ]
+        if others:
+            await _collapse_endpoint_duplicates(db, [service, *others], prefer_id=service.id)
     await db.commit()
     await db.refresh(service)
     return service
@@ -1753,13 +1863,21 @@ async def delete_service(
     return {"ok": True}
 
 
-async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
+async def _upsert_service(
+    item: DiscoveredService,
+    *,
+    user_initiated: bool = False,
+) -> tuple[str, int]:
+    """Insert or update a discovered endpoint. Collapses duplicate host:port rows.
+
+    ``user_initiated`` (targeted probe / manual path) marks the row customized so
+    stale auto-purge never removes a service the user explicitly asked to keep.
+    """
     async with async_session() as db:
-        existing = await db.execute(
-            select(Service).where(Service.host == item.host, Service.port == item.port)
-        )
-        service = existing.scalar_one_or_none()
+        matches = await _find_services_by_endpoint(db, item.host, item.port)
+        service = await _collapse_endpoint_duplicates(db, matches) if matches else None
         now = datetime.now(timezone.utc)
+        clean_url = normalize_endpoint_url(item.url) or sanitize_service_url(item.url)
         if service:
             if not service.customized:
                 if is_http_error_name(item.name):
@@ -1771,7 +1889,7 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
                     service.name = item.name
                     if item.health_detail:
                         service.health_detail = item.health_detail[:128]
-                service.url = sanitize_service_url(item.url)
+                service.url = clean_url
                 service.protocol = item.protocol
                 service.category = item.category
                 service.icon = item.icon
@@ -1784,6 +1902,8 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
             service.is_online = True
             service.last_seen = now
             service.last_checked = now
+            if user_initiated:
+                service.customized = True
             if not service.mac_address:
                 mac = await lookup_mac_for_ip(item.host)
                 if mac:
@@ -1796,7 +1916,7 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
             db.add(
                 Service(
                     name=new_name,
-                    url=sanitize_service_url(item.url),
+                    url=clean_url,
                     host=item.host,
                     port=item.port,
                     protocol=item.protocol,
@@ -1804,9 +1924,11 @@ async def _upsert_service(item: DiscoveredService) -> tuple[str, int]:
                     icon=item.icon,
                     icon_url=item.icon_url,
                     description=item.description,
-                    auto_discovered=True,
+                    auto_discovered=not user_initiated,
+                    customized=user_initiated,
                     has_login=item.has_login,
                     is_online=True,
+                    last_seen=now,
                     last_checked=now,
                     health_detail=(item.health_detail or item.name)[:128] if is_http_error_name(item.name) else item.health_detail,
                     mac_address=mac,
@@ -2148,15 +2270,13 @@ async def probe_service_endpoint(
         )
         message = f"Port zamknięty ({status_label})"
     elif result.get("service") and data.add:
-        existing = await db.execute(
-            select(Service).where(Service.host == result["host"], Service.port == result["port"])
-        )
-        was_existing = existing.scalar_one_or_none() is not None
-        await _upsert_service(result["service"])
-        refreshed = await db.execute(
-            select(Service).where(Service.host == result["host"], Service.port == result["port"])
-        )
-        row = refreshed.scalar_one_or_none()
+        before = await _find_services_by_endpoint(db, result["host"], result["port"])
+        was_existing = len(before) > 0
+        await _upsert_service(result["service"], user_initiated=True)
+        # Upsert commits in its own session — expire request-session cache before re-read.
+        db.expire_all()
+        after = await _find_services_by_endpoint(db, result["host"], result["port"])
+        row = _pick_endpoint_service(after)
         if row:
             service_id = row.id
             if was_existing:

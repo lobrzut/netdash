@@ -6,9 +6,12 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.155"
+VERSION = "1.3.156"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Ręczne dodanie / probe: upsert po host:port (bez duplikatów przez trailing slash), probe nie pada na MultipleResultsFound",
+    "Ukierunkowany skan oznacza serwis jako customized — auto-purge nie usuwa ręcznie dodanych",
+    "Po dodaniu: toast + reset filtrów + przejście do listy Serwisów (wcześniej sukces przy ukrytej kategorii)",
     "Timeout skanu popularnego /24 — budżet = hosty×porty×(delay+jitter) + overhead, cap 7200 s; porty tylko na żywych hostach",
     "Postęp skanu: „Porty na żywych hostach 12/30”; limit czasu z zapisanymi wynikami = sukces częściowy (nie czerwony błąd)",
     "Ukierunkowany skan — w Opcjach skanu: IP + port → sprawdź i dodaj (np. qBittorrent :6363) bez skanu całej sieci",
@@ -34,7 +37,7 @@ WHATS_NEW = [
     "Kafelek Brain (opcjonalny) — statystyki wiedzy z endpointu /stats; domyślnie wyłączony",
     "Watermark marek/ikon na wszystkich kafelkach — także przypiętych i emoji",
     "Hardening bezpieczeństwa: limit prób logowania (brute-force)",
-    "Hasło zmienione w UI nie jest już nadpisywane przy restarcie",
+    "Hasło admin zmienione w UI nie jest już nadpisywane przy restarcie",
     "Swagger /docs domyślnie wyłączony (NETDASH_DOCS_ENABLED=true by włączyć)",
     "Migracja JWT na PyJWT + guard SSRF na metadane chmurowe",
 ]

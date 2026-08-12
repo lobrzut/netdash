@@ -3949,6 +3949,23 @@ function resetAddServiceForm() {
   updateServiceUrlDuplicateHint('add');
 }
 
+function revealServiceInList(svc) {
+  serviceSearch = '';
+  const searchInput = $('#service-search');
+  if (searchInput) searchInput.value = '';
+  activeFilter = 'all';
+  accessFilter = 'all';
+  availabilityFilter = 'all';
+  networkFilter = 'all';
+  navigateTo('services');
+  if (svc?.id) {
+    requestAnimationFrame(() => {
+      const card = document.querySelector(`.service-card[data-id="${svc.id}"]`);
+      card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+}
+
 async function saveServiceAdd() {
   const name = $('#add-name').value.trim();
   const url = $('#add-url').value.trim();
@@ -3959,7 +3976,7 @@ async function saveServiceAdd() {
   const pinned = $('#add-pinned').checked;
   const has_login = $('#add-has-login').checked;
   if (!name || !url) return showToast(t('alert.serviceFields'), 'error');
-  await api('/api/services', {
+  const created = await api('/api/services', {
     method: 'POST',
     body: JSON.stringify({
       name,
@@ -3975,6 +3992,8 @@ async function saveServiceAdd() {
   closeModal('add-modal');
   resetAddServiceForm();
   await loadDashboard();
+  revealServiceInList(created);
+  showToast(t('toast.serviceSaved', { name: created?.name || name }), 'success');
 }
 
 function openServiceEditModal(id) {
@@ -4682,13 +4701,17 @@ async function runTargetedProbe() {
     );
     if (res.status_code != null) parts.push(`HTTP ${res.status_code}`);
     if (res.url) parts.push(res.url);
-    const ok = !!res.open && !!res.identified;
-    showProbeResult(parts.filter(Boolean).join(' · '), ok);
-    if (ok) {
+    const saved = !!(res.added || res.updated || res.service_id);
+    const ok = saved || (!!res.open && !!res.identified);
+    showProbeResult(parts.filter(Boolean).join(' · '), ok && (saved || !!res.open));
+    if (saved) {
       showToast(res.message || t('modal.scan.probeSuccess', { name: res.name || `${host}:${port}` }), 'success');
       try {
-        await loadServices();
+        await loadDashboard();
+        revealServiceInList({ id: res.service_id, name: res.name, category: res.category });
       } catch (_) { /* non-fatal */ }
+    } else if (res.open && res.identified) {
+      showToast(res.message || t('modal.scan.probeSuccess', { name: res.name || `${host}:${port}` }), 'info');
     }
   } catch (err) {
     showProbeResult(err.message || t('modal.scan.probeError'), false);

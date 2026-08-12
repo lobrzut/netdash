@@ -417,6 +417,7 @@
   "settings.showNetwork": "Pokaż kafelkę Sieć",
   "toast.unpinned": "Odpięto z pulpitu",
   "toast.copied": "Skopiowano do schowka",
+  "toast.serviceSaved": "Zapisano serwis: {name}",
   "action.wolFailed": "Nie udało się wysłać WoL",
   "action.sleepSent": "Pakiet SOL wysłany",
   "action.sleepFailed": "Nie udało się wysłać SOL",

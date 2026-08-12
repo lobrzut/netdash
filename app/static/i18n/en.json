@@ -410,6 +410,7 @@
   "settings.showNetwork": "Show Network tile",
   "toast.unpinned": "Unpinned from dashboard",
   "toast.copied": "Copied to clipboard",
+  "toast.serviceSaved": "Saved service: {name}",
   "action.wolFailed": "Failed to send WoL",
   "action.sleepSent": "SOL packet sent",
   "action.sleepFailed": "Failed to send SOL",

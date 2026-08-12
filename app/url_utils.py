@@ -46,6 +46,27 @@ def sanitize_service_url(url: str | bytes | None) -> str:
     return text
 
 
+def normalize_endpoint_url(url: str | bytes | None) -> str:
+    """Sanitize URL and collapse a bare trailing slash (http://host:port/ → …:port).
+
+    Keeps non-root paths intact (e.g. /web/). Used so manual add and discovery
+    don't create duplicate services that differ only by a trailing slash.
+    """
+    text = sanitize_service_url(url)
+    if not text or text == "#":
+        return text
+    try:
+        parsed = urlparse(text)
+    except Exception:
+        return text
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return text
+    path = parsed.path or ""
+    if path == "/":
+        path = ""
+    return urlunparse(parsed._replace(path=path, params="", fragment=""))
+
+
 _SAFE_ICON_HOSTS = frozenset({"cdn.simpleicons.org"})
 
 # Cloud-metadata endpoints — never fetch these server-side (SSRF guard).
