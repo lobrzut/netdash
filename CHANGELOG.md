@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.151
+
+- **UI safe mode / discovery** — komunikaty o ręcznym skanie i trybie bezpiecznym nie twierdzą już, że „discovery TCP działa automatycznie”, gdy polityka to `on_demand` / `off`. Osobne teksty dla tła (adaptive/scheduled/passive) vs na żądanie.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.151`.
+
 ## v1.3.150
 
 - **Polityka discovery** — nowy model zamiast ciągłego skanowania TCP: `off`, `on_demand` (zalecane), `scheduled`, `passive` (ARP), `adaptive` (legacy). Domyślnie **`on_demand`** w `dockge/compose.yaml`: brak skanu w tle, pełny skan przez przycisk **Skanuj sieć**.

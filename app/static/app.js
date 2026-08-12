@@ -1179,6 +1179,12 @@ function isBackgroundDiscovery(netRes) {
   return isAutoDiscovery(netRes);
 }
 
+function safeModeWideCidrMessage(netRes) {
+  return isBackgroundDiscovery(netRes)
+    ? t('discovery.useAgentInsteadBg')
+    : t('discovery.useAgentInstead');
+}
+
 function isWeakDiscoveryProfile(netRes) {
   const net = resolveNetwork(netRes);
   return (net.discovery_profile || '').toLowerCase() === 'weak';
@@ -4438,7 +4444,7 @@ async function startScan(cidr, fullScan = false, opts = {}) {
   }
   if (netRes?.scan_safe_mode && isWideScanCidr(resolvedCidr, netRes)) {
     if (isRemoteDiscovery(netRes)) return;
-    showScanError(t('discovery.useAgentInstead'));
+    showScanError(safeModeWideCidrMessage(netRes));
     openScanModal();
     return;
   }
@@ -4493,7 +4499,7 @@ async function oneClickScan() {
   const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
   if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
-    showScanError(t('discovery.useAgentInstead'));
+    showScanError(safeModeWideCidrMessage(netRes));
     openScanModal();
     return;
   }
@@ -4504,19 +4510,21 @@ async function oneClickScan() {
 function updateScanModalUI(netRes, settings) {
   const net = resolveNetwork(netRes);
   const adaptive = isAdaptiveDiscovery(netRes);
+  const onDemand = isOnDemandDiscovery(netRes, settings);
   const safe = net.scan_safe_mode;
   const titleEl = $('#scan-modal-title');
   if (titleEl) titleEl.textContent = t('modal.scan.titleAdvanced');
   const descEl = $('#scan-modal-desc');
   if (descEl) {
-    descEl.textContent = adaptive
-      ? t('modal.scan.descAdaptive')
-      : t('modal.scan.descManual');
+    if (adaptive) descEl.textContent = t('modal.scan.descAdaptive');
+    else if (onDemand) descEl.textContent = t('modal.scan.descOnDemand');
+    else descEl.textContent = t('modal.scan.descManual');
   }
   const warning = $('#scan-modal-adaptive-warning');
   if (warning) {
     let msg = '';
     if (adaptive) msg = t('modal.scan.adaptiveWarning');
+    else if (safe && isBackgroundDiscovery(netRes)) msg = t('modal.scan.safeModeWarningBg');
     else if (safe) msg = t('modal.scan.safeModeWarning');
     else msg = t('modal.scan.manualWideWarning');
     warning.textContent = msg;

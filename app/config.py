@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.150"
+VERSION = "1.3.151"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Komunikaty safe mode / skanu ręcznego zgodne z polityką discovery — przy on_demand nie twierdzą już, że TCP discovery działa automatycznie w tle",
     "Polityka discovery — off / na żądanie (zalecane) / harmonogram / pasywne ARP / legacy adaptive. Domyślnie na żądanie: skan ręczny „Skanuj sieć”, bez ciągłego TCP w tle",
     "Harmonogram — jeden pełny cykl IPS-friendly dziennie (NETDASH_DISCOVERY_SCHEDULE=03:00) lub co N godzin",
     "Pasywne discovery — odczyt tablicy ARP co ~10 min, bez skanu portów (przyjazne SEP)",

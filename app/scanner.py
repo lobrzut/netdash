@@ -623,7 +623,7 @@ def validate_manual_scan_cidrs(cidrs: list[str]) -> None:
         if network.prefixlen < min_pfx:
             raise ScanError(
                 f"Skan ręczny: zakres {cidr} jest zbyt szeroki (min /{min_pfx}). "
-                f"Użyj mniejszego CIDR (np. /28) lub włącz automatyczne discovery w tle.",
+                f"Użyj mniejszego CIDR (np. /28).",
                 code="manual_cidr_too_wide",
             )
     validate_cidrs_for_safe_mode(cidrs)
@@ -632,7 +632,7 @@ def validate_manual_scan_cidrs(cidrs: list[str]) -> None:
     if host_count > cap:
         raise ScanError(
             f"Skan ręczny: {host_count} hostów przekracza limit {cap}. "
-            f"Zawęź CIDR lub użyj automatycznego discovery (skanuje w chunkach).",
+            f"Zawęź CIDR (np. /28) lub zwiększ NETDASH_MANUAL_SCAN_MAX_HOSTS.",
             code="manual_too_many_hosts",
         )
 
