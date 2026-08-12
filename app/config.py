@@ -9,7 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 VERSION = "1.3.153"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Popularne porty homelab w skanie ręcznym — checkbox „Popularne porty” działa też w trybie bezpiecznym (IPS-friendly); lista obejmuje m.in. 6363 qBittorrent, Immich, *arr, Plex/Jellyfin (nie skanuje 1–65535)",
+    "Ukierunkowany skan — w Opcjach skanu: IP + port → sprawdź i dodaj (np. qBittorrent :6363) bez skanu całej sieci",
+    "Popularne porty (zalecane) — Skanuj sieć obejmuje homelab/*arr/media (6363, Plex, Jellyfin, HA, Immich); Podstawowe = krótka lista; nie 1–65535",
     "NETDASH_SCAN_PORT_PROFILE=safe|popular|all_listed — domyślnie safe; SCAN_ALL_PORTS=true = pełna lista usług (~190)",
     "Skan ręczny /24 nie blokuje już UI — praca w chunkach /28, częstsze yield’e, timeout skalowany z liczbą hostów, /api/health odpowiada w trakcie skanu",
     "Skan ręczny „Skanuj sieć” skanuje pełny CIDR z ustawień (np. /24) nawet przy NETDASH_SCAN_SAFE_MODE=true — safe mode tylko throttluje (IPS-friendly), nie ucina do /28",

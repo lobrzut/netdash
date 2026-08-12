@@ -147,6 +147,52 @@ class ScanRequest(BaseModel):
         return normalize_scan_cidr_list(value)
 
 
+class ProbeRequest(BaseModel):
+    host: str = Field(description="IP lub hostname jednego serwisu")
+    port: int = Field(ge=1, le=65535, description="Port TCP")
+    protocol: str = Field(
+        default="auto",
+        description="auto | http | https | tcp",
+    )
+    add: bool = Field(default=True, description="Upsert wyniku do bazy serwisów")
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        from app.scanner import normalize_probe_host
+
+        return normalize_probe_host(value)
+
+    @field_validator("protocol")
+    @classmethod
+    def validate_protocol(cls, value: str) -> str:
+        proto = (value or "auto").strip().lower()
+        if proto not in {"auto", "http", "https", "tcp"}:
+            raise ValueError("protocol must be auto, http, https, or tcp")
+        return proto
+
+
+class ProbeResponse(BaseModel):
+    host: str
+    port: int
+    open: bool
+    tcp_status: str
+    protocol: str | None = None
+    name: str | None = None
+    url: str | None = None
+    category: str | None = None
+    icon: str | None = None
+    icon_url: str | None = None
+    description: str | None = None
+    has_login: bool = False
+    status_code: int | None = None
+    identified: bool = False
+    added: bool = False
+    updated: bool = False
+    service_id: int | None = None
+    message: str | None = None
+
+
 class ScanStatus(BaseModel):
     id: int
     cidr: str

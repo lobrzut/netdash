@@ -64,6 +64,7 @@ from app.scanner import (
     is_http_error_name,
     is_likely_docker_bridge,
     normalize_scan_cidr_list,
+    probe_single_host_port,
     resolve_scan_cidrs,
     parse_host_scan_ports,
     scan_networks,
@@ -147,6 +148,8 @@ from app.schemas import (
     NoteOut,
     NoteUpdate,
     PowerActionResult,
+    ProbeRequest,
+    ProbeResponse,
     ScanRequest,
     ScanStatus,
     ScanUiAttemptRequest,
@@ -2082,6 +2085,88 @@ async def log_scan_ui_attempt(
         _.username,
     )
     return {"ok": True}
+
+
+@app.post("/api/scan/probe", response_model=ProbeResponse)
+async def probe_service_endpoint(
+    data: ProbeRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Targeted one-host/one-port probe — identify + optional upsert. Does not start a network scan."""
+    if settings.scan_disabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Skan lokalny wyłączony na tym hoście.",
+        )
+    logger.info(
+        "POST /api/scan/probe host=%s port=%s protocol=%s add=%s user=%s",
+        data.host,
+        data.port,
+        data.protocol,
+        data.add,
+        _.username,
+    )
+    try:
+        result = await probe_single_host_port(data.host, data.port, protocol=data.protocol)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    added = False
+    updated = False
+    service_id: int | None = None
+    message: str | None = None
+
+    if not result["open"]:
+        status_label = {"refused": "odmowa połączenia", "timeout": "timeout"}.get(
+            result["tcp_status"], result["tcp_status"]
+        )
+        message = f"Port zamknięty ({status_label})"
+    elif result.get("service") and data.add:
+        existing = await db.execute(
+            select(Service).where(Service.host == result["host"], Service.port == result["port"])
+        )
+        was_existing = existing.scalar_one_or_none() is not None
+        await _upsert_service(result["service"])
+        refreshed = await db.execute(
+            select(Service).where(Service.host == result["host"], Service.port == result["port"])
+        )
+        row = refreshed.scalar_one_or_none()
+        if row:
+            service_id = row.id
+            if was_existing:
+                updated = True
+                message = f"Zaktualizowano: {result.get('name') or row.name}"
+            else:
+                added = True
+                message = f"Dodano: {result.get('name') or row.name}"
+        else:
+            message = "Wykryto, ale nie udało się zapisać serwisu"
+    elif result.get("identified"):
+        message = f"Wykryto: {result.get('name')}"
+    else:
+        message = "Port otwarty"
+
+    return ProbeResponse(
+        host=result["host"],
+        port=result["port"],
+        open=result["open"],
+        tcp_status=result["tcp_status"],
+        protocol=result.get("protocol"),
+        name=result.get("name"),
+        url=result.get("url"),
+        category=result.get("category"),
+        icon=result.get("icon"),
+        icon_url=result.get("icon_url"),
+        description=result.get("description"),
+        has_login=bool(result.get("has_login")),
+        status_code=result.get("status_code"),
+        identified=bool(result.get("identified")),
+        added=added,
+        updated=updated,
+        service_id=service_id,
+        message=message,
+    )
 
 
 @app.post("/api/scan", response_model=ScanStatus)

@@ -5578,6 +5578,56 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
   accent-color: var(--accent);
 }
 
+.scan-port-profile {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 0.875rem 0.5rem;
+  margin: 0.75rem 0 0;
+}
+
+.scan-port-profile legend {
+  padding: 0 0.35rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.scan-probe-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.scan-probe-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.7fr 0.8fr;
+  gap: 0.625rem;
+}
+
+@media (max-width: 640px) {
+  .scan-probe-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scan-probe-actions {
+  margin-top: 0.75rem;
+}
+
+.scan-probe-result {
+  margin-top: 0.625rem;
+  white-space: pre-wrap;
+}
+
+.scan-probe-result.is-ok {
+  color: var(--accent);
+}
+
+.scan-probe-result.is-err {
+  color: var(--danger, #ef4444);
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

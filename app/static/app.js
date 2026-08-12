@@ -4553,7 +4553,9 @@ async function oneClickScan() {
     return;
   }
   void logScanUiAttempt(cidr, 'ui-one-click');
-  await startScan(cidr, false, { skipConfirm: false, suppressStartToast: false });
+  // v1.3.153: intentional „Skanuj sieć” uses popular homelab ports (IPS-throttled; not 1–65535).
+  // Advanced modal can still pick Podstawowe.
+  await startScan(cidr, true, { skipConfirm: false, suppressStartToast: false });
 }
 
 function updateScanModalUI(netRes, settings) {
@@ -4585,6 +4587,7 @@ function updateScanModalUI(netRes, settings) {
     warning.textContent = msg;
     warning.classList.toggle('hidden', !msg);
   }
+  $('#scan-port-profile')?.classList.remove('hidden');
   $('#scan-full-scan-row')?.classList.remove('hidden');
   const fullNote = $('#scan-full-scan-hidden-note');
   if (fullNote) {
@@ -4615,6 +4618,78 @@ function openSettingsScanTab() {
   openModal('settings-modal');
 }
 
+function syncScanPortProfileFromRadios() {
+  const popular = $('#scan-ports-popular')?.checked;
+  const full = $('#full-scan');
+  if (full) full.checked = !!popular;
+  return !!popular;
+}
+
+function setScanPortProfile(popular) {
+  const usePopular = popular !== false;
+  const basic = $('#scan-ports-basic');
+  const pop = $('#scan-ports-popular');
+  if (basic) basic.checked = !usePopular;
+  if (pop) pop.checked = usePopular;
+  const full = $('#full-scan');
+  if (full) full.checked = usePopular;
+}
+
+function showProbeResult(text, ok) {
+  const el = $('#probe-result');
+  if (!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('hidden', !text);
+  el.classList.toggle('is-ok', !!ok);
+  el.classList.toggle('is-err', !!text && !ok);
+}
+
+async function runTargetedProbe() {
+  const host = ($('#probe-host')?.value || '').trim();
+  const portRaw = ($('#probe-port')?.value || '').trim();
+  const protocol = ($('#probe-protocol')?.value || 'auto').trim() || 'auto';
+  const port = Number(portRaw);
+  if (!host) {
+    showProbeResult(t('modal.scan.probeNeedHost'), false);
+    return;
+  }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    showProbeResult(t('modal.scan.probeNeedPort'), false);
+    return;
+  }
+  const btn = $('#probe-submit');
+  if (btn) btn.disabled = true;
+  showProbeResult(t('modal.scan.probeRunning'), true);
+  try {
+    const res = await api('/api/scan/probe', {
+      method: 'POST',
+      body: JSON.stringify({ host, port, protocol, add: true }),
+    });
+    const parts = [];
+    if (res.message) parts.push(res.message);
+    else if (res.name) parts.push(res.name);
+    parts.push(
+      res.open
+        ? t('modal.scan.probeOpen')
+        : t('modal.scan.probeClosed', { status: res.tcp_status || '?' })
+    );
+    if (res.status_code != null) parts.push(`HTTP ${res.status_code}`);
+    if (res.url) parts.push(res.url);
+    const ok = !!res.open && !!res.identified;
+    showProbeResult(parts.filter(Boolean).join(' · '), ok);
+    if (ok) {
+      showToast(res.message || t('modal.scan.probeSuccess', { name: res.name || `${host}:${port}` }), 'success');
+      try {
+        await loadServices();
+      } catch (_) { /* non-fatal */ }
+    }
+  } catch (err) {
+    showProbeResult(err.message || t('modal.scan.probeError'), false);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function openScanModal() {
   console.log('[NetDash] scan: openScanModal');
   const net = window.__netdashNetwork;
@@ -4629,7 +4704,9 @@ function openScanModal() {
       || net?.local_network
       || '';
   }
-  $('#full-scan').checked = !!appSettings?.full_scan_default;
+  // Default popular (zalecane) unless user explicitly disabled full_scan_default.
+  setScanPortProfile(appSettings?.full_scan_default !== false);
+  showProbeResult('', false);
   updateScanModalUI(net, appSettings);
   updateScanCidrPreview();
   openModal('scan-modal');
@@ -4664,11 +4741,17 @@ function bindScanUi() {
         console.log('[NetDash] scan: #scan-start disabled');
         return;
       }
-      const fullScan = $('#full-scan')?.checked ?? false;
+      const fullScan = syncScanPortProfileFromRadios();
       const cidr = resolveScanCidrInput();
       console.log('[NetDash] scan: #scan-start click', { cidr, fullScan });
       void logScanUiAttempt(cidr, 'ui-advanced');
       void startScan(cidr, fullScan, { advanced: true });
+      return;
+    }
+    const probeBtn = e.target.closest('#probe-submit');
+    if (probeBtn) {
+      e.preventDefault();
+      void runTargetedProbe();
       return;
     }
     const quickScanBtn = e.target.closest('#scan-btn, #empty-scan-btn');
@@ -4693,6 +4776,8 @@ function bindScanUi() {
     console.log('[NetDash] scan: anuluj modal CIDR');
     closeModal('scan-modal');
   });
+  $('#scan-ports-basic')?.addEventListener('change', syncScanPortProfileFromRadios);
+  $('#scan-ports-popular')?.addEventListener('change', syncScanPortProfileFromRadios);
   $('#scan-cidr-select')?.addEventListener('change', () => {
     syncScanCidrCustomVisibility();
     updateScanCidrPreview();

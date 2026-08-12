@@ -2,9 +2,9 @@
 
 ## v1.3.153
 
-- **Popularne porty homelab** — checkbox „Popularne porty” w Opcjach skanu działa też przy `NETDASH_SCAN_SAFE_MODE=true` (IPS-friendly delays). Curated ~45 portów: m.in. **6363** (qBittorrent), Immich 2283, Overseerr 5055, *arr, Plex/Jellyfin, WireGuard 51820 — **nie** skanuje 1–65535.
-- **NETDASH_SCAN_PORT_PROFILE** — `safe` (domyślnie ~12) | `popular` (~45) | `all_listed` (~190). `NETDASH_SCAN_ALL_PORTS=true` = `all_listed`.
-- **SERVICE_PORTS** — dopisane brakujące porty popularne (6363, 2283, 5055, 8334, 51820). Domyślny safe scan bez zmian (`SAFE_WEB_PORTS`).
+- **Ukierunkowany skan** — w Opcjach skanu: IP + port (+ protokół auto/http/https/tcp) → `POST /api/scan/probe` → fingerprint (PORT_SIGNATURES / HTTP title, np. qBittorrent) → upsert do Serwisów. Bez skanu całej sieci.
+- **Popularne porty (zalecane)** — radio Podstawowe / Popularne w modalu; jedno kliknięcie „Skanuj sieć” używa popularnych (~45: 6363, Immich, *arr, Plex/Jellyfin, HA…). Działa też przy `NETDASH_SCAN_SAFE_MODE=true` (IPS-friendly). **Nie** skanuje 1–65535. Stabilność skanu z v1.3.152 (chunki /28) bez zmian.
+- **NETDASH_SCAN_PORT_PROFILE** — `safe` | `popular` | `all_listed`. `NETDASH_SCAN_ALL_PORTS=true` = `all_listed`.
 - **Obraz**: `ghcr.io/lobrzut/netdash:1.3.153`.
 
 ## v1.3.152

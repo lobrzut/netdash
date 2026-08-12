@@ -1490,12 +1490,19 @@ def _is_dashboard_worthy(service: DiscoveredService) -> bool:
     return service.port not in NOISE_PORTS
 
 
-async def _probe_http(host: str, port: int) -> DiscoveredService | None:
+async def _probe_http_detailed(
+    host: str,
+    port: int,
+    schemes: list[str] | None = None,
+) -> tuple[DiscoveredService | None, int | None]:
+    """HTTP(S) fingerprint — returns (service, best status_code)."""
     best: DiscoveredService | None = None
     best_score = -999
+    best_status: int | None = None
+    order = schemes or _schemes_for_port(port)
 
     async with httpx.AsyncClient(verify=False, follow_redirects=True, timeout=settings.http_timeout) as client:
-        for scheme in _schemes_for_port(port):
+        for scheme in order:
             url = _build_url(host, port, scheme)
             try:
                 response = await client.get(url, headers={"User-Agent": "NetDash/1.0 Scanner"})
@@ -1507,42 +1514,160 @@ async def _probe_http(host: str, port: int) -> DiscoveredService | None:
                 if score > best_score:
                     best_score = score
                     best = _parse_probe_response(host, port, response)
+                    best_status = response.status_code
 
                 if score >= 50:
-                    return best
+                    return best, best_status
             except (httpx.HTTPError, asyncio.TimeoutError):
                 continue
 
-    return best if best_score > 0 else None
+    return (best, best_status) if best_score > 0 else (None, best_status)
 
 
-async def _identify_service(host: str, port: int) -> DiscoveredService:
-    http_worthy = port in WEB_PORTS or port in HTTP_FIRST_PORTS or port in HTTPS_PORTS
-    if http_worthy:
-        probed = await _probe_http(host, port)
-        if probed:
-            return probed
+async def _probe_http(host: str, port: int) -> DiscoveredService | None:
+    service, _ = await _probe_http_detailed(host, port)
+    return service
 
+
+def _tcp_fallback_service(host: str, port: int, *, protocol: str | None = None) -> DiscoveredService:
     name, icon, category = _base_from_port(port)
-    if port in HTTPS_PORTS:
-        protocol, url = "https", _build_url(host, port, "https")
-    elif http_worthy:
-        protocol, url = "http", _build_url(host, port, "http")
+    if protocol == "http":
+        scheme, url = "http", _build_url(host, port, "http")
+    elif protocol == "https":
+        scheme, url = "https", _build_url(host, port, "https")
+    elif protocol == "tcp":
+        scheme, url = "tcp", f"tcp://{host}:{port}"
+    elif port in HTTPS_PORTS:
+        scheme, url = "https", _build_url(host, port, "https")
+    elif port in WEB_PORTS or port in HTTP_FIRST_PORTS or port in POPULAR_HOMELAB_PORTS:
+        scheme, url = "http", _build_url(host, port, "http")
     else:
-        protocol, url = "tcp", f"tcp://{host}:{port}"
+        scheme, url = "tcp", f"tcp://{host}:{port}"
 
     service = DiscoveredService(
         host=host,
         port=port,
         name=name,
         url=url,
-        protocol=protocol,
+        protocol=scheme,
         category=category,
         icon=icon,
         icon_url=resolve_brand_icon(name) or resolve_port_brand_icon(port),
         description=f"Wykryto otwarty port {port}",
     )
     return _apply_os_hint(service)
+
+
+async def _identify_service(host: str, port: int) -> DiscoveredService:
+    # Keep network-scan identify narrow (known web ports) — targeted probe uses probe_single_host_port.
+    http_worthy = (
+        port in WEB_PORTS
+        or port in HTTP_FIRST_PORTS
+        or port in HTTPS_PORTS
+        or port in POPULAR_HOMELAB_PORTS
+    )
+    if http_worthy:
+        probed = await _probe_http(host, port)
+        if probed:
+            return probed
+    return _tcp_fallback_service(host, port)
+
+
+_PROBE_HOST_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$")
+
+
+def normalize_probe_host(host: str) -> str:
+    """Validate a single host/IP for targeted probe (not a CIDR)."""
+    raw = (host or "").strip()
+    if not raw or len(raw) > 253:
+        raise ValueError("Nieprawidłowy host — podaj IP lub nazwę hosta")
+    if "/" in raw or " " in raw or "\\" in raw:
+        raise ValueError("Nieprawidłowy host — podaj pojedyncze IP lub nazwę (bez CIDR)")
+    try:
+        return str(ipaddress.ip_address(raw))
+    except ValueError:
+        pass
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1]
+        try:
+            return str(ipaddress.ip_address(inner))
+        except ValueError as exc:
+            raise ValueError("Nieprawidłowy adres IPv6") from exc
+    if not _PROBE_HOST_RE.match(raw):
+        raise ValueError("Nieprawidłowy host — dozwolone litery, cyfry, kropki i myślniki")
+    return raw
+
+
+async def probe_single_host_port(
+    host: str,
+    port: int,
+    *,
+    protocol: str = "auto",
+) -> dict:
+    """Targeted one-shot probe: TCP open check + HTTP fingerprint + PORT_SIGNATURES.
+
+    Does not scan other ports. Additive to network scan — leave scan_network unchanged.
+    """
+    normalized = normalize_probe_host(host)
+    if not isinstance(port, int) or port < 1 or port > 65535:
+        raise ValueError("Port musi być liczbą z zakresu 1–65535")
+    proto = (protocol or "auto").strip().lower()
+    if proto not in {"auto", "http", "https", "tcp"}:
+        raise ValueError("Protokół: auto, http, https lub tcp")
+
+    tcp_status = await asyncio.to_thread(tcp_port_open_sync, normalized, port)
+    result: dict = {
+        "host": normalized,
+        "port": port,
+        "open": tcp_status == "open",
+        "tcp_status": tcp_status,
+        "protocol": None,
+        "name": None,
+        "url": None,
+        "category": None,
+        "icon": None,
+        "icon_url": None,
+        "description": None,
+        "has_login": False,
+        "status_code": None,
+        "identified": False,
+        "service": None,
+    }
+    if tcp_status != "open":
+        return result
+
+    status_code: int | None = None
+    service: DiscoveredService | None = None
+
+    if proto == "tcp":
+        service = _tcp_fallback_service(normalized, port, protocol="tcp")
+    elif proto in ("http", "https"):
+        service, status_code = await _probe_http_detailed(normalized, port, schemes=[proto])
+        if not service:
+            service = _tcp_fallback_service(normalized, port, protocol=proto)
+            service.description = f"Port otwarty, brak odpowiedzi {proto.upper()}"
+    else:
+        # auto: always try HTTP(S) first — even uncommon ports (targeted dialog)
+        service, status_code = await _probe_http_detailed(normalized, port)
+        if not service:
+            service = _tcp_fallback_service(normalized, port)
+
+    result.update(
+        {
+            "protocol": service.protocol,
+            "name": service.name,
+            "url": service.url,
+            "category": service.category,
+            "icon": service.icon,
+            "icon_url": service.icon_url,
+            "description": service.description,
+            "has_login": service.has_login,
+            "status_code": status_code,
+            "identified": True,
+            "service": service,
+        }
+    )
+    return result
 
 
 def resolve_manual_scan_ports(
