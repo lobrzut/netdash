@@ -577,8 +577,8 @@
             <h3 class="settings-subheading" data-i18n="settings.manualScanHeading">Skan ręczny</h3>
             <p class="hint" data-i18n="settings.manualScanIntro">Uruchamiany przyciskiem „Skanuj sieć” / „Opcje skanu”. To główna ścieżka przy polityce „Na żądanie” — nie wymaga skanowania w tle.</p>
             <p id="docker-scan-warning" class="hint hint-warning hidden" role="alert"></p>
-            <label class="checkbox-row hidden" id="settings-full-scan-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
-            <p class="hint hidden" id="settings-full-scan-hidden-note" data-i18n="settings.scanProfile.safeFullScanNote">Pełny skan jest wyłączony dopóki NETDASH_SCAN_SAFE_MODE=true.</p>
+            <label class="checkbox-row hidden" id="settings-full-scan-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Popularne porty domyślnie</span></label>
+            <p class="hint hidden" id="settings-full-scan-hidden-note" data-i18n="settings.scanProfile.popularPortsNote">Skanuje curated listę portów homelab (~45), nie 1–65535. Działa też w trybie bezpiecznym (IPS-friendly).</p>
             <div class="field">
               <label for="settings-host-ports" data-i18n="settings.hostPorts">Porty urządzeń (SSH, SMB, RDP…)</label>
               <input type="text" id="settings-host-ports" placeholder="22,445,3389,5900" />
@@ -882,7 +882,7 @@ sol --udp-port 9
       <p class="scan-cidr-preview" id="scan-cidr-preview" aria-live="polite"></p>
       <label class="checkbox-row" id="scan-full-scan-row">
         <input type="checkbox" id="full-scan" />
-        <span data-i18n="modal.scan.fullLong">Pełny skan (wszystkie porty — wolniejszy, więcej wyników)</span>
+        <span data-i18n="modal.scan.fullLong">Popularne porty (homelab / *arr / media — wolniejszy, więcej wyników)</span>
       </label>
       <p class="hint hidden" id="scan-full-scan-hidden-note"></p>
       <div class="modal-actions">

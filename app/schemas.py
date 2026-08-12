@@ -129,7 +129,10 @@ class ScanRequest(BaseModel):
         default=None,
         description="Sieć(e) w formacie CIDR — wiele oddzielonych przecinkiem lub nową linią",
     )
-    full_scan: bool = Field(default=False, description="Skanuj wszystkie porty (wolniejsze)")
+    full_scan: bool = Field(
+        default=False,
+        description="Skanuj popularne porty homelab (nie 1–65535; wolniejsze, więcej wyników)",
+    )
     quick_scan: bool | None = Field(
         default=None,
         description="Szybki skan (gateway, ARP, znane hosty) — domyślnie auto na Docker bridge / safe mode",
@@ -202,6 +205,8 @@ class NetworkInfo(BaseModel):
     ping_available: bool = True
     scan_safe_mode: bool = True
     scan_disabled: bool = False
+    scan_all_ports: bool = False
+    scan_port_profile: str = "safe"
     discovery_enabled: bool = True
     discovery_mode: str = "local"
     discovery_policy: str = "on_demand"

@@ -1565,10 +1565,16 @@ function updateScanProfileUI(netRes, settings) {
   badge.dataset.profile = profile;
   badge.textContent = t(`settings.scanProfile.${profile}`);
   let description = t(`settings.scanProfile.${profile}Desc`);
-  if (netRes?.scan_safe_mode && settings?.full_scan_default) {
-    description += ` ${t('settings.scanProfile.safeFullScanNote')}`;
+  if (settings?.full_scan_default) {
+    description += ` ${t('settings.scanProfile.popularPortsNote')}`;
   }
   desc.textContent = description;
+  $('#settings-full-scan-row')?.classList.remove('hidden');
+  const fullNote = $('#settings-full-scan-hidden-note');
+  if (fullNote) {
+    fullNote.textContent = t('settings.scanProfile.popularPortsNote');
+    fullNote.classList.remove('hidden');
+  }
 }
 
 function updateScanConfigWarning(netRes, settings, lastScan) {
@@ -4504,10 +4510,6 @@ async function startScan(cidr, fullScan = false, opts = {}) {
       return;
     }
   }
-  if (netRes?.scan_safe_mode && fullScan) {
-    fullScan = false;
-    showToast(t('scan.safeModeFullScanDisabled'), 'info');
-  }
   closeModal('scan-modal');
   $('#scan-bar')?.classList.remove('hidden');
   setScanControlsDisabled(true);
@@ -4583,11 +4585,13 @@ function updateScanModalUI(netRes, settings) {
     warning.textContent = msg;
     warning.classList.toggle('hidden', !msg);
   }
-  $('#scan-full-scan-row')?.classList.toggle('hidden', !!safe);
+  $('#scan-full-scan-row')?.classList.remove('hidden');
   const fullNote = $('#scan-full-scan-hidden-note');
   if (fullNote) {
-    fullNote.textContent = safe ? t('settings.scanProfile.safeFullScanNote') : '';
-    fullNote.classList.toggle('hidden', !safe);
+    fullNote.textContent = safe
+      ? t('modal.scan.popularPortsSafeHint')
+      : t('modal.scan.popularPortsHint');
+    fullNote.classList.remove('hidden');
   }
 }
 
@@ -5826,10 +5830,7 @@ $('#settings-password-change').addEventListener('click', async () => {
 $('#settings-full-scan')?.addEventListener('change', (e) => {
   const netRes = window.__netdashNetwork;
   if (e.target.checked) {
-    const wouldBeAggressive = netRes?.scan_safe_mode === false;
-    const msg = wouldBeAggressive
-      ? t('settings.scanProfile.confirmAggressive')
-      : t('settings.scanProfile.confirmFullScanSafe');
+    const msg = t('settings.scanProfile.confirmPopularPorts');
     if (!confirm(msg)) {
       e.target.checked = false;
     }

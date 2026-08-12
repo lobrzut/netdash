@@ -6,9 +6,11 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.152"
+VERSION = "1.3.153"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Popularne porty homelab w skanie ręcznym — checkbox „Popularne porty” działa też w trybie bezpiecznym (IPS-friendly); lista obejmuje m.in. 6363 qBittorrent, Immich, *arr, Plex/Jellyfin (nie skanuje 1–65535)",
+    "NETDASH_SCAN_PORT_PROFILE=safe|popular|all_listed — domyślnie safe; SCAN_ALL_PORTS=true = pełna lista usług (~190)",
     "Skan ręczny /24 nie blokuje już UI — praca w chunkach /28, częstsze yield’e, timeout skalowany z liczbą hostów, /api/health odpowiada w trakcie skanu",
     "Skan ręczny „Skanuj sieć” skanuje pełny CIDR z ustawień (np. /24) nawet przy NETDASH_SCAN_SAFE_MODE=true — safe mode tylko throttluje (IPS-friendly), nie ucina do /28",
     "Komunikaty safe mode / discovery zgodne z polityką (on_demand nie twierdzi, że TCP działa automatycznie w tle)",
@@ -20,7 +22,7 @@ WHATS_NEW = [
     "Kafelek Brain — link „Otwórz dashboard” (URL z ustawień statystyk, widoczny gdy Brain online)",
     "Auto-usuwanie nieaktywnych serwisów — NETDASH_STALE_REMOVE_DAYS lub Ustawienia → Skanowanie",
     "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
-    "Wykrywanie serwisów na dowolnym porcie — NETDASH_SCAN_ALL_PORTS sonduje żywe hosty po ~190 portach usług",
+    "Wykrywanie serwisów na liście usług — NETDASH_SCAN_ALL_PORTS / profile=all_listed sonduje żywe hosty po ~190 portach (nie 1–65535)",
     "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",
     "Sejf API: klucze nie nakładają się już w wąskim widgecie; notatki jako czytelne wiersze",
     "Zatrzymanie skanu sieci (przycisk Zatrzymaj) + flaga kraju WAN i czytelny podgląd klucza",
@@ -152,7 +154,11 @@ class Settings(BaseSettings):
     scan_disabled: bool = False
     # Probe every LIVE host on the full service-port list (scanner.SERVICE_PORTS) so services
     # on non-standard ports are auto-discovered. Heavier but stays safe (only live hosts).
+    # Equivalent to NETDASH_SCAN_PORT_PROFILE=all_listed. Never sweeps 1-65535.
     scan_all_ports: bool = False
+    # Manual scan port profile: safe (default SAFE_WEB_PORTS) | popular (homelab/*arr)
+    # | all_listed (SERVICE_PORTS). Overridden by scan_all_ports=true → all_listed.
+    scan_port_profile: str = "safe"
     # Background auto-discovery: gradual all-port probe on live hosts only (throttled batches).
     auto_discovery_all_ports: bool = False
     # Weak profile: scan two /28 chunks per cycle (heavier — off by default on 2 GB hosts).
@@ -331,6 +337,26 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return v.strip().lower() in ("true", "1", "yes", "on")
         return bool(v)
+
+    @field_validator("scan_port_profile", mode="before")
+    @classmethod
+    def _scan_port_profile(cls, v: object) -> str:
+        allowed = {"safe", "popular", "all_listed"}
+        if v is None or (isinstance(v, str) and not str(v).strip()):
+            return "safe"
+        val = str(v).strip().lower().replace("-", "_")
+        aliases = {
+            "basic": "safe",
+            "default": "safe",
+            "homelab": "popular",
+            "media": "popular",
+            "full": "all_listed",
+            "all": "all_listed",
+            "service": "all_listed",
+            "services": "all_listed",
+        }
+        val = aliases.get(val, val)
+        return val if val in allowed else "safe"
 
     @field_validator("auto_discovery_all_ports", mode="before")
     @classmethod

@@ -769,6 +769,8 @@ async def health(db: AsyncSession = Depends(get_db)):
         "secret_key_stable": settings.secret_key_stable,
         "scan_safe_mode": settings.scan_safe_mode,
         "scan_disabled": settings.scan_disabled,
+        "scan_all_ports": settings.scan_all_ports,
+        "scan_port_profile": settings.scan_port_profile,
         "startup_health_defer": settings.effective_startup_health_defer,
         "startup_health_defer_seconds": settings.effective_startup_health_defer_seconds,
         "discovery_startup_delay": settings.effective_discovery_startup_delay,
@@ -961,6 +963,8 @@ async def network_info(
         ping_available=ping_ok,
         scan_safe_mode=settings.scan_safe_mode,
         scan_disabled=settings.scan_disabled,
+        scan_all_ports=settings.scan_all_ports,
+        scan_port_profile=settings.scan_port_profile,
         discovery_enabled=settings.effective_discovery_enabled,
         discovery_mode=settings.effective_discovery_mode,
         discovery_policy=settings.effective_discovery_policy,
@@ -2100,10 +2104,12 @@ async def start_scan(
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
 
     full_scan = data.full_scan
-    if settings.scan_safe_mode and full_scan:
-        logger.warning("full_scan requested but scan_safe_mode=true — forcing quick scan")
-        full_scan = False
-
+    # v1.3.153+: full_scan in safe mode means popular homelab ports (IPS-throttled),
+    # not a 1-65535 sweep. Previously full_scan was forced off in safe mode.
+    if full_scan and settings.scan_safe_mode:
+        logger.info(
+            "full_scan with safe_mode — using popular/homelab port list (IPS-friendly delays)"
+        )
     docker_br = is_likely_docker_bridge()
     quick_scan = data.quick_scan
     # Intentional POST /api/scan: cover the selected CIDR. Safe mode still throttles

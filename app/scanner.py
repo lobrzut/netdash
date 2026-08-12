@@ -49,8 +49,12 @@ OS_PORT_HINTS: dict[int, str] = {
     5900: "VNC (zdalny pulpit)",
 }
 
-HTTPS_PORTS = {443, 8443, 9443, 6443, 4443, 8006}
-HTTP_FIRST_PORTS = {80, 81, 8080, 8081, 8000, 8008, 3000, 5000, 5001, 8888, 9000, 9090, 8787, 18787, 4000, 4200}
+HTTPS_PORTS = {443, 8443, 9443, 6443, 4443, 8006, 5001}
+HTTP_FIRST_PORTS = {
+    80, 81, 8080, 8081, 8000, 8008, 3000, 5000, 5001, 8888, 9000, 9090, 8787, 18787,
+    4000, 4200, 2283, 5055, 6363, 6767, 7878, 8096, 8123, 8191, 8334, 8686, 8989,
+    9117, 9696, 32400,
+}
 
 TLS_MISMATCH_RE = re.compile(
     r"plain HTTP request was sent to HTTPS|"
@@ -85,24 +89,35 @@ COMMON_PORTS = [
 
 NOISE_PORTS = {135, 139, 445, 110, 143, 993, 995, 587, 465, 25, 23}
 
-# NETDASH_SCAN_ALL_PORTS=true: once a host is found live, probe it on this comprehensive
-# service-port list so services on non-standard ports get discovered too. Only live hosts
-# are probed this deeply (a few dozen), so it stays safe under the usual throttling —
-# unlike a 1-65535 sweep of the whole /24, which would flood the NAS.
+# Curated middle set for manual "popular ports" / NETDASH_SCAN_PORT_PROFILE=popular.
+# Homelab media/*arr, NAS, DB, VPN — NOT 1-65535. Used when full_scan=true (even in safe mode)
+# with IPS-friendly per-host delays. Default safe scans still use SAFE_WEB_PORTS only.
+POPULAR_HOMELAB_PORTS = [
+    22, 80, 443, 873, 1194, 1883, 2049, 2283, 3000, 3306, 3389, 5000, 5001, 5055,
+    5432, 5672, 5900, 6363, 6379, 6767, 7878, 8000, 8006, 8080, 8081, 8096, 8123,
+    8191, 8334, 8443, 8686, 8787, 8989, 9000, 9090, 9117, 9443, 9696, 15672, 18787,
+    27017, 32400, 51820,
+]
+
+# NETDASH_SCAN_ALL_PORTS=true / profile=all_listed: once a host is found live, probe it on
+# this comprehensive service-port list so services on non-standard ports get discovered too.
+# Only live hosts are probed this deeply (a few dozen), so it stays safe under the usual
+# throttling — unlike a 1-65535 sweep of the whole /24, which would flood the NAS / IPS.
 SERVICE_PORTS = [
     21, 22, 23, 25, 53, 67, 69, 80, 81, 88, 110, 111, 123, 135, 139, 143, 161, 389,
     443, 445, 465, 502, 515, 548, 554, 587, 631, 636, 873, 902, 993, 995, 1080, 1194,
     1234, 1400, 1433, 1521, 1880, 1883, 2049, 2052, 2082, 2083, 2086, 2087, 2095, 2096,
-    2222, 2375, 2376, 2379, 2483, 3000, 3001, 3002, 3128, 3260, 3306, 3389, 3478, 3493,
-    4000, 4040, 4200, 4433, 4443, 4444, 4533, 4567, 5000, 5001, 5006, 5044, 5060, 5076,
-    5173, 5201, 5222, 5280, 5299, 5353, 5432, 5601, 5672, 5683, 5800, 5900, 5901, 5984,
-    6052, 6379, 6443, 6767, 6789, 6881, 7000, 7001, 7070, 7100, 7359, 7474, 7575, 7777,
-    7878, 8000, 8001, 8006, 8007, 8008, 8009, 8010, 8042, 8069, 8080, 8081, 8082, 8083,
-    8085, 8086, 8088, 8089, 8090, 8091, 8095, 8096, 8112, 8118, 8123, 8125, 8181, 8191,
-    8200, 8222, 8266, 8333, 8384, 8443, 8500, 8501, 8554, 8581, 8585, 8686, 8765, 8786,
-    8787, 8800, 8810, 8843, 8880, 8888, 8920, 8989, 9000, 9001, 9002, 9003, 9090, 9091,
-    9092, 9093, 9100, 9117, 9119, 9200, 9292, 9443, 9696, 9981, 9999, 10000, 11211,
-    13378, 15672, 18787, 19132, 19999, 20000, 25565, 27017, 32400, 37777, 49152, 61208,
+    2222, 2283, 2375, 2376, 2379, 2483, 3000, 3001, 3002, 3128, 3260, 3306, 3389, 3478,
+    3493, 4000, 4040, 4200, 4433, 4443, 4444, 4533, 4567, 5000, 5001, 5006, 5044, 5055,
+    5060, 5076, 5173, 5201, 5222, 5280, 5299, 5353, 5432, 5601, 5672, 5683, 5800, 5900,
+    5901, 5984, 6052, 6363, 6379, 6443, 6767, 6789, 6881, 7000, 7001, 7070, 7100, 7359,
+    7474, 7575, 7777, 7878, 8000, 8001, 8006, 8007, 8008, 8009, 8010, 8042, 8069, 8080,
+    8081, 8082, 8083, 8085, 8086, 8088, 8089, 8090, 8091, 8095, 8096, 8112, 8118, 8123,
+    8125, 8181, 8191, 8200, 8222, 8266, 8333, 8334, 8384, 8443, 8500, 8501, 8554, 8581,
+    8585, 8686, 8765, 8786, 8787, 8800, 8810, 8843, 8880, 8888, 8920, 8989, 9000, 9001,
+    9002, 9003, 9090, 9091, 9092, 9093, 9100, 9117, 9119, 9200, 9292, 9443, 9696, 9981,
+    9999, 10000, 11211, 13378, 15672, 18787, 19132, 19999, 20000, 25565, 27017, 32400,
+    37777, 49152, 51820, 61208,
 ]
 
 PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
@@ -142,6 +157,23 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     9090: ("Prometheus", "chart", "Monitoring"),
     9200: ("Elasticsearch", "search", "Baza danych"),
     27017: ("MongoDB", "database", "Baza danych"),
+    2283: ("Immich", "photo", "Media"),
+    5055: ("Overseerr", "play", "Media"),
+    6363: ("qBittorrent", "download", "Media"),
+    6767: ("Bazarr", "tv", "Media"),
+    7878: ("Radarr", "film", "Media"),
+    8096: ("Jellyfin", "play", "Media"),
+    8123: ("Home Assistant", "home", "Smart Home"),
+    8191: ("FlareSolverr", "shield", "Media"),
+    8334: ("HTTP Alt", "globe", "Web"),
+    8686: ("Lidarr", "play", "Media"),
+    8989: ("Sonarr", "tv", "Media"),
+    9117: ("Jackett", "search", "Media"),
+    9443: ("Portainer HTTPS", "docker", "DevOps"),
+    9696: ("Prowlarr", "search", "Media"),
+    15672: ("RabbitMQ Mgmt", "queue", "Kolejka"),
+    32400: ("Plex", "play", "Media"),
+    51820: ("WireGuard", "lock", "Sieć"),
     8787: ("NetDash (legacy)", "dashboard", "Dashboard"),
     18787: ("NetDash", "dashboard", "Dashboard"),
 }
@@ -1485,7 +1517,8 @@ async def _probe_http(host: str, port: int) -> DiscoveredService | None:
 
 
 async def _identify_service(host: str, port: int) -> DiscoveredService:
-    if port in WEB_PORTS:
+    http_worthy = port in WEB_PORTS or port in HTTP_FIRST_PORTS or port in HTTPS_PORTS
+    if http_worthy:
         probed = await _probe_http(host, port)
         if probed:
             return probed
@@ -1493,7 +1526,7 @@ async def _identify_service(host: str, port: int) -> DiscoveredService:
     name, icon, category = _base_from_port(port)
     if port in HTTPS_PORTS:
         protocol, url = "https", _build_url(host, port, "https")
-    elif port in WEB_PORTS:
+    elif http_worthy:
         protocol, url = "http", _build_url(host, port, "http")
     else:
         protocol, url = "tcp", f"tcp://{host}:{port}"
@@ -1512,6 +1545,40 @@ async def _identify_service(host: str, port: int) -> DiscoveredService:
     return _apply_os_hint(service)
 
 
+def resolve_manual_scan_ports(
+    *,
+    full_scan: bool = False,
+    host_scan_ports: list[int] | None = None,
+) -> list[int]:
+    """Pick TCP ports for a manual / on-demand network scan.
+
+    Profiles (NETDASH_SCAN_PORT_PROFILE):
+      - safe (default): SAFE_WEB_PORTS + host ports — IPS-friendly minimum
+      - popular: POPULAR_HOMELAB_PORTS (media/*arr/homelab) — still curated, not 1-65535
+      - all_listed: SERVICE_PORTS (~190 curated) — same as NETDASH_SCAN_ALL_PORTS=true
+
+    full_scan=True (UI „Popularne porty”) selects popular unless scan_all_ports / all_listed
+    already forces the full curated list. Never sweeps 1-65535.
+    """
+    profile = (settings.scan_port_profile or "safe").strip().lower()
+    if settings.scan_safe_mode:
+        default_extra = SAFE_HOST_DISCOVERY_PORTS
+    else:
+        default_extra = HOST_DISCOVERY_PORTS
+    extra = host_scan_ports if host_scan_ports is not None else default_extra
+
+    use_all_listed = settings.scan_all_ports or profile == "all_listed"
+    use_popular = full_scan or profile == "popular"
+
+    if use_all_listed:
+        return sorted(set(SERVICE_PORTS + extra))
+    if use_popular:
+        return sorted(set(POPULAR_HOMELAB_PORTS + extra))
+    if settings.scan_safe_mode:
+        return sorted(set(SAFE_WEB_PORTS + extra))
+    return sorted(set(WEB_PORTS + extra))
+
+
 async def scan_network(
     cidr: str,
     *,
@@ -1524,20 +1591,7 @@ async def scan_network(
     service_callback: ServiceCallback | None = None,
     manual_scan: bool = False,
 ) -> list[DiscoveredService]:
-    if settings.scan_all_ports:
-        extra = host_scan_ports if host_scan_ports is not None else (
-            SAFE_HOST_DISCOVERY_PORTS if settings.scan_safe_mode else HOST_DISCOVERY_PORTS
-        )
-        ports = sorted(set(SERVICE_PORTS + extra))
-    elif full_scan and not settings.scan_safe_mode:
-        ports = COMMON_PORTS
-    elif settings.scan_safe_mode:
-        extra = host_scan_ports if host_scan_ports is not None else SAFE_HOST_DISCOVERY_PORTS
-        ports = sorted(set(SAFE_WEB_PORTS + extra))
-    else:
-        extra = host_scan_ports if host_scan_ports is not None else HOST_DISCOVERY_PORTS
-        ports = sorted(set(WEB_PORTS + extra))
-
+    ports = resolve_manual_scan_ports(full_scan=full_scan, host_scan_ports=host_scan_ports)
     if progress_callback:
         await progress_callback("ping", 0, 1)
     # Intentional manual scan must cover the selected CIDR — never the 16-host quick seed path.

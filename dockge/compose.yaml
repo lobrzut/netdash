@@ -64,6 +64,8 @@ services:
       # Legacy /28-only manual: NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false
       # Always-on homelab hosts outside current /28 chunk (e.g. Proxmox):
       # NETDASH_ARP_EXTRA_HOSTS: "192.168.1.200"
+      # Manual scan: NETDASH_SCAN_ALL_PORTS=true = ~190 curated service ports (not 1-65535)
+      # Or NETDASH_SCAN_PORT_PROFILE=popular for ~45 homelab ports (v1.3.153+)
       # Manual scan only: NETDASH_SCAN_ALL_PORTS=true (heavier than auto gradual probe)
     volumes:
       - ./data:/app/data
