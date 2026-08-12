@@ -2,7 +2,9 @@
 
 ## v1.3.151
 
-- **UI safe mode / discovery** — komunikaty o ręcznym skanie i trybie bezpiecznym nie twierdzą już, że „discovery TCP działa automatycznie”, gdy polityka to `on_demand` / `off`. Osobne teksty dla tła (adaptive/scheduled/passive) vs na żądanie.
+- **Skan ręczny = pełny CIDR** — przy `on_demand` / `POST /api/scan` tryb bezpieczny **nie ucina już do /28** i nie blokuje `/24`. `NETDASH_SCAN_SAFE_MODE=true` nadal ogranicza równoległość i porty (IPS-friendly); pełny zakres bierze się z `NETDASH_SCAN_CIDR` / `scan_cidr_default` (domyślnie /24). Wyłączenie: `NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false`.
+- **UI** — dialog skanu domyślnie pokazuje CIDR z ustawień (nie auto-wykryte /28 wokół IP hosta); /28 zostaje jako ostrożny preset. Soft warning + potwierdzenie dla /24 (nota SEP).
+- **i18n** — komunikaty safe mode / discovery zgodne z polityką: przy `on_demand` nie twierdzą, że TCP discovery działa automatycznie w tle.
 - **Obraz**: `ghcr.io/lobrzut/netdash:1.3.151`.
 
 ## v1.3.150

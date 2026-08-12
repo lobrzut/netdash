@@ -9,7 +9,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 VERSION = "1.3.151"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Komunikaty safe mode / skanu ręcznego zgodne z polityką discovery — przy on_demand nie twierdzą już, że TCP discovery działa automatycznie w tle",
+    "Skan ręczny „Skanuj sieć” skanuje pełny CIDR z ustawień (np. /24) nawet przy NETDASH_SCAN_SAFE_MODE=true — safe mode tylko throttluje (IPS-friendly), nie ucina do /28",
+    "Komunikaty safe mode / discovery zgodne z polityką (on_demand nie twierdzi, że TCP działa automatycznie w tle)",
     "Polityka discovery — off / na żądanie (zalecane) / harmonogram / pasywne ARP / legacy adaptive. Domyślnie na żądanie: skan ręczny „Skanuj sieć”, bez ciągłego TCP w tle",
     "Harmonogram — jeden pełny cykl IPS-friendly dziennie (NETDASH_DISCOVERY_SCHEDULE=03:00) lub co N godzin",
     "Pasywne discovery — odczyt tablicy ARP co ~10 min, bez skanu portów (przyjazne SEP)",
@@ -163,11 +164,16 @@ class Settings(BaseSettings):
     auto_discovery_always_chunk: bool = True
     auto_discovery_chunk_prefix: int = 28
     # Manual scan hard limits — apply even when NETDASH_SCAN_SAFE_MODE=false (stability).
-    manual_scan_max_hosts: int = 128
+    # When true (default): POST /api/scan may use full /24; safe mode still throttles concurrency/ports.
+    # Background discovery keeps /28 chunking. Set NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false to restore /28 block.
+    manual_scan_allow_full_cidr: bool = True
+    manual_scan_max_hosts: int = 256
     manual_scan_min_prefix: int = 24
     manual_scan_warn_prefix: int = 24
     manual_scan_max_concurrency: int = 32
     manual_scan_batch_delay: float = 0.15
+    # Manual /24 with IPS-friendly delays needs more wall time than background /28 chunks.
+    manual_scan_max_duration: float = 900.0
     # local = manual TCP scan; adaptive = tiered ping→ARP→ports (default QNAP);
     # arp = legacy background arp-scan; remote = deploy/agent
     discovery_mode: str = "local"
@@ -652,6 +658,21 @@ class Settings(BaseSettings):
     @property
     def effective_scan_max_hosts(self) -> int:
         return self.scan_safe_max_hosts if self.scan_safe_mode else self.scan_max_hosts
+
+    @property
+    def effective_manual_scan_max_hosts(self) -> int:
+        """Host cap for intentional POST /api/scan — not the background /28 seed limit."""
+        if self.manual_scan_allow_full_cidr:
+            return max(1, self.manual_scan_max_hosts)
+        if self.scan_safe_mode:
+            return min(self.manual_scan_max_hosts, self.scan_safe_max_hosts)
+        return max(1, self.manual_scan_max_hosts)
+
+    @property
+    def effective_manual_scan_max_duration(self) -> float:
+        if self.manual_scan_allow_full_cidr:
+            return max(self.manual_scan_max_duration, self.effective_scan_max_duration)
+        return self.effective_scan_max_duration
 
     @property
     def effective_port_parallel_per_host(self) -> int:

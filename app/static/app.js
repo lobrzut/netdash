@@ -1105,6 +1105,9 @@ const DEFAULT_NETWORK = Object.freeze({
   scan_safe_min_prefix: SCAN_SAFE_MIN_PREFIX,
   scan_max_hosts: 16,
   scan_chunk_size: 4,
+  manual_scan_allow_full_cidr: true,
+  manual_scan_max_hosts: 256,
+  manual_scan_warn_prefix: 24,
   discovery_last_import_at: null,
   discovery_last_import_source: null,
   discovery_last_import_hosts: null,
@@ -1444,10 +1447,22 @@ function cidrPrefixLen(cidr) {
 
 function isWideScanCidr(cidr, netRes) {
   if (!cidr) return false;
+  // Soft warn only — manual /24 is allowed when API says so (default).
+  if (netRes?.manual_scan_allow_full_cidr !== false) {
+    const warnPrefix = netRes?.manual_scan_warn_prefix ?? 24;
+    return cidrPrefixLen(cidr) < warnPrefix;
+  }
   const minPrefix = netRes?.scan_safe_min_prefix ?? SCAN_SAFE_MIN_PREFIX;
   if (netRes?.scan_safe_mode && cidrPrefixLen(cidr) < minPrefix) return true;
   const warnPrefix = netRes?.manual_scan_warn_prefix ?? 24;
   return cidrPrefixLen(cidr) < warnPrefix;
+}
+
+function isManualScanBlockedWide(cidr, netRes) {
+  if (!cidr) return false;
+  if (netRes?.manual_scan_allow_full_cidr !== false) return false;
+  const minPrefix = netRes?.scan_safe_min_prefix ?? SCAN_SAFE_MIN_PREFIX;
+  return !!netRes?.scan_safe_mode && cidrPrefixLen(cidr) < minPrefix;
 }
 
 function isManualScanCidrTooWide(cidr, netRes) {
@@ -1460,6 +1475,7 @@ function scanNeedsConfirm(netRes, cidrLabel) {
   const net = resolveNetwork(netRes);
   if (net.scan_safe_mode && net.docker_bridge) return true;
   if (localStorage.getItem(SCAN_CONFIRM_SKIP_KEY) === '1') return false;
+  if (cidrLabel && isWideScanCidr(cidrLabel, netRes)) return true;
   if (net.scan_safe_mode) return true;
   if (cidrLabel && isManualScanCidrTooWide(cidrLabel, netRes)) return true;
   return net.docker_bridge === true && net.ping_available === false;
@@ -1497,7 +1513,7 @@ function confirmScanStart(netRes, cidrLabel) {
       let text = cidrLabel
         ? t('modal.scan.selectedCidr', { cidr: cidrLabel })
         : '';
-      if (cidrLabel && isManualScanCidrTooWide(cidrLabel, netRes) && !netRes?.scan_safe_mode) {
+      if (cidrLabel && isWideScanCidr(cidrLabel, netRes)) {
         text += ` ${t('scan.confirmWideCidr')}`;
       }
       cidrEl.textContent = text;
@@ -1594,10 +1610,14 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
       network: net.local_network,
     });
   } else if (net.scan_safe_mode && net.docker_bridge && !isScanSafeBannerDismissed()) {
-    message = t('scan.qnapSafeWarning');
+    message = net.manual_scan_allow_full_cidr === false
+      ? t('scan.qnapSafeWarning')
+      : t('scan.safeModeThrottleWarning');
     dismissible = true;
   } else if ((net.scan_safe_mode || scanNeedsConfirm(net)) && !isScanSafeBannerDismissed()) {
-    message = t('scan.safeModeWarning');
+    message = net.manual_scan_allow_full_cidr === false
+      ? t('scan.safeModeWarning')
+      : t('scan.safeModeThrottleWarning');
     dismissible = true;
   } else {
     const emptyHint = scanEmptyResultHint(lastScan || window.__lastScanStatus, net);
@@ -4189,7 +4209,7 @@ function parseScanCidrList(text) {
   return text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
 }
 
-const ONE_CLICK_SCAN_CIDR_FALLBACK = '192.168.1.144/28';
+const ONE_CLICK_SCAN_CIDR_FALLBACK = '192.168.1.0/24';
 
 function resolveOneClickScanCidr(settings, netRes) {
   const settingsCidr = settings?.scan_cidr_default?.trim();
@@ -4199,6 +4219,15 @@ function resolveOneClickScanCidr(settings, netRes) {
   }
   const envCidr = netRes?.env_scan_cidr?.trim();
   if (envCidr) return parseScanCidrList(envCidr)[0] || envCidr;
+  const detected = (netRes?.detected_cidrs || []).find((c) => !isDockerInternalCidr(c));
+  if (detected) {
+    // Prefer /24 (or configured wide LAN) over auto /28 chunk around host IP.
+    const wide = (netRes?.detected_cidrs || []).find((c) => {
+      if (isDockerInternalCidr(c)) return false;
+      return cidrPrefixLen(c) <= 24;
+    });
+    return wide || detected;
+  }
   return ONE_CLICK_SCAN_CIDR_FALLBACK;
 }
 
@@ -4242,7 +4271,7 @@ function populateScanCidrSelect(netRes, settings) {
     orderedCidrs.unshift(defaultVal);
   }
   orderedCidrs.forEach((cidr) => {
-    if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) return;
+    if (isManualScanBlockedWide(cidr, netRes)) return;
     if (!seen.has(cidr)) {
       seen.add(cidr);
       options.push({ value: cidr, label: cidrOptionLabel(cidr, netRes, settings) });
@@ -4255,7 +4284,7 @@ function populateScanCidrSelect(netRes, settings) {
     el.textContent = opt.label;
     select.appendChild(el);
   });
-  if (!options.length && netRes?.scan_safe_mode) {
+  if (!options.length && netRes?.scan_safe_mode && netRes?.manual_scan_allow_full_cidr === false) {
     const fallback = ONE_CLICK_SCAN_CIDR_FALLBACK;
     const el = document.createElement('option');
     el.value = fallback;
@@ -4442,7 +4471,7 @@ async function startScan(cidr, fullScan = false, opts = {}) {
     resolvedCidr = resolveOneClickScanCidr(appSettings, netRes);
     console.log('[NetDash] scan: CIDR Docker → fallback', { resolvedCidr });
   }
-  if (netRes?.scan_safe_mode && isWideScanCidr(resolvedCidr, netRes)) {
+  if (isManualScanBlockedWide(resolvedCidr, netRes)) {
     if (isRemoteDiscovery(netRes)) return;
     showScanError(safeModeWideCidrMessage(netRes));
     openScanModal();
@@ -4498,7 +4527,7 @@ async function oneClickScan() {
   if (isRemoteDiscovery(netRes)) return;
   const cidr = resolveOneClickScanCidr(appSettings, netRes);
   console.log('[NetDash] scan: oneClickScan', { cidr });
-  if (netRes?.scan_safe_mode && isWideScanCidr(cidr, netRes)) {
+  if (isManualScanBlockedWide(cidr, netRes)) {
     showScanError(safeModeWideCidrMessage(netRes));
     openScanModal();
     return;
@@ -4524,9 +4553,15 @@ function updateScanModalUI(netRes, settings) {
   if (warning) {
     let msg = '';
     if (adaptive) msg = t('modal.scan.adaptiveWarning');
-    else if (safe && isBackgroundDiscovery(netRes)) msg = t('modal.scan.safeModeWarningBg');
-    else if (safe) msg = t('modal.scan.safeModeWarning');
-    else msg = t('modal.scan.manualWideWarning');
+    else if (safe && net.manual_scan_allow_full_cidr === false && isBackgroundDiscovery(netRes)) {
+      msg = t('modal.scan.safeModeWarningBg');
+    } else if (safe && net.manual_scan_allow_full_cidr === false) {
+      msg = t('modal.scan.safeModeWarning');
+    } else if (safe) {
+      msg = t('modal.scan.safeModeThrottleWarning');
+    } else {
+      msg = t('modal.scan.manualWideWarning');
+    }
     warning.textContent = msg;
     warning.classList.toggle('hidden', !msg);
   }

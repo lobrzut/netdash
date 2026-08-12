@@ -58,8 +58,9 @@ services:
       NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
       NETDASH_AUTO_DISCOVERY_ALL_PORTS: ${NETDASH_AUTO_DISCOVERY_ALL_PORTS:-false}
       NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK: ${NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK:-true}
-      # Set LAN in .env: NETDASH_SCAN_CIDR=192.168.1.0/24 (or UI → Automatic discovery)
-      # Keep SCAN_SAFE_MODE=true on shared VLANs — manual /24 with false can overload the network
+      # Set LAN in .env: NETDASH_SCAN_CIDR=192.168.1.0/24 (or UI → Scanning / Automatic discovery)
+      # Safe mode throttles manual scans (IPS-friendly) but allows full /24 by default (v1.3.151+)
+      # Legacy /28-only manual: NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false
       # Always-on homelab hosts outside current /28 chunk (e.g. Proxmox):
       # NETDASH_ARP_EXTRA_HOSTS: "192.168.1.200"
       # Manual scan only: NETDASH_SCAN_ALL_PORTS=true (heavier than auto gradual probe)

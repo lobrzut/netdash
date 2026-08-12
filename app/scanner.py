@@ -388,7 +388,7 @@ def get_local_network() -> str:
 
 
 def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
-    """CIDR options for scan UI: env/settings first on Docker bridge, then auto /24+/28."""
+    """CIDR options for scan UI: env/settings first, then auto /24+/28."""
     cidrs: list[str] = []
     seen: set[str] = set()
     docker_br = is_likely_docker_bridge()
@@ -401,12 +401,11 @@ def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
                 seen.add(cidr)
                 cidrs.append(cidr)
 
-    # On QNAP bridge the container IP is 172.x — LAN CIDR must appear first in the dropdown.
-    if docker_br:
-        if settings.scan_cidr:
-            add(settings.scan_cidr)
-        if scan_cidr_default:
-            add(scan_cidr_default)
+    # Prefer configured LAN CIDR (user intent) over auto-detected /28 around host IP.
+    if settings.scan_cidr:
+        add(settings.scan_cidr)
+    if scan_cidr_default:
+        add(scan_cidr_default)
     try:
         local_ip = get_local_ip()
         auto24 = str(ipaddress.ip_network(f"{local_ip}/24", strict=False))
@@ -416,14 +415,12 @@ def get_detected_cidrs(scan_cidr_default: str | None = None) -> list[str]:
             add(auto28)
     except (OSError, ValueError):
         pass
-    if not docker_br:
-        if settings.scan_cidr:
-            add(settings.scan_cidr)
-        if scan_cidr_default:
-            add(scan_cidr_default)
     if not cidrs:
-        add("192.168.1.144/28" if settings.scan_safe_mode else "192.168.1.0/24")
-    if settings.scan_safe_mode:
+        add("192.168.1.0/24" if settings.manual_scan_allow_full_cidr else "192.168.1.144/28")
+        if settings.manual_scan_allow_full_cidr:
+            add("192.168.1.144/28")
+    # Legacy: when full manual CIDR is disabled, safe mode hides wide presets from the dropdown.
+    if settings.scan_safe_mode and not settings.manual_scan_allow_full_cidr:
         min_pfx = settings.scan_safe_min_prefix
         narrow = [
             c for c in cidrs
@@ -566,8 +563,14 @@ def safe_mode_scan_cidrs(cidr: str) -> list[str]:
     return selected
 
 
-def expand_cidrs_for_safe_mode(cidrs: list[str]) -> list[str]:
-    """Expand each CIDR into safe-mode chunks; dedupe preserving order."""
+def expand_cidrs_for_safe_mode(cidrs: list[str], *, for_manual: bool = False) -> list[str]:
+    """Expand each CIDR into safe-mode chunks; dedupe preserving order.
+
+    Manual scans with NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR keep the user-selected range.
+    Background discovery still chunks to /28 when auto-shrink is enabled.
+    """
+    if for_manual and settings.manual_scan_allow_full_cidr:
+        return cidrs
     if not settings.scan_safe_mode or settings.scan_safe_block_wide:
         return cidrs
     expanded: list[str] = []
@@ -580,8 +583,13 @@ def expand_cidrs_for_safe_mode(cidrs: list[str]) -> list[str]:
     return expanded
 
 
-def validate_cidrs_for_safe_mode(cidrs: list[str]) -> None:
-    """Reject wide-CIDR scans that can crash weak NAS hosts (QNAP)."""
+def validate_cidrs_for_safe_mode(cidrs: list[str], *, for_manual: bool = False) -> None:
+    """Reject wide-CIDR scans that can crash weak NAS hosts (QNAP).
+
+    Intentional manual scans may skip this when manual_scan_allow_full_cidr is on.
+    """
+    if for_manual and settings.manual_scan_allow_full_cidr:
+        return
     if not settings.scan_safe_mode:
         return
     min_pfx = settings.scan_safe_min_prefix
@@ -591,7 +599,7 @@ def validate_cidrs_for_safe_mode(cidrs: list[str]) -> None:
             raise ScanError(
                 f"Tryb bezpieczny: zakres {cidr} jest zbyt szeroki (max /{min_pfx}, np. 192.168.1.144/28). "
                 "Skan /24 może zawiesić cały QNAP — użyj Opcje skanu z węższym CIDR "
-                "lub NETDASH_SCAN_SAFE_MODE=false (ryzyko).",
+                "lub NETDASH_SCAN_SAFE_MODE=false / NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=true.",
                 code="cidr_too_wide",
             )
 
@@ -626,9 +634,9 @@ def validate_manual_scan_cidrs(cidrs: list[str]) -> None:
                 f"Użyj mniejszego CIDR (np. /28).",
                 code="manual_cidr_too_wide",
             )
-    validate_cidrs_for_safe_mode(cidrs)
+    validate_cidrs_for_safe_mode(cidrs, for_manual=True)
     host_count = count_hosts_in_cidrs(cidrs)
-    cap = settings.manual_scan_max_hosts
+    cap = settings.effective_manual_scan_max_hosts
     if host_count > cap:
         raise ScanError(
             f"Skan ręczny: {host_count} hostów przekracza limit {cap}. "
@@ -638,9 +646,7 @@ def validate_manual_scan_cidrs(cidrs: list[str]) -> None:
 
 
 def effective_manual_scan_max_hosts() -> int:
-    if settings.scan_safe_mode:
-        return min(settings.manual_scan_max_hosts, settings.scan_safe_max_hosts)
-    return settings.manual_scan_max_hosts
+    return settings.effective_manual_scan_max_hosts
 
 
 def parse_host_scan_ports(ports_str: str | None) -> list[int]:
@@ -728,10 +734,15 @@ def _create_host_only_service(host: str) -> DiscoveredService:
     )
 
 
-def parse_cidr(cidr: str, *, max_hosts: int | None = None) -> list[str]:
+def parse_cidr(cidr: str, *, max_hosts: int | None = None, manual_scan: bool = False) -> list[str]:
     network = ipaddress.ip_network(cidr.strip(), strict=False)
     hosts = [str(host) for host in network.hosts()]
-    cap = max_hosts if max_hosts is not None else settings.effective_scan_max_hosts
+    if max_hosts is not None:
+        cap = max_hosts
+    elif manual_scan:
+        cap = settings.effective_manual_scan_max_hosts
+    else:
+        cap = settings.effective_scan_max_hosts
     if len(hosts) > cap:
         hosts = hosts[:cap]
     return hosts
@@ -793,13 +804,15 @@ async def discover_live_hosts_tcp(
     cidr: str,
     ports: list[int] | None = None,
     progress_callback: ProgressCallback | None = None,
+    *,
+    manual_scan: bool = False,
 ) -> set[str]:
     """Find hosts with at least one open TCP port — fallback when ping is blocked."""
     if ports is None:
         probe_ports = SAFE_TCP_DISCOVERY_PORTS if settings.scan_safe_mode else TCP_DISCOVERY_PORTS
     else:
         probe_ports = ports
-    candidates = parse_cidr(cidr)
+    candidates = parse_cidr(cidr, manual_scan=manual_scan)
     live = _discovery_extras(cidr)
     total = len(candidates) * len(probe_ports)
     done = 0
@@ -843,8 +856,9 @@ async def discover_live_hosts(
     progress_callback: ProgressCallback | None = None,
     *,
     tcp_fallback: bool = True,
+    manual_scan: bool = False,
 ) -> list[str]:
-    candidates = parse_cidr(cidr)
+    candidates = parse_cidr(cidr, manual_scan=manual_scan)
     extra = _discovery_extras(cidr)
     icmp_ok = await icmp_ping_available()
 
@@ -880,12 +894,18 @@ async def discover_live_hosts(
 
     # Docker: ping often fails even with correct CIDR — TCP sweep entire subnet.
     ping_only_hosts = len(live - extra)
-    # Normal mode: always TCP-sweep so hosts that block ICMP ping (e.g. a
-    # firewalled Proxmox/server) but have open ports are still found. Safe mode
-    # keeps the conservative ping-first behaviour to avoid flooding weak NAS HW.
-    use_tcp = tcp_fallback and (not settings.scan_safe_mode or not icmp_ok or ping_only_hosts <= 1)
+    # Normal mode / intentional manual scan: TCP-sweep so hosts that block ICMP are found.
+    # Background safe mode keeps conservative ping-first behaviour.
+    use_tcp = tcp_fallback and (
+        manual_scan
+        or not settings.scan_safe_mode
+        or not icmp_ok
+        or ping_only_hosts <= 1
+    )
     if use_tcp:
-        tcp_live = await discover_live_hosts_tcp(cidr, progress_callback=progress_callback)
+        tcp_live = await discover_live_hosts_tcp(
+            cidr, progress_callback=progress_callback, manual_scan=manual_scan
+        )
         live.update(tcp_live)
 
     return sorted(live)
@@ -1471,14 +1491,17 @@ async def scan_network(
 
     if progress_callback:
         await progress_callback("ping", 0, 1)
-    if quick_scan:
+    # Intentional manual scan must cover the selected CIDR — never the 16-host quick seed path.
+    if quick_scan and not manual_scan:
         live_hosts = await discover_live_hosts_quick(
             cidr,
             extra_hosts=known_hosts,
             progress_callback=progress_callback,
         )
     else:
-        live_hosts = await discover_live_hosts(cidr, progress_callback)
+        live_hosts = await discover_live_hosts(
+            cidr, progress_callback, manual_scan=manual_scan
+        )
 
     if progress_callback:
         await progress_callback("ports", 0, len(live_hosts) * len(ports))
@@ -1571,7 +1594,7 @@ async def scan_networks(
     manual_scan: bool = False,
 ) -> list[DiscoveredService]:
     unique: dict[tuple[str, int], DiscoveredService] = {}
-    scan_cidrs = expand_cidrs_for_safe_mode(cidrs)
+    scan_cidrs = expand_cidrs_for_safe_mode(cidrs, for_manual=manual_scan)
     for idx, cidr in enumerate(scan_cidrs):
         if idx > 0 and settings.scan_safe_mode:
             await asyncio.sleep(settings.scan_inter_chunk_delay)

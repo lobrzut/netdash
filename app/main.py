@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import logging
 import re
 import time
@@ -783,7 +784,8 @@ async def health(db: AsyncSession = Depends(get_db)):
         "scan_chunk_size": settings.effective_scan_batch_size,
         "auto_discovery_all_ports": settings.auto_discovery_all_ports,
         "auto_discovery_always_chunk": settings.auto_discovery_always_chunk,
-        "manual_scan_max_hosts": settings.manual_scan_max_hosts,
+        "manual_scan_allow_full_cidr": settings.manual_scan_allow_full_cidr,
+        "manual_scan_max_hosts": settings.effective_manual_scan_max_hosts,
         "manual_scan_warn_prefix": settings.manual_scan_warn_prefix,
         "discovery_last_import_at": app_settings.discovery_last_import_at,
         "discovery_last_import_source": app_settings.discovery_last_import_source,
@@ -937,6 +939,9 @@ async def network_info(
             scan_safe_min_prefix=settings.scan_safe_min_prefix,
             scan_max_hosts=settings.effective_scan_max_hosts,
             scan_chunk_size=settings.effective_scan_batch_size,
+            manual_scan_allow_full_cidr=settings.manual_scan_allow_full_cidr,
+            manual_scan_max_hosts=settings.effective_manual_scan_max_hosts,
+            manual_scan_warn_prefix=settings.manual_scan_warn_prefix,
         )
     app_settings = await _get_or_create_settings(db)
     ping_ok = await icmp_ping_available()
@@ -963,7 +968,8 @@ async def network_info(
         scan_safe_min_prefix=settings.scan_safe_min_prefix,
         scan_max_hosts=settings.effective_scan_max_hosts,
         scan_chunk_size=settings.effective_scan_batch_size,
-        manual_scan_max_hosts=settings.manual_scan_max_hosts,
+        manual_scan_allow_full_cidr=settings.manual_scan_allow_full_cidr,
+        manual_scan_max_hosts=settings.effective_manual_scan_max_hosts,
         manual_scan_warn_prefix=settings.manual_scan_warn_prefix,
         auto_discovery_all_ports=settings.auto_discovery_all_ports,
         discovery_last_import_at=app_settings.discovery_last_import_at,
@@ -1885,7 +1891,7 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         host_only = app_settings.host_only_entries is not False
         known_hosts = await _collect_known_scan_hosts(db)
 
-    scan_timeout = settings.effective_scan_max_duration
+    scan_timeout = settings.effective_manual_scan_max_duration
     try:
         discovered = await asyncio.wait_for(
             scan_networks(
@@ -1945,8 +1951,9 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         )
     except asyncio.TimeoutError:
         msg = (
-            f"Skanowanie przekroczyło limit czasu ({int(settings.effective_scan_max_duration)} s). "
-            "Na słabym sprzęcie zostaw NETDASH_SCAN_SAFE_MODE=true, użyj mniejszego CIDR (/28) lub wyłącz pełny skan."
+            f"Skanowanie przekroczyło limit czasu ({int(settings.effective_manual_scan_max_duration)} s). "
+            "Na słabym sprzęcie użyj mniejszego CIDR (/28), zwiększ NETDASH_MANUAL_SCAN_MAX_DURATION "
+            "lub wyłącz pełny skan portów."
         )
         logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
@@ -2073,11 +2080,16 @@ async def start_scan(
 
     docker_br = is_likely_docker_bridge()
     quick_scan = data.quick_scan
+    # Intentional POST /api/scan: cover the selected CIDR. Safe mode still throttles
+    # concurrency/ports; it must not force the 16-host quick seed path when full CIDR is allowed.
     if quick_scan is None:
-        quick_scan = settings.scan_safe_mode or docker_br
+        if settings.manual_scan_allow_full_cidr:
+            quick_scan = False
+        else:
+            quick_scan = settings.scan_safe_mode or docker_br
     if full_scan:
         quick_scan = False
-    if settings.scan_safe_mode:
+    if settings.scan_safe_mode and not settings.manual_scan_allow_full_cidr:
         quick_scan = True
 
     app_settings = await _get_or_create_settings(db)
@@ -2111,9 +2123,13 @@ async def start_scan(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     requested_label = format_cidr_list(cidrs)
-    scan_cidrs = expand_cidrs_for_safe_mode(cidrs)
+    scan_cidrs = expand_cidrs_for_safe_mode(cidrs, for_manual=True)
     cidr_label = format_cidr_list(scan_cidrs)
-    safe_narrowed = settings.scan_safe_mode and cidr_label != requested_label
+    safe_narrowed = (
+        settings.scan_safe_mode
+        and not settings.manual_scan_allow_full_cidr
+        and cidr_label != requested_label
+    )
     if safe_narrowed:
         logger.info("Safe mode narrowed scan CIDR %s → %s", requested_label, cidr_label)
     ping_ok = await icmp_ping_available()
@@ -2125,8 +2141,8 @@ async def start_scan(
             full_scan,
             settings.scan_safe_mode,
             settings.effective_scan_concurrency,
-            settings.effective_scan_max_hosts,
-            int(settings.effective_scan_max_duration),
+            settings.effective_manual_scan_max_hosts,
+            int(settings.effective_manual_scan_max_duration),
             docker_br,
         )
     else:
@@ -2150,6 +2166,15 @@ async def start_scan(
         job_notes.append(
             f"Tryb bezpieczny: skan ograniczony z {requested_label} do {cidr_label}. "
             "Ustaw węższy CIDR (/28) lub limit RAM 768 MB+ przed pełnym /24."
+        )
+    elif (
+        settings.scan_safe_mode
+        and settings.manual_scan_allow_full_cidr
+        and any(ipaddress.ip_network(c, strict=False).prefixlen < settings.scan_safe_min_prefix for c in scan_cidrs)
+    ):
+        job_notes.append(
+            "Tryb bezpieczny: skan ręczny pełnego CIDR z throttlingiem IPS-friendly "
+            "(bez ucinania do /28). Na słabym sprzęcie rozważ węższy CIDR."
         )
     if job_notes:
         job.error_message = " ".join(job_notes)
