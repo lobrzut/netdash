@@ -53,6 +53,8 @@ from app.scanner import (
     ScanError,
     _fallback_service_name,
     build_local_host_service,
+    compute_manual_scan_timeout,
+    count_hosts_in_cidrs,
     format_cidr_list,
     get_default_gateway,
     get_detected_cidrs,
@@ -1839,6 +1841,8 @@ async def _update_scan_progress(job_id: int, phase: str, current: int, total: in
         if found is not None:
             job.found_count = found
         await db.commit()
+    # Let pending HTTP handlers (health / scan poll) run between DB commits.
+    await asyncio.sleep(0)
 
 
 async def _collect_known_scan_hosts(db: AsyncSession) -> list[str]:
@@ -1874,8 +1878,24 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
 
     found_count = 0
     seen_keys: set[tuple[str, int]] = set()
+    last_progress_at = 0.0
+    last_progress_phase = ""
 
     async def on_progress(phase: str, current: int, total: int):
+        nonlocal last_progress_at, last_progress_phase
+        now = time.monotonic()
+        # Heartbeat at least every 1.5s so UI doesn't think the server died; always
+        # flush on phase change or completion.
+        force = (
+            phase != last_progress_phase
+            or current >= total
+            or current == 0
+            or (now - last_progress_at) >= 1.5
+        )
+        if not force:
+            return
+        last_progress_at = now
+        last_progress_phase = phase
         await _update_scan_progress(job_id, phase, current, total, found_count)
 
     async def on_service(item: DiscoveredService):
@@ -1891,7 +1911,13 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         host_only = app_settings.host_only_entries is not False
         known_hosts = await _collect_known_scan_hosts(db)
 
-    scan_timeout = settings.effective_manual_scan_max_duration
+    scan_timeout = compute_manual_scan_timeout(cidrs)
+    logger.info(
+        "Scan %s timeout budget=%ss (hosts≈%s)",
+        job_id,
+        int(scan_timeout),
+        count_hosts_in_cidrs(cidrs),
+    )
     try:
         discovered = await asyncio.wait_for(
             scan_networks(
@@ -1951,9 +1977,9 @@ async def _run_scan(job_id: int, cidrs: list[str], full_scan: bool = False, quic
         )
     except asyncio.TimeoutError:
         msg = (
-            f"Skanowanie przekroczyło limit czasu ({int(settings.effective_manual_scan_max_duration)} s). "
+            f"Skanowanie przekroczyło limit czasu ({int(scan_timeout)} s). "
             "Na słabym sprzęcie użyj mniejszego CIDR (/28), zwiększ NETDASH_MANUAL_SCAN_MAX_DURATION "
-            "lub wyłącz pełny skan portów."
+            "/ NETDASH_MANUAL_SCAN_TIMEOUT_PER_HOST, albo wyłącz pełny skan portów."
         )
         logger.exception("Scan %s timed out for %s", job_id, format_cidr_list(cidrs))
         async with async_session() as db:
@@ -2142,7 +2168,7 @@ async def start_scan(
             settings.scan_safe_mode,
             settings.effective_scan_concurrency,
             settings.effective_manual_scan_max_hosts,
-            int(settings.effective_manual_scan_max_duration),
+            int(compute_manual_scan_timeout(scan_cidrs)),
             docker_br,
         )
     else:
@@ -2252,6 +2278,9 @@ async def _send_via_gptwol(base_url: str, mac: str, ip: str) -> bool:
 
 @app.post("/api/services/health-check")
 async def run_health_check(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+    # Avoid racing the background health loop / starving the scan event loop.
+    if _scan_in_progress():
+        return {"checked": 0, "skipped": "scan_in_progress"}
     count = await check_all_services(db)
     return {"checked": count}
 

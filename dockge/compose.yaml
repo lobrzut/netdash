@@ -60,6 +60,7 @@ services:
       NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK: ${NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK:-true}
       # Set LAN in .env: NETDASH_SCAN_CIDR=192.168.1.0/24 (or UI → Scanning / Automatic discovery)
       # Safe mode throttles manual scans (IPS-friendly) but allows full /24 by default (v1.3.151+)
+      # v1.3.152+: /24 work is chunked into /28 internally so /api/health stays responsive
       # Legacy /28-only manual: NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false
       # Always-on homelab hosts outside current /28 chunk (e.g. Proxmox):
       # NETDASH_ARP_EXTRA_HOSTS: "192.168.1.200"

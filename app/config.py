@@ -6,9 +6,10 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.151"
+VERSION = "1.3.152"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Skan ręczny /24 nie blokuje już UI — praca w chunkach /28, częstsze yield’e, timeout skalowany z liczbą hostów, /api/health odpowiada w trakcie skanu",
     "Skan ręczny „Skanuj sieć” skanuje pełny CIDR z ustawień (np. /24) nawet przy NETDASH_SCAN_SAFE_MODE=true — safe mode tylko throttluje (IPS-friendly), nie ucina do /28",
     "Komunikaty safe mode / discovery zgodne z polityką (on_demand nie twierdzi, że TCP działa automatycznie w tle)",
     "Polityka discovery — off / na żądanie (zalecane) / harmonogram / pasywne ARP / legacy adaptive. Domyślnie na żądanie: skan ręczny „Skanuj sieć”, bez ciągłego TCP w tle",
@@ -173,7 +174,14 @@ class Settings(BaseSettings):
     manual_scan_max_concurrency: int = 32
     manual_scan_batch_delay: float = 0.15
     # Manual /24 with IPS-friendly delays needs more wall time than background /28 chunks.
-    manual_scan_max_duration: float = 900.0
+    manual_scan_max_duration: float = 1800.0
+    # Extra seconds per host on top of base duration (TCP discovery + IPS delays).
+    manual_scan_timeout_per_host: float = 6.0
+    # Hard cap for scaled manual scan timeout (seconds).
+    manual_scan_timeout_cap: float = 3600.0
+    # Internally split wide manual CIDRs into /28 work units (one job still covers full /24).
+    manual_scan_internal_chunk: bool = True
+    manual_scan_work_chunk_prefix: int = 28
     # local = manual TCP scan; adaptive = tiered ping→ARP→ports (default QNAP);
     # arp = legacy background arp-scan; remote = deploy/agent
     discovery_mode: str = "local"
@@ -410,6 +418,43 @@ class Settings(BaseSettings):
         if v is None or (isinstance(v, str) and not v.strip()):
             return 0.15
         return max(0.05, float(v))
+
+    @field_validator("manual_scan_max_duration", mode="before")
+    @classmethod
+    def _manual_scan_max_duration(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 1800.0
+        return max(60.0, float(v))
+
+    @field_validator("manual_scan_timeout_per_host", mode="before")
+    @classmethod
+    def _manual_scan_timeout_per_host(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 6.0
+        return max(0.0, float(v))
+
+    @field_validator("manual_scan_timeout_cap", mode="before")
+    @classmethod
+    def _manual_scan_timeout_cap(cls, v: object) -> float:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 3600.0
+        return max(120.0, float(v))
+
+    @field_validator("manual_scan_internal_chunk", mode="before")
+    @classmethod
+    def _manual_scan_internal_chunk(cls, v: object) -> bool:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return True
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "on")
+        return bool(v)
+
+    @field_validator("manual_scan_work_chunk_prefix", mode="before")
+    @classmethod
+    def _manual_scan_work_chunk_prefix(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 28
+        return max(24, min(30, int(v)))
 
     @field_validator("discovery_mode", mode="before")
     @classmethod
@@ -673,6 +718,13 @@ class Settings(BaseSettings):
         if self.manual_scan_allow_full_cidr:
             return max(self.manual_scan_max_duration, self.effective_scan_max_duration)
         return self.effective_scan_max_duration
+
+    def manual_scan_timeout_for_hosts(self, host_count: int) -> float:
+        """Wall-clock budget for one manual scan job — scales with CIDR size."""
+        base = self.effective_manual_scan_max_duration
+        hosts = max(0, int(host_count))
+        scaled = max(base, hosts * max(0.0, self.manual_scan_timeout_per_host))
+        return min(scaled, max(base, self.manual_scan_timeout_cap))
 
     @property
     def effective_port_parallel_per_host(self) -> int:

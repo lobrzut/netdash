@@ -17,6 +17,10 @@ from app.url_utils import is_blocked_fetch_target, sanitize_service_url
 
 logger = logging.getLogger("netdash.health")
 
+# Serialize full-table health passes — concurrent loop + POST /api/services/health-check
+# used to race on the same AsyncSession rows (StaleDataError).
+_health_check_lock = asyncio.Lock()
+
 _HTTP_STATUS_RE = re.compile(r"^HTTP\s+(\d{3})\b", re.IGNORECASE)
 # Auth / redirect responses mean the host is reachable, not an outage.
 _REACHABLE_HTTP_CODES = frozenset(range(300, 400)) | {401, 403}
@@ -196,43 +200,44 @@ async def purge_stale_services(db: AsyncSession, stale_days: int) -> int:
 
 
 async def check_all_services(db: AsyncSession) -> int:
-    result = await db.execute(select(Service))
-    services = result.scalars().all()
-    if not services:
-        return 0
+    async with _health_check_lock:
+        result = await db.execute(select(Service))
+        services = result.scalars().all()
+        if not services:
+            return 0
 
-    sem = asyncio.Semaphore(settings.health_check_concurrency)
-    # IPS-friendly: serialize probes to the SAME host (+jittered delay) so several services
-    # sharing one host aren't probed as a simultaneous multi-port burst (IPS port-scan flag).
-    host_gates: dict[str, asyncio.Semaphore] = {}
-    per_host = max(1, settings.effective_port_parallel_per_host)
-    delay = settings.effective_ports_per_host_delay
-    jitter = settings.ports_per_host_jitter if settings.ips_friendly else 0.0
+        sem = asyncio.Semaphore(settings.health_check_concurrency)
+        # IPS-friendly: serialize probes to the SAME host (+jittered delay) so several services
+        # sharing one host aren't probed as a simultaneous multi-port burst (IPS port-scan flag).
+        host_gates: dict[str, asyncio.Semaphore] = {}
+        per_host = max(1, settings.effective_port_parallel_per_host)
+        delay = settings.effective_ports_per_host_delay
+        jitter = settings.ports_per_host_jitter if settings.ips_friendly else 0.0
 
-    def _host_gate(host: str) -> asyncio.Semaphore | None:
-        if not settings.ips_friendly:
-            return None
-        return host_gates.setdefault(host, asyncio.Semaphore(per_host))
+        def _host_gate(host: str) -> asyncio.Semaphore | None:
+            if not settings.ips_friendly:
+                return None
+            return host_gates.setdefault(host, asyncio.Semaphore(per_host))
 
-    async def _run(svc: Service) -> None:
-        try:
-            online, detail = await check_service_online(svc)
-            await apply_health_result(db, svc, online, detail)
-        except Exception:
-            logger.warning("Health check failed for service %s (%s)", svc.id, svc.host, exc_info=True)
-            await apply_health_result(db, svc, False)
+        async def _run(svc: Service) -> None:
+            try:
+                online, detail = await check_service_online(svc)
+                await apply_health_result(db, svc, online, detail)
+            except Exception:
+                logger.warning("Health check failed for service %s (%s)", svc.id, svc.host, exc_info=True)
+                await apply_health_result(db, svc, False)
 
-    async def check_one(svc: Service):
-        async with sem:
-            gate = _host_gate((svc.host or "").strip())
-            if gate is None:
-                await _run(svc)
-                return
-            async with gate:
-                if delay > 0:
-                    await asyncio.sleep(delay + (random.random() * jitter if jitter > 0 else 0.0))
-                await _run(svc)
+        async def check_one(svc: Service):
+            async with sem:
+                gate = _host_gate((svc.host or "").strip())
+                if gate is None:
+                    await _run(svc)
+                    return
+                async with gate:
+                    if delay > 0:
+                        await asyncio.sleep(delay + (random.random() * jitter if jitter > 0 else 0.0))
+                    await _run(svc)
 
-    await asyncio.gather(*(check_one(s) for s in services))
-    await db.commit()
-    return len(services)
+        await asyncio.gather(*(check_one(s) for s in services))
+        await db.commit()
+        return len(services)

@@ -682,7 +682,9 @@ async def run_discovery_cycle() -> int:
 
         seen_ips = {e.ip for e in entries}
         new_ips = seen_ips - _known_ips
-        _known_ips |= seen_ips
+        # Replace (don't union forever) — stale IPs from prior chunks must drop out
+        # or "new host" detection and memory grow without bound across /24 rotation.
+        _known_ips = seen_ips
 
         mark_offline = _should_mark_missing_offline(cycle_cidrs, tiers, len(seen_ips))
 

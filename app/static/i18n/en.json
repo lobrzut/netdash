@@ -535,7 +535,7 @@
   "scan.error.sessionExpired": "Session expired — log in again and start the scan.",
   "scan.error.server": "Server rejected the scan (error {status}). Check container logs.",
   "scan.error.pollFailed": "Lost connection to scan — check container logs and try again.",
-  "scan.error.pollRetry": "Scan in progress — server not responding (attempt {n}/{max}). Waiting for container…",
+  "scan.error.pollRetry": "Scan in progress — server briefly busy (attempt {n}/{max}). Progress continues in the background…",
   "app.titleSuffix": "Network Dashboard",
   "error.unknown": "unknown error",
   "error.serverHealth": "Server is not responding correctly",

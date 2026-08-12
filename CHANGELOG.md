@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.152
+
+- **Skan ręczny /24 nie zabija UI** — pełny CIDR nadal w jednym jobie, ale praca idzie **chunkami /28** z `asyncio.sleep(0)` między hostami; sync TCP/DNS zeszły z pętli zdarzeń; `/api/health` i poll skanu odpowiadają w trakcie skanu.
+- **Timeout skalowany** — `NETDASH_MANUAL_SCAN_MAX_DURATION` (domyślnie 1800 s) + `NETDASH_MANUAL_SCAN_TIMEOUT_PER_HOST` (6 s), cap 3600 s — /24 nie urywa się na 900 s w fazie ports.
+- **Progress** — częstszy heartbeat postępu (co ≤1.5 s); UI ma dłuższy retry (45 prób) i komunikat „serwer chwilowo zajęty” zamiast „czekam na kontener”.
+- **Health check** — `asyncio.Lock` wokół pełnego przebiegu; POST `/api/services/health-check` pomija się gdy skan trwa (brak wyścigu StaleDataError z pętlą tła).
+- **Fix** — `_known_ips = seen_ips` w `discovery_pipeline` (zamiast `|=`), żeby stare IP nie rosły w nieskończoność przy rotacji chunków.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.152`.
+
 ## v1.3.151
 
 - **Skan ręczny = pełny CIDR** — przy `on_demand` / `POST /api/scan` tryb bezpieczny **nie ucina już do /28** i nie blokuje `/24`. `NETDASH_SCAN_SAFE_MODE=true` nadal ogranicza równoległość i porty (IPS-friendly); pełny zakres bierze się z `NETDASH_SCAN_CIDR` / `scan_cidr_default` (domyślnie /24). Wyłączenie: `NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false`.

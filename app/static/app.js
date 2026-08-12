@@ -22,9 +22,10 @@ let scanPollTimer = null;
 let scanPollFailures = 0;
 let currentScanJobId = null;
 let lastScanServicesRefresh = 0;
-const SCAN_POLL_BASE_MS = 6000;
-const SCAN_POLL_MAX_MS = 20000;
-const SCAN_POLL_MAX_FAILURES = 12;
+const SCAN_POLL_BASE_MS = 4000;
+const SCAN_POLL_MAX_MS = 12000;
+const SCAN_POLL_MAX_FAILURES = 45;
+const SCAN_POLL_REQUEST_TIMEOUT_MS = 8000;
 const SCAN_SERVICES_REFRESH_MS = 30000;
 const SCAN_SAFE_MIN_PREFIX = 28;
 let healthPollInterval = null;
@@ -4339,7 +4340,24 @@ function setScanControlsDisabled(disabled) {
 async function pollScanProgress(jobId) {
   const statusEl = $('#scan-status-text');
   try {
-    const status = await api(`/api/scan/${jobId}`);
+    const status = await fetchWithTimeout(
+      `${API}/api/scan/${jobId}`,
+      {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      },
+      SCAN_POLL_REQUEST_TIMEOUT_MS,
+    ).then(async (res) => {
+      if (res.status === 401) throw new Error('Unauthorized');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(translateApiDetail(err.detail) || `HTTP ${res.status}`);
+      }
+      return res.json();
+    });
     if (statusEl) statusEl.textContent = formatScanStatus(status);
 
     if (status.status === 'running' && status.found_count > 0) {

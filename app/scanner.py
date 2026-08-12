@@ -583,6 +583,42 @@ def expand_cidrs_for_safe_mode(cidrs: list[str], *, for_manual: bool = False) ->
     return expanded
 
 
+def chunk_cidrs_for_manual_work(cidrs: list[str], *, prefix: int | None = None) -> list[str]:
+    """Split wide manual CIDRs into sequential /28 (or prefix) work units — full coverage.
+
+    One manual job still represents the user-selected range (e.g. /24), but work is done
+    chunk-by-chunk so the event loop can serve /api/health between chunks.
+    """
+    if not settings.manual_scan_internal_chunk:
+        return list(cidrs)
+    pfx = prefix if prefix is not None else settings.manual_scan_work_chunk_prefix
+    pfx = max(24, min(30, int(pfx)))
+    out: list[str] = []
+    seen: set[str] = set()
+    for cidr in cidrs:
+        try:
+            network = ipaddress.ip_network(cidr.strip(), strict=False)
+        except ValueError:
+            if cidr not in seen:
+                seen.add(cidr)
+                out.append(cidr)
+            continue
+        if network.prefixlen >= pfx:
+            pieces = [str(network)]
+        else:
+            pieces = [str(c) for c in network.subnets(new_prefix=pfx)]
+        for piece in pieces:
+            if piece not in seen:
+                seen.add(piece)
+                out.append(piece)
+    return out or list(cidrs)
+
+
+def compute_manual_scan_timeout(cidrs: list[str]) -> float:
+    """Scaled wall-clock timeout for a manual scan covering ``cidrs``."""
+    return settings.manual_scan_timeout_for_hosts(count_hosts_in_cidrs(cidrs))
+
+
 def validate_cidrs_for_safe_mode(cidrs: list[str], *, for_manual: bool = False) -> None:
     """Reject wide-CIDR scans that can crash weak NAS hosts (QNAP).
 
@@ -715,11 +751,11 @@ def build_local_host_service() -> DiscoveredService:
     )
 
 
-def _create_host_only_service(host: str) -> DiscoveredService:
+def _create_host_only_service(host: str, *, display_name: str | None = None) -> DiscoveredService:
     local_ip = get_local_ip()
     if host == local_ip:
         return build_local_host_service()
-    display = _resolve_display_name(host)
+    display = display_name if display_name is not None else _resolve_display_name(host)
     name = display if display != host else f"Urządzenie {host}"
     return DiscoveredService(
         host=host,
@@ -732,6 +768,15 @@ def _create_host_only_service(host: str) -> DiscoveredService:
         icon_url=None,
         description="Wykryto przez ping — brak otwartych portów usługowych",
     )
+
+
+async def _create_host_only_service_async(host: str) -> DiscoveredService:
+    """Reverse-DNS off the event loop so long scans don't freeze /api/health."""
+    local_ip = get_local_ip()
+    if host == local_ip:
+        return build_local_host_service()
+    display = await asyncio.to_thread(_resolve_display_name, host)
+    return _create_host_only_service(host, display_name=display)
 
 
 def parse_cidr(cidr: str, *, max_hosts: int | None = None, manual_scan: bool = False) -> list[str]:
@@ -749,6 +794,8 @@ def parse_cidr(cidr: str, *, max_hosts: int | None = None, manual_scan: bool = F
 
 
 async def _scan_batch_pause(done: int) -> None:
+    # Always yield so FastAPI can serve /api/health during long manual scans.
+    await asyncio.sleep(0)
     if not settings.scan_safe_mode:
         return
     batch = settings.effective_scan_batch_size
@@ -833,14 +880,15 @@ async def discover_live_hosts_tcp(
                 await progress_callback("ping", done, total)
         return None
 
-    # Safe mode: tiny batches — parallel TCP probes can saturate QNAP network stack.
-    if settings.scan_safe_mode:
-        batch = max(1, settings.effective_scan_concurrency)
+    # Safe mode / manual: tiny batches — parallel TCP probes can saturate QNAP + starve API.
+    if settings.scan_safe_mode or manual_scan:
+        batch = max(1, settings.effective_scan_concurrency if not manual_scan else min(2, settings.effective_scan_concurrency))
         results: list[str | None] = []
         for i in range(0, len(candidates), batch):
             chunk = candidates[i : i + batch]
             results.extend(await asyncio.gather(*(probe_host(host) for host in chunk)))
-            await asyncio.sleep(settings.scan_batch_delay * 2)
+            await asyncio.sleep(settings.scan_batch_delay if settings.scan_safe_mode else 0.05)
+            await asyncio.sleep(0)
     else:
         results = await asyncio.gather(*(probe_host(host) for host in candidates))
     for host in results:
@@ -879,12 +927,13 @@ async def discover_live_hosts(
             if progress_callback and done % 20 == 0:
                 await progress_callback("ping", done, total)
 
-        if settings.scan_safe_mode:
-            batch = max(1, settings.effective_scan_concurrency)
+        if settings.scan_safe_mode or manual_scan:
+            batch = max(1, min(2, settings.effective_scan_concurrency) if manual_scan else settings.effective_scan_concurrency)
             for i in range(0, len(candidates), batch):
                 chunk = candidates[i : i + batch]
                 await asyncio.gather(*(ping_one(host) for host in chunk))
-                await asyncio.sleep(settings.scan_batch_delay * 2)
+                await asyncio.sleep(settings.scan_batch_delay if settings.scan_safe_mode else 0.05)
+                await asyncio.sleep(0)
         else:
             await asyncio.gather(*(ping_one(host) for host in candidates))
         if progress_callback:
@@ -956,12 +1005,12 @@ async def discover_live_hosts_quick(
     sem = asyncio.Semaphore(max(4, settings.effective_scan_concurrency))
 
     if extra_hosts:
-        timeout = min(settings.scan_timeout, 1.5)
         for host in extra_hosts:
             for port in EXTRA_HOST_PROBE_PORTS:
-                if tcp_port_open_sync(host, port, timeout=timeout) == "open":
+                if await _check_port_raw(host, port):
                     live.add(host)
                     break
+            await asyncio.sleep(0)
 
     if icmp_ok:
         async def ping_one(host: str) -> None:
@@ -1524,11 +1573,16 @@ async def scan_network(
         await _scan_batch_pause(done)
         if progress_callback:
             await progress_callback("ports", min(done, total), total)
+        await asyncio.sleep(0)
 
-    if settings.scan_safe_mode:
+    # Manual + safe mode: always sequential hosts so API stays responsive on /24.
+    if settings.scan_safe_mode or manual_scan:
         for host in live_hosts:
             await scan_host(host)
-            await asyncio.sleep(settings.scan_batch_delay)
+            delay = settings.scan_batch_delay if settings.scan_safe_mode else settings.manual_scan_batch_delay
+            if delay:
+                await asyncio.sleep(delay)
+            await asyncio.sleep(0)
     else:
         host_sem = asyncio.Semaphore(max(1, settings.effective_scan_concurrency))
         inter_host_delay = settings.manual_scan_batch_delay if manual_scan else 0.0
@@ -1554,10 +1608,18 @@ async def scan_network(
                 unique[(host, port)] = service
                 if service_callback:
                     await service_callback(service)
+            await asyncio.sleep(0)
 
     if progress_callback:
         await progress_callback("identify", 0, len(open_ports))
-    await asyncio.gather(*(identify(host, port) for host, port in open_ports))
+    # Identify in small batches so HTTP probes don't starve the event loop.
+    identify_batch = max(1, settings.scan_identify_concurrency)
+    for i in range(0, len(open_ports), identify_batch):
+        batch = open_ports[i : i + identify_batch]
+        await asyncio.gather(*(identify(host, port) for host, port in batch))
+        if progress_callback:
+            await progress_callback("identify", min(i + len(batch), len(open_ports)), len(open_ports))
+        await asyncio.sleep(0)
     if progress_callback:
         await progress_callback("identify", len(open_ports), len(open_ports))
 
@@ -1572,11 +1634,12 @@ async def scan_network(
             service = (
                 build_local_host_service()
                 if host == local_ip
-                else _create_host_only_service(host)
+                else await _create_host_only_service_async(host)
             )
             unique[(host, HOST_ONLY_PORT)] = service
             if service_callback:
                 await service_callback(service)
+            await asyncio.sleep(0)
 
     return list(unique.values())
 
@@ -1594,10 +1657,36 @@ async def scan_networks(
     manual_scan: bool = False,
 ) -> list[DiscoveredService]:
     unique: dict[tuple[str, int], DiscoveredService] = {}
-    scan_cidrs = expand_cidrs_for_safe_mode(cidrs, for_manual=manual_scan)
+    if manual_scan and settings.manual_scan_allow_full_cidr and settings.manual_scan_internal_chunk:
+        # Keep full user range as one job, but work /28 chunks so API stays responsive.
+        base = expand_cidrs_for_safe_mode(cidrs, for_manual=True)
+        scan_cidrs = chunk_cidrs_for_manual_work(base)
+        if len(scan_cidrs) > 1:
+            logger.info(
+                "Manual scan: splitting %s into %s work chunk(s) (/%s)",
+                format_cidr_list(base),
+                len(scan_cidrs),
+                settings.manual_scan_work_chunk_prefix,
+            )
+    else:
+        scan_cidrs = expand_cidrs_for_safe_mode(cidrs, for_manual=manual_scan)
+
+    chunk_count = len(scan_cidrs)
     for idx, cidr in enumerate(scan_cidrs):
-        if idx > 0 and settings.scan_safe_mode:
-            await asyncio.sleep(settings.scan_inter_chunk_delay)
+        if idx > 0:
+            pause = settings.scan_inter_chunk_delay if settings.scan_safe_mode else 0.5
+            await asyncio.sleep(pause)
+            await asyncio.sleep(0)
+
+        # Remap per-chunk progress onto a stable overall bar (chunk-major).
+        async def chunk_progress(phase: str, current: int, total: int, _idx=idx) -> None:
+            if not progress_callback:
+                return
+            # Encode chunk index in totals so UI % advances across the full /24.
+            overall_total = max(1, chunk_count * max(1, total))
+            overall_current = _idx * max(1, total) + min(current, max(1, total))
+            await progress_callback(phase, overall_current, overall_total)
+
         discovered = await scan_network(
             cidr,
             full_scan=full_scan,
@@ -1605,7 +1694,7 @@ async def scan_networks(
             known_hosts=known_hosts,
             host_scan_ports=host_scan_ports,
             host_only_entries=host_only_entries,
-            progress_callback=progress_callback,
+            progress_callback=chunk_progress if progress_callback else None,
             service_callback=service_callback,
             manual_scan=manual_scan,
         )
