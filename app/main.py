@@ -2189,7 +2189,7 @@ async def start_scan(
         raise HTTPException(status_code=409, detail="Skanowanie już trwa — poczekaj na zakończenie")
 
     full_scan = data.full_scan
-    # v1.3.153+: full_scan in safe mode means popular homelab ports (IPS-throttled),
+    # v1.3.154+: full_scan in safe mode means popular homelab ports (IPS-throttled),
     # not a 1-65535 sweep. Previously full_scan was forced off in safe mode.
     if full_scan and settings.scan_safe_mode:
         logger.info(

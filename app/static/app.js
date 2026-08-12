@@ -4553,7 +4553,7 @@ async function oneClickScan() {
     return;
   }
   void logScanUiAttempt(cidr, 'ui-one-click');
-  // v1.3.153: intentional „Skanuj sieć” uses popular homelab ports (IPS-throttled; not 1–65535).
+  // v1.3.154: intentional „Skanuj sieć” uses popular homelab ports (IPS-throttled; not 1–65535).
   // Advanced modal can still pick Podstawowe.
   await startScan(cidr, true, { skipConfirm: false, suppressStartToast: false });
 }

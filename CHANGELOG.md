@@ -1,11 +1,18 @@
 # Changelog
 
+## v1.3.154
+
+- **Ukierunkowany skan** — w Opcjach skanu: IP + port (+ protokół auto/http/https/tcp) → POST /api/scan/probe → fingerprint (PORT_SIGNATURES / HTTP title, np. qBittorrent) → upsert do Serwisów. Bez skanu całej sieci.
+- **Popularne porty (zalecane)** — radio Podstawowe / Popularne w modalu; jedno kliknięcie „Skanuj sieć” używa popularnych (~45: 6363, Immich, *arr, Plex/Jellyfin, HA…). Działa też przy NETDASH_SCAN_SAFE_MODE=true (IPS-friendly). **Nie** skanuje 1–65535. Stabilność skanu z v1.3.152 (chunki /28) bez zmian.
+- **NETDASH_SCAN_PORT_PROFILE** — safe | popular | ll_listed. NETDASH_SCAN_ALL_PORTS=true = ll_listed.
+- **Obraz**: ghcr.io/lobrzut/netdash:1.3.154.
+
 ## v1.3.153
 
-- **Ukierunkowany skan** — w Opcjach skanu: IP + port (+ protokół auto/http/https/tcp) → `POST /api/scan/probe` → fingerprint (PORT_SIGNATURES / HTTP title, np. qBittorrent) → upsert do Serwisów. Bez skanu całej sieci.
-- **Popularne porty (zalecane)** — radio Podstawowe / Popularne w modalu; jedno kliknięcie „Skanuj sieć” używa popularnych (~45: 6363, Immich, *arr, Plex/Jellyfin, HA…). Działa też przy `NETDASH_SCAN_SAFE_MODE=true` (IPS-friendly). **Nie** skanuje 1–65535. Stabilność skanu z v1.3.152 (chunki /28) bez zmian.
-- **NETDASH_SCAN_PORT_PROFILE** — `safe` | `popular` | `all_listed`. `NETDASH_SCAN_ALL_PORTS=true` = `all_listed`.
-- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.153`.
+- Popularne porty homelab w skanie ręcznym (działa też w safe mode / IPS-friendly).
+- NETDASH_SCAN_PORT_PROFILE=safe|popular|all_listed; SERVICE_PORTS: +6363, 2283, 5055, 8334, 51820.
+- Nie skanuje 1–65535. Pełny UI + ukierunkowany probe: **v1.3.154**.
+- **Obraz**: ghcr.io/lobrzut/netdash:1.3.153.
 
 ## v1.3.152
 

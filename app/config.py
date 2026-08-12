@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.153"
+VERSION = "1.3.154"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
     "Ukierunkowany skan — w Opcjach skanu: IP + port → sprawdź i dodaj (np. qBittorrent :6363) bez skanu całej sieci",
