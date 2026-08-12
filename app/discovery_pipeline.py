@@ -496,6 +496,94 @@ async def _resolve_discovery_cidr() -> str:
     return _pick_rotated_cidr(cidrs)
 
 
+async def run_scheduled_full_scan() -> int:
+    """One-shot scheduled scan — all /28 chunks of each CIDR sequentially (IPS-friendly)."""
+    global _known_ips, _profile, _chunk_index, _cidr_index
+
+    if _state["running"]:
+        logger.debug("Scheduled full scan skipped — discovery already running")
+        return _state.get("last_cycle_hosts") or 0
+
+    saved_chunk = _chunk_index
+    saved_cidr = _cidr_index
+    _state["running"] = True
+    _state["mode"] = "scheduled"
+    total_hosts = 0
+
+    try:
+        _profile = detect_hardware_profile()
+        profile = get_profile_config(_profile)
+        cidrs = await _resolve_discovery_cidrs()
+        _state["profile"] = profile.name
+
+        for base_cidr in cidrs:
+            try:
+                wide_net = ipaddress.ip_network(base_cidr.strip(), strict=False)
+            except ValueError:
+                continue
+            chunk_pfx = (
+                settings.auto_discovery_chunk_prefix
+                if settings.auto_discovery_always_chunk
+                else profile.chunk_prefix
+            )
+            force_chunk = settings.auto_discovery_always_chunk or profile.name == "weak"
+            if force_chunk and wide_net.prefixlen < chunk_pfx:
+                chunks = [str(c) for c in wide_net.subnets(new_prefix=chunk_pfx)]
+            else:
+                chunks = [str(wide_net)]
+
+            _state["cidr"] = base_cidr
+            _state["chunk_total"] = len(chunks)
+            for idx, cidr in enumerate(chunks):
+                _state["chunk_index"] = idx + 1
+                _state["current_tier"] = "tcp"
+                chunk_live, _ports, _svc = await _tier1_tcp_discovery(cidr, profile)
+                entries, _arp = await asyncio.to_thread(
+                    _tier2_arp_enrich, cidr, chunk_live, profile
+                )
+                if entries:
+                    async with async_session() as db:
+                        await import_discovery_hosts(
+                            db,
+                            entries,
+                            source="scheduled-tcp",
+                            source_hostname="netdash",
+                            mark_missing_offline=False,
+                        )
+                    total_hosts += len(entries)
+                await asyncio.sleep(profile.tier_delay_sec)
+
+        extra_live, extra_map, _extra_svc = await _tier0_extra_hosts(profile)
+        if extra_map:
+            async with async_session() as db:
+                await import_discovery_hosts(
+                    db,
+                    list(extra_map.values()),
+                    source="scheduled-tcp",
+                    source_hostname="netdash",
+                    mark_missing_offline=False,
+                )
+            total_hosts += len(extra_map)
+
+        _state["last_cycle_at"] = datetime.now(timezone.utc)
+        _state["last_cycle_hosts"] = total_hosts
+        _state["last_status_line"] = f"Harmonogram: {total_hosts} hostów (pełny cykl)"
+        _state["last_error"] = None
+        _state["current_tier"] = None
+        logger.info("Scheduled full scan done: %s host(s) across %s", total_hosts, cidrs)
+        return total_hosts
+    except Exception as exc:
+        _state["last_error"] = str(exc)[:256]
+        _state["current_tier"] = None
+        logger.exception("Scheduled full scan error")
+        raise
+    finally:
+        _chunk_index = saved_chunk
+        _cidr_index = saved_cidr
+        _state["running"] = False
+        _state["mode"] = "adaptive"
+
+
 async def run_discovery_cycle() -> int:
     """Single adaptive discovery cycle. Returns total host count."""
     global _known_ips, _profile

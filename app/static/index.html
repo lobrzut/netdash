@@ -522,20 +522,32 @@
         <details class="settings-accordion" open>
           <summary data-i18n="settings.tab.discovery">Automatyczne discovery</summary>
           <div class="settings-accordion-body discovery-auto-body">
-            <label class="checkbox-row" id="settings-discovery-enabled-row">
-              <input type="checkbox" id="settings-discovery-enabled" checked />
-              <span data-i18n="settings.discoveryEnabled">Automatyczne skanowanie sieci</span>
-            </label>
-            <p class="hint" id="settings-discovery-manual-hint" data-i18n="settings.discoveryManualHint">Wyłączenie zatrzymuje discovery w tle. Serwisy dodasz ręcznie: Serwisy → Dodaj.</p>
-            <p class="hint hint-warning hidden" id="settings-discovery-env-locked-hint" data-i18n="settings.discoveryEnvLocked">Wymuszone przez NETDASH_DISCOVERY_ENABLED w .env — zmiana tutaj nie ma efektu.</p>
+            <div class="field" id="settings-discovery-policy-row">
+              <label for="settings-discovery-policy" data-i18n="settings.discoveryPolicy">Polityka discovery</label>
+              <select id="settings-discovery-policy">
+                <option value="on_demand" data-i18n="settings.discoveryPolicy.onDemand">Na żądanie (zalecane)</option>
+                <option value="off" data-i18n="settings.discoveryPolicy.off">Wyłączone</option>
+                <option value="scheduled" data-i18n="settings.discoveryPolicy.scheduled">Harmonogram</option>
+                <option value="passive" data-i18n="settings.discoveryPolicy.passive">Pasywne (ARP/mDNS)</option>
+                <option value="adaptive" data-i18n="settings.discoveryPolicy.adaptive">Legacy adaptive (niezalecane z SEP)</option>
+              </select>
+              <span class="hint" data-i18n="settings.discoveryPolicyHint">Na żądanie = tylko przycisk „Skanuj sieć”. Pasywne = tablica ARP bez skanu TCP. Legacy adaptive = ciągły skan TCP w tle (może kolidować z SEP).</span>
+            </div>
+            <div class="field hidden" id="settings-discovery-schedule-row">
+              <label for="settings-discovery-schedule" data-i18n="settings.discoverySchedule">Harmonogram (UTC)</label>
+              <input type="text" id="settings-discovery-schedule" placeholder="03:00" />
+              <span class="hint" data-i18n="settings.discoveryScheduleHint">Godzina UTC (np. 03:00) lub interwał (np. 24h, 6h). Jeden pełny cykl, potem cisza.</span>
+            </div>
+            <p class="hint hint-warning hidden" id="settings-discovery-legacy-hint" data-i18n="settings.discoveryLegacyWarning">Tryb legacy adaptive skanuje sieć ciągle w tle — może wyzwalać IPS (Symantec SEP). Zalecamy „Na żądanie” lub „Pasywne”.</p>
+            <p class="hint hint-warning hidden" id="settings-discovery-env-locked-hint" data-i18n="settings.discoveryEnvLocked">Wymuszone przez NETDASH_DISCOVERY_ENABLED / NETDASH_DISCOVERY_POLICY w .env — zmiana tutaj nie ma efektu.</p>
             <div class="discovery-status-card" id="discovery-status-card" role="status">
               <p class="discovery-status-detail" id="discovery-status-detail"></p>
             </div>
-            <p class="hint discovery-arp-intro hidden" id="discovery-arp-intro" data-i18n="discovery.arpIntro"></p>
+            <p class="hint discovery-arp-intro hidden" id="discovery-arp-intro" data-i18n="discovery.passiveIntro"></p>
             <div class="field" id="settings-auto-discovery-cidr">
-              <label for="settings-scan-cidr" data-i18n="settings.autoDiscoveryCidr">Sieci automatycznego discovery (CIDR)</label>
+              <label for="settings-scan-cidr" data-i18n="settings.autoDiscoveryCidr">Sieci LAN (CIDR)</label>
               <textarea id="settings-scan-cidr" rows="3" data-i18n-placeholder="settings.autoDiscoveryCidrPlaceholder" placeholder="192.168.1.0/24&#10;192.168.10.0/24"></textarea>
-              <span class="hint" data-i18n="settings.autoDiscoveryCidrHint">Używane przez skan w tle (chunki /28, rotacja). Jedna sieć na linię lub przecinek.</span>
+              <span class="hint" data-i18n="settings.autoDiscoveryCidrHint">Używane przez skan ręczny, harmonogram i pasywne discovery. Jedna sieć na linię lub przecinek.</span>
             </div>
             <details class="discovery-install-details">
               <summary data-i18n="discovery.installHeadingOptional">Opcjonalny agent na innym hoście</summary>
@@ -563,7 +575,7 @@
               <p class="hint hint-warning" id="settings-scan-profile-weak-hint" data-i18n="settings.scanProfile.weakHardwareHint">Na słabym sprzęcie (RPi, stary PC, NAS, N100) zostaw tryb bezpieczny i mniejszy CIDR (/28 zamiast /24).</p>
             </div>
             <h3 class="settings-subheading" data-i18n="settings.manualScanHeading">Skan ręczny</h3>
-            <p class="hint" data-i18n="settings.manualScanIntro">Uruchamiany przyciskiem „Opcje skanu”. Ma twarde limity — nie zastępuje discovery w tle.</p>
+            <p class="hint" data-i18n="settings.manualScanIntro">Uruchamiany przyciskiem „Skanuj sieć” / „Opcje skanu”. To główna ścieżka przy polityce „Na żądanie” — nie wymaga skanowania w tle.</p>
             <p id="docker-scan-warning" class="hint hint-warning hidden" role="alert"></p>
             <label class="checkbox-row hidden" id="settings-full-scan-row"><input type="checkbox" id="settings-full-scan" /><span data-i18n="settings.fullScan">Pełny skan domyślnie</span></label>
             <p class="hint hidden" id="settings-full-scan-hidden-note" data-i18n="settings.scanProfile.safeFullScanNote">Pełny skan jest wyłączony dopóki NETDASH_SCAN_SAFE_MODE=true.</p>

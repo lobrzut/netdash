@@ -126,6 +126,7 @@ class AppSettings(Base):
     gptwol_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
     stale_remove_days: Mapped[int] = mapped_column(Integer, default=0)
     discovery_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    discovery_policy: Mapped[str | None] = mapped_column(String(32), nullable=True)
     discovery_last_import_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     discovery_last_import_source: Mapped[str | None] = mapped_column(String(128), nullable=True)
     discovery_last_import_hosts: Mapped[int | None] = mapped_column(Integer, nullable=True)

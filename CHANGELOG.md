@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.3.150
+
+- **Polityka discovery** — nowy model zamiast ciągłego skanowania TCP: `off`, `on_demand` (zalecane), `scheduled`, `passive` (ARP), `adaptive` (legacy). Domyślnie **`on_demand`** w `dockge/compose.yaml`: brak skanu w tle, pełny skan przez przycisk **Skanuj sieć**.
+- **Harmonogram** — `NETDASH_DISCOVERY_SCHEDULE=03:00` (UTC) lub `24h`: jeden pełny cykl IPS-friendly, potem cisza do następnego terminu.
+- **Pasywne discovery** — odczyt tablicy ARP co `NETDASH_PASSIVE_INTERVAL` (domyślnie 600 s), bez sondowania portów TCP (przyjazne Symantec SEP).
+- **UI** — Ustawienia → Automatyczne discovery: wybór polityki z opisem trade-offów; ostrzeżenie dla legacy adaptive.
+- **Legacy** — `NETDASH_DISCOVERY_MODE=adaptive` mapuje na politykę `adaptive` gdy `NETDASH_DISCOVERY_POLICY` nie ustawiony.
+- **Obraz**: `ghcr.io/lobrzut/netdash:1.3.150`.
+
 ## v1.3.149
 
 - **Tryb IPS-friendly / stealth (anty-blokada Symantec SEP)**: IPS na komputerach w LAN (np. Symantec Endpoint Protection) blokowały źródłowe IP NetDash na 600 s (`The client will block traffic from IP address … for the next 600 seconds`), bo widziały wiele **różnych** portów sondowanych na **tym samym** hoście w krótkim oknie czasu. Największym wyzwalaczem było probowanie ~190 portów usług (`SCAN_ALL_PORTS` / `AUTO_DISCOVERY_ALL_PORTS`) na jednym żywym hoście naraz.

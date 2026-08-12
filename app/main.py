@@ -29,7 +29,8 @@ from app.auth import (
     verify_password,
 )
 from app.config import BASE_DIR, BUILD_DATE, DATA_DIR, GITHUB_REPO, GHCR_IMAGE, VERSION, WHATS_NEW, settings
-from app.discovery_runtime import set_app_discovery_enabled
+from app.discovery_runtime import set_app_discovery_enabled, set_app_discovery_policy
+from app.discovery_policy import policy_env_locked
 from app.docker_update import (
     pull_and_restart,
     trigger_watchtower_update,
@@ -71,6 +72,17 @@ from app.arp_discovery import (
     run_arp_discovery_cycle,
     start_arp_discovery_scheduler,
     stop_arp_discovery_scheduler,
+)
+from app.passive_discovery import (
+    get_passive_discovery_status,
+    run_passive_discovery_cycle,
+    start_passive_discovery_scheduler,
+    stop_passive_discovery_scheduler,
+)
+from app.scheduled_discovery import (
+    get_scheduled_discovery_status,
+    start_scheduled_discovery_scheduler,
+    stop_scheduled_discovery_scheduler,
 )
 _DISCOVERY_PIPELINE_AVAILABLE = True
 try:
@@ -268,6 +280,7 @@ def _migrate_db(sync_conn):
             ("gptwol_url", "VARCHAR(256)"),
             ("stale_remove_days", "INTEGER DEFAULT 0"),
             ("discovery_enabled", "BOOLEAN DEFAULT 1"),
+            ("discovery_policy", "VARCHAR(32)"),
             ("discovery_last_import_at", "DATETIME"),
             ("discovery_last_import_source", "VARCHAR(128)"),
             ("discovery_last_import_hosts", "INTEGER"),
@@ -323,29 +336,38 @@ async def _get_or_create_settings(db: AsyncSession) -> AppSettings:
 
 def _sync_discovery_runtime_from_db(app_settings: AppSettings) -> None:
     set_app_discovery_enabled(app_settings.discovery_enabled)
+    set_app_discovery_policy(app_settings.discovery_policy)
 
 
 def _settings_to_out(app_settings: AppSettings) -> AppSettingsOut:
     out = AppSettingsOut.model_validate(app_settings)
+    policy = settings.effective_discovery_policy
     return out.model_copy(
         update={
             "discovery_env_locked": settings.discovery_env_locked,
             "discovery_effective": settings.effective_discovery_enabled,
+            "discovery_policy_effective": policy,
+            "discovery_policy_legacy": policy == "adaptive",
         }
     )
 
 
 async def _apply_discovery_schedulers() -> None:
     """Start/stop background discovery after a runtime settings change (no restart)."""
+    await stop_discovery_scheduler()
+    await stop_arp_discovery_scheduler()
+    await stop_passive_discovery_scheduler()
+    await stop_scheduled_discovery_scheduler()
     if not settings.effective_discovery_enabled:
-        await stop_discovery_scheduler()
-        await stop_arp_discovery_scheduler()
         return
-    if settings.adaptive_discovery_enabled:
-        await stop_arp_discovery_scheduler()
+    policy = settings.effective_discovery_policy
+    if policy == "adaptive":
         start_discovery_scheduler()
-    elif settings.arp_discovery_enabled:
-        await stop_discovery_scheduler()
+    elif policy == "passive":
+        start_passive_discovery_scheduler()
+    elif policy == "scheduled":
+        start_scheduled_discovery_scheduler()
+    elif policy == "arp" or settings.arp_discovery_enabled:
         start_arp_discovery_scheduler()
 
 
@@ -665,11 +687,17 @@ async def lifespan(app: FastAPI):
                 "discovery_pipeline missing — falling back to ARP discovery scheduler (upgrade image for adaptive mode)"
             )
             start_arp_discovery_scheduler()
+    elif settings.scheduled_discovery_enabled:
+        start_scheduled_discovery_scheduler()
+    elif settings.passive_discovery_enabled:
+        start_passive_discovery_scheduler()
     elif settings.arp_discovery_enabled:
         start_arp_discovery_scheduler()
     yield
     await stop_discovery_scheduler()
     await stop_arp_discovery_scheduler()
+    await stop_passive_discovery_scheduler()
+    await stop_scheduled_discovery_scheduler()
     if health_task:
         health_task.cancel()
         try:
@@ -746,6 +774,9 @@ async def health(db: AsyncSession = Depends(get_db)):
         "startup_enrich_enabled": settings.effective_startup_enrich_enabled,
         "weak_dual_chunk": settings.weak_dual_chunk,
         "discovery_mode": settings.effective_discovery_mode,
+        "discovery_policy": settings.effective_discovery_policy,
+        "discovery_schedule": settings.discovery_schedule,
+        "passive_interval": settings.passive_interval,
         "resource_profile": settings.resource_profile,
         "scan_safe_min_prefix": settings.scan_safe_min_prefix,
         "scan_max_hosts": settings.effective_scan_max_hosts,
@@ -759,6 +790,8 @@ async def health(db: AsyncSession = Depends(get_db)):
         "discovery_last_import_hosts": app_settings.discovery_last_import_hosts,
         "adaptive_discovery": get_discovery_pipeline_status() if settings.adaptive_discovery_enabled else None,
         "arp_discovery": get_arp_discovery_status() if settings.arp_discovery_enabled else None,
+        "passive_discovery": get_passive_discovery_status() if settings.passive_discovery_enabled else None,
+        "scheduled_discovery": get_scheduled_discovery_status() if settings.scheduled_discovery_enabled else None,
     }
 
 
@@ -910,7 +943,9 @@ async def network_info(
     env_cidr = settings.scan_cidr.strip() if settings.scan_cidr else None
     adaptive = get_discovery_pipeline_status() if settings.adaptive_discovery_enabled else None
     arp = get_arp_discovery_status() if settings.arp_discovery_enabled else None
-    auto_status = adaptive or arp
+    passive = get_passive_discovery_status() if settings.passive_discovery_enabled else None
+    scheduled = get_scheduled_discovery_status() if settings.scheduled_discovery_enabled else None
+    auto_status = adaptive or passive or scheduled or arp
     return NetworkInfo(
         local_network=get_local_network(),
         local_ip=get_local_ip(),
@@ -921,6 +956,7 @@ async def network_info(
         scan_disabled=settings.scan_disabled,
         discovery_enabled=settings.effective_discovery_enabled,
         discovery_mode=settings.effective_discovery_mode,
+        discovery_policy=settings.effective_discovery_policy,
         resource_profile=settings.resource_profile,
         detected_cidrs=get_detected_cidrs(app_settings.scan_cidr_default),
         env_scan_cidr=env_cidr,
@@ -960,7 +996,28 @@ async def _build_network_diagnostics(db: AsyncSession) -> NetworkDiagnostics:
     settings_cidr = app_settings.scan_cidr_default or None
     scan_ready = bool(resolved) and (not docker_br or bool(env_cidr or settings_cidr))
     hints: list[str] = []
-    if settings.adaptive_discovery_enabled:
+    policy = settings.effective_discovery_policy
+    if policy == "on_demand":
+        hints.append(
+            "Discovery na żądanie — użyj Serwisy → Skanuj sieć. Brak skanowania TCP w tle."
+        )
+    elif policy == "off":
+        hints.append("Discovery wyłączone — dodawaj serwisy ręcznie lub uruchom skan ręczny.")
+    elif settings.scheduled_discovery_enabled:
+        sched = get_scheduled_discovery_status()
+        if sched.get("last_status_line"):
+            hints.append(f"Discovery harmonogram — {sched['last_status_line']}")
+        elif sched.get("next_run_at"):
+            hints.append(f"Discovery harmonogram — następny skan: {sched['next_run_at']}")
+        else:
+            hints.append("Discovery harmonogram — pierwszy skan po starcie.")
+    elif settings.passive_discovery_enabled:
+        passive = get_passive_discovery_status()
+        if passive.get("last_status_line"):
+            hints.append(passive["last_status_line"])
+        else:
+            hints.append("Discovery pasywne (ARP) — pierwszy odczyt tablicy ARP w toku.")
+    elif settings.adaptive_discovery_enabled:
         disc = get_discovery_pipeline_status()
         line = disc.get("last_status_line")
         if line:
@@ -1049,9 +1106,16 @@ async def update_settings(
         updates["custom_css"] = _sanitize_custom_css(updates["custom_css"])
     if "discovery_enabled" in updates and settings.discovery_env_locked:
         updates.pop("discovery_enabled")
-    discovery_changed = "discovery_enabled" in updates
+    if "discovery_policy" in updates and policy_env_locked():
+        updates.pop("discovery_policy")
+    discovery_changed = "discovery_enabled" in updates or "discovery_policy" in updates
     for field, value in updates.items():
         setattr(app_settings, field, value)
+    if "discovery_policy" in updates:
+        policy = updates["discovery_policy"]
+        from app.discovery_policy import policy_runs_background
+
+        app_settings.discovery_enabled = bool(policy and policy_runs_background(policy))
     await db.commit()
     await db.refresh(app_settings)
     if discovery_changed:
@@ -2249,9 +2313,31 @@ async def trigger_discovery_cycle(_: User = Depends(get_current_user)):
 async def discovery_status(_: User = Depends(get_current_user)):
     if settings.adaptive_discovery_enabled:
         return get_discovery_pipeline_status()
+    if settings.scheduled_discovery_enabled:
+        return get_scheduled_discovery_status()
+    if settings.passive_discovery_enabled:
+        return get_passive_discovery_status()
     if settings.arp_discovery_enabled:
         return get_arp_discovery_status()
-    return {"enabled": False, "mode": settings.effective_discovery_mode}
+    return {
+        "enabled": False,
+        "mode": settings.effective_discovery_mode,
+        "policy": settings.effective_discovery_policy,
+    }
+
+
+@app.post("/api/discovery/passive-cycle")
+async def trigger_passive_discovery_cycle(_: User = Depends(get_current_user)):
+    if settings.effective_discovery_policy != "passive" and not settings.passive_discovery_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Pasywne discovery nieaktywne — ustaw politykę discovery na „Pasywne”",
+        )
+    try:
+        count = await run_passive_discovery_cycle()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"ok": True, "hosts": count, **get_passive_discovery_status()}
 
 
 @app.post("/api/discovery/arp-cycle")

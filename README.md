@@ -223,19 +223,37 @@ Shortcuts: Windows `.\start.ps1`, Linux `./start.sh`.
 
 ## Network scanning
 
-NetDash has **two scan modes**:
+NetDash supports **discovery policies** (Settings → Automatic discovery or env). Recommended for homelabs with Symantec SEP / endpoint IPS: **`on_demand`** — no background TCP; use **Scan network** when you want a full scan.
 
-| Mode | Trigger | Purpose |
-|------|---------|---------|
-| **Automatic discovery** | Background (`NETDASH_DISCOVERY_MODE=adaptive`) | Low-priority, throttled scan from **Settings → Automatic discovery** (or `NETDASH_SCAN_CIDR`). Rotates `/28` chunks; optional gradual all-port probe via `NETDASH_AUTO_DISCOVERY_ALL_PORTS` (off by default on 2 GB VMs). Disable entirely with `NETDASH_DISCOVERY_ENABLED=false`. |
-| **Manual scan** | **Scan options** button | On-demand CIDR scan. Hard limits (`NETDASH_MANUAL_SCAN_MAX_HOSTS`, max `/24`). Optional `NETDASH_SCAN_ALL_PORTS=true` for full port list. **Stop** button cancels the job. |
+| Policy | Background | Best for |
+|--------|------------|----------|
+| **`on_demand`** (default in Dockge) | None | Homelab with SEP — manual **Scan network** only |
+| **`off`** | None | Dashboard-only; add services manually |
+| **`passive`** | ARP table read every ~10 min | Light device list without TCP port sweep |
+| **`scheduled`** | One full IPS-friendly cycle at `03:00` UTC or every `24h` | Nightly inventory without continuous load |
+| **`adaptive`** (legacy) | Continuous TCP in `/28` chunks | Old behaviour; may trigger SEP blocks |
+
+**Manual scan** (Scan network / Scan options) always works when local scan is not disabled (`NETDASH_SCAN_DISABLED`). Hard limits apply (`NETDASH_MANUAL_SCAN_MAX_HOSTS`, max `/24`). **Stop** cancels the job.
 
 1. Sign in.
-2. For manual scan: click **Scan options**, pick a CIDR (e.g. `192.168.1.144/28`), confirm.
-3. For automatic discovery: set CIDR in **Settings → Automatic discovery** and ensure `NETDASH_DISCOVERY_MODE=adaptive` (default in `dockge/compose.yaml`).
-4. Services appear in real time.
+2. Set **Settings → Automatic discovery → Policy** to **On demand** (recommended).
+3. Set LAN CIDR: `NETDASH_SCAN_CIDR=192.168.1.0/24` or Settings → Automatic discovery.
+4. Click **Scan network** when you want to discover services.
 
-> **Docker note:** without `network_mode: host`, the container scans its own bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/macOS, disable host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings → Automatic discovery.
+> **Docker note:** without `network_mode: host`, the container scans its own bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/macOS, disable host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings.
+
+### Recommended homelab config (192.168.1.0/24, SEP on Windows)
+
+```env
+NETDASH_SCAN_CIDR=192.168.1.0/24
+NETDASH_DISCOVERY_POLICY=on_demand
+NETDASH_DISCOVERY_ENABLED=false
+NETDASH_IPS_FRIENDLY=true
+NETDASH_SCAN_SAFE_MODE=true
+NETDASH_AUTO_DISCOVERY_ALL_PORTS=false
+```
+
+Use **Scan network** weekly or after adding devices. For automatic host list without TCP, use `NETDASH_DISCOVERY_POLICY=passive` and `NETDASH_DISCOVERY_ENABLED=true`. Avoid **`adaptive`** on SEP-protected VLANs.
 
 ### IPS-friendly scanning (Symantec SEP / endpoint IPS)
 
@@ -260,11 +278,11 @@ NetDash is designed to run on low-resource homelab hardware. A **2 GB Proxmox VM
 | Problem | Recommendation |
 |---------|----------------|
 | Host becomes unstable during scans | Keep safe mode enabled; use **automatic discovery** (chunked `/28`) instead of manual `/24` |
-| Need full LAN coverage | Set `NETDASH_SCAN_CIDR=192.168.1.0/24` and `NETDASH_DISCOVERY_MODE=adaptive` — background scan covers the /24 over time |
+| Need full LAN coverage | `NETDASH_DISCOVERY_POLICY=scheduled` (nightly) or manual **Scan network** with `/24` |
 | Manual scan on strong hardware | Keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs; use `/28` manual scans or accept confirmation for `/24` |
-| Scans are too slow on strong hardware | Tune `NETDASH_DISCOVERY_INTERVAL` or `NETDASH_DISCOVERY_PROFILE=strong` — do not disable chunking on weak hosts |
-| Full port scan needed | `NETDASH_AUTO_DISCOVERY_ALL_PORTS=true` (auto, gradual — 4 GB+ VM) or `NETDASH_SCAN_ALL_PORTS=true` (manual only) |
-| Discovery overloads weak host | `NETDASH_DISCOVERY_ENABLED=false` or use ultra-safe profile in `.env.example` |
+| Scans are too slow on strong hardware | Use **scheduled** or manual scan; avoid legacy **`adaptive`** on SEP VLANs |
+| Full port scan needed | `NETDASH_SCAN_ALL_PORTS=true` (manual only) on 4 GB+ VM |
+| Discovery overloads weak host | `NETDASH_DISCOVERY_POLICY=on_demand` or `off` |
 | Symantec SEP / IPS blocks NetDash IP | IPS-friendly mode is on by default; increase `NETDASH_PORTS_PER_HOST_DELAY` (e.g. `0.6`–`1.0`) |
 | Health checks consume too many resources | Increase health-check interval (for example 120s) or disable it |
 | Stale offline services clutter the list | Enable auto-remove in **Settings → Scanning** or set `NETDASH_STALE_REMOVE_DAYS=7` |
@@ -346,8 +364,11 @@ sudo systemctl enable --now netdash
 | `NETDASH_DEFAULT_ADMIN_PASSWORD` | Admin password from env (`changeme` by default — change after first login) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | Sync admin password from env on every start (`true` by default; set to `false` after changing in UI) |
 | `NETDASH_SCAN_CIDR` | Networks for automatic discovery (and Docker bridge LAN override) |
-| `NETDASH_DISCOVERY_ENABLED` | Master switch for background TCP discovery (`false` by default in Dockge compose); UI toggle in **Settings → Automatic discovery** when env is not locked |
-| `NETDASH_DISCOVERY_MODE` | `adaptive` (background TCP discovery), `arp`, `local`, or `remote` |
+| `NETDASH_DISCOVERY_POLICY` | **`on_demand`** (recommended), `off`, `scheduled`, `passive`, or legacy `adaptive` |
+| `NETDASH_DISCOVERY_SCHEDULE` | For `scheduled`: `03:00` (daily UTC) or `24h` / `6h` interval |
+| `NETDASH_PASSIVE_INTERVAL` | Seconds between passive ARP reads (default `600`) |
+| `NETDASH_DISCOVERY_ENABLED` | Master switch for background policies (`scheduled`, `passive`, `adaptive`); off for `on_demand` |
+| `NETDASH_DISCOVERY_MODE` | Legacy — mapped to policy when `NETDASH_DISCOVERY_POLICY` unset |
 | `NETDASH_SCAN_SAFE_MODE` | Safe manual scan limits (`true` by default) |
 | `NETDASH_SCAN_ALL_PORTS` | Deep-probe live hosts on ~190 service ports during **manual** scan (`false` by default) |
 | `NETDASH_AUTO_DISCOVERY_ALL_PORTS` | Gradual ~190-port probe on live hosts in auto mode (`false` by default on 2 GB VMs) |

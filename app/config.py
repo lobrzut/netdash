@@ -6,9 +6,12 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.149"
+VERSION = "1.3.150"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Polityka discovery — off / na żądanie (zalecane) / harmonogram / pasywne ARP / legacy adaptive. Domyślnie na żądanie: skan ręczny „Skanuj sieć”, bez ciągłego TCP w tle",
+    "Harmonogram — jeden pełny cykl IPS-friendly dziennie (NETDASH_DISCOVERY_SCHEDULE=03:00) lub co N godzin",
+    "Pasywne discovery — odczyt tablicy ARP co ~10 min, bez skanu portów (przyjazne SEP)",
     "Tryb IPS-friendly (stealth) — skan rozkłada porty jednego hosta w czasie (1 port/raz, losowa kolejność, odstęp z jitterem), więc nie wyzwala blokad IPS/Symantec SEP („blokuje ruch z IP…”). Domyślnie włączony: NETDASH_IPS_FRIENDLY, NETDASH_PORTS_PER_HOST_DELAY, NETDASH_PORT_PARALLEL_PER_HOST",
     "Ustawienia → Automatyczne discovery — przełącznik wyłączenia skanowania w tle (ręczne dodawanie serwisów nadal działa)",
     "Kafelek Brain — link „Otwórz dashboard” (URL z ustawień statystyk, widoczny gdy Brain online)",
@@ -167,6 +170,12 @@ class Settings(BaseSettings):
     # local = manual TCP scan; adaptive = tiered ping→ARP→ports (default QNAP);
     # arp = legacy background arp-scan; remote = deploy/agent
     discovery_mode: str = "local"
+    # Primary discovery policy (preferred over discovery_mode): off | on_demand | scheduled | passive | adaptive
+    discovery_policy: str | None = None
+    # Scheduled mode: daily time UTC (03:00) or interval (24h, 6h)
+    discovery_schedule: str = "03:00"
+    # Passive mode: seconds between ARP table reads (default 10 min)
+    passive_interval: int = 600
     # Hardware profile for adaptive discovery: auto|weak|normal|strong
     discovery_profile: str = "auto"
     # Override adaptive cycle interval (seconds); profile default if unset
@@ -402,6 +411,29 @@ class Settings(BaseSettings):
             return "local"
         mode = str(v).strip().lower()
         return mode if mode in ("local", "remote", "arp", "adaptive") else "local"
+
+    @field_validator("discovery_policy", mode="before")
+    @classmethod
+    def _discovery_policy(cls, v: object) -> str | None:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        from app.discovery_policy import normalize_policy
+
+        return normalize_policy(str(v))
+
+    @field_validator("discovery_schedule", mode="before")
+    @classmethod
+    def _discovery_schedule(cls, v: object) -> str:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "03:00"
+        return str(v).strip()
+
+    @field_validator("passive_interval", mode="before")
+    @classmethod
+    def _passive_interval(cls, v: object) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 600
+        return max(300, int(v))
 
     @field_validator("discovery_profile", mode="before")
     @classmethod
@@ -648,13 +680,34 @@ class Settings(BaseSettings):
     def effective_discovery_mode(self) -> str:
         if self.scan_disabled:
             return "remote"
+        policy = self.effective_discovery_policy
+        if policy == "adaptive":
+            return "adaptive"
+        if policy == "passive":
+            return "arp"
+        if policy in ("off", "on_demand", "scheduled"):
+            return "local"
         return self.discovery_mode
 
     @property
+    def effective_discovery_policy(self) -> str:
+        from app.discovery_policy import resolve_discovery_policy
+        from app.discovery_runtime import get_app_discovery_policy
+
+        policy = resolve_discovery_policy(get_app_discovery_policy())
+        if policy == "off":
+            return "off"
+        if not self.effective_discovery_enabled and policy in ("scheduled", "passive", "adaptive"):
+            return "off"
+        return policy
+
+    @property
     def discovery_env_locked(self) -> bool:
-        """True when NETDASH_DISCOVERY_ENABLED is set — UI toggle cannot override."""
+        """True when NETDASH_DISCOVERY_ENABLED or NETDASH_DISCOVERY_POLICY is set in env."""
+        from app.discovery_policy import policy_env_locked
+
         raw = os.environ.get("NETDASH_DISCOVERY_ENABLED")
-        return raw is not None and bool(str(raw).strip())
+        return (raw is not None and bool(str(raw).strip())) or policy_env_locked()
 
     @property
     def effective_discovery_enabled(self) -> bool:
@@ -686,7 +739,7 @@ class Settings(BaseSettings):
         return (
             self.effective_discovery_enabled
             and not self.scan_disabled
-            and self.discovery_mode == "adaptive"
+            and self.effective_discovery_policy == "adaptive"
         )
 
     @property
@@ -695,11 +748,37 @@ class Settings(BaseSettings):
             self.effective_discovery_enabled
             and not self.scan_disabled
             and self.discovery_mode == "arp"
+            and self.effective_discovery_policy not in ("passive", "scheduled", "on_demand", "off")
         )
 
     @property
+    def passive_discovery_enabled(self) -> bool:
+        return (
+            self.effective_discovery_enabled
+            and not self.scan_disabled
+            and self.effective_discovery_policy == "passive"
+        )
+
+    @property
+    def scheduled_discovery_enabled(self) -> bool:
+        return (
+            self.effective_discovery_enabled
+            and not self.scan_disabled
+            and self.effective_discovery_policy == "scheduled"
+        )
+
+    @property
+    def on_demand_discovery(self) -> bool:
+        return self.effective_discovery_policy == "on_demand"
+
+    @property
     def auto_discovery_enabled(self) -> bool:
-        return self.adaptive_discovery_enabled or self.arp_discovery_enabled
+        return (
+            self.adaptive_discovery_enabled
+            or self.arp_discovery_enabled
+            or self.passive_discovery_enabled
+            or self.scheduled_discovery_enabled
+        )
 
     @property
     def effective_startup_health_defer(self) -> bool:

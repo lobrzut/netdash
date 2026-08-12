@@ -1109,6 +1109,8 @@ const DEFAULT_NETWORK = Object.freeze({
   discovery_last_import_source: null,
   discovery_last_import_hosts: null,
   discovery_mode: 'local',
+  discovery_policy: 'on_demand',
+  discovery_policy_effective: 'on_demand',
   discovery_profile: null,
   discovery_status_line: null,
   discovery_current_tier: null,
@@ -1120,20 +1122,46 @@ const DEFAULT_NETWORK = Object.freeze({
 
 const DISCOVERY_STALE_MS = 20 * 60 * 1000;
 
+function getDiscoveryPolicy(netRes, settings) {
+  return (
+    settings?.discovery_policy_effective
+    || settings?.discovery_policy
+    || resolveNetwork(netRes)?.discovery_policy
+    || resolveNetwork(netRes)?.discovery_mode
+    || 'on_demand'
+  );
+}
+
+function isDiscoveryPolicyOff(netRes, settings) {
+  return getDiscoveryPolicy(netRes, settings) === 'off';
+}
+
+function isOnDemandDiscovery(netRes, settings) {
+  return getDiscoveryPolicy(netRes, settings) === 'on_demand';
+}
+
+function isPassiveDiscovery(netRes, settings) {
+  return getDiscoveryPolicy(netRes, settings) === 'passive';
+}
+
+function isScheduledDiscovery(netRes, settings) {
+  return getDiscoveryPolicy(netRes, settings) === 'scheduled';
+}
+
 function isDiscoveryEnabled() {
-  return appSettings?.discovery_enabled !== false;
+  return !isDiscoveryPolicyOff(window.__netdashNetwork, appSettings);
 }
 
 function isAdaptiveDiscovery(netRes) {
-  if (!isDiscoveryEnabled()) return false;
   const net = resolveNetwork(netRes);
-  return net.discovery_mode === 'adaptive' && net.scan_disabled !== true;
+  if (net.scan_disabled === true) return false;
+  return getDiscoveryPolicy(netRes, appSettings) === 'adaptive';
 }
 
 function isArpDiscovery(netRes) {
-  if (!isDiscoveryEnabled()) return false;
   const net = resolveNetwork(netRes);
-  return net.discovery_mode === 'arp' && net.scan_disabled !== true;
+  if (net.scan_disabled === true) return false;
+  return getDiscoveryPolicy(netRes, appSettings) === 'passive' || net.discovery_mode === 'arp';
 }
 
 function isRemoteDiscovery(netRes) {
@@ -1142,8 +1170,13 @@ function isRemoteDiscovery(netRes) {
 }
 
 function isAutoDiscovery(netRes) {
-  if (!isDiscoveryEnabled()) return false;
-  return isAdaptiveDiscovery(netRes) || isArpDiscovery(netRes) || isRemoteDiscovery(netRes);
+  if (isRemoteDiscovery(netRes)) return false;
+  const policy = getDiscoveryPolicy(netRes, appSettings);
+  return policy === 'adaptive' || policy === 'passive' || policy === 'scheduled';
+}
+
+function isBackgroundDiscovery(netRes) {
+  return isAutoDiscovery(netRes);
 }
 
 function isWeakDiscoveryProfile(netRes) {
@@ -1189,11 +1222,12 @@ function getArpDiscoveryMeta(netRes) {
 }
 
 function formatDiscoveryStatusLine(netRes, settings) {
+  const policy = getDiscoveryPolicy(netRes, settings);
+  if (policy === 'off') return t('discovery.offHint');
+  if (policy === 'on_demand') return t('discovery.onDemandHint');
   if (isAdaptiveDiscovery(netRes)) {
     const net = resolveNetwork(netRes);
-    if (net.discovery_status_line) {
-      return net.discovery_status_line;
-    }
+    if (net.discovery_status_line) return net.discovery_status_line;
     if (net.discovery_current_tier) {
       return t('discovery.tcpRunning', {
         tier: net.discovery_current_tier,
@@ -1202,21 +1236,36 @@ function formatDiscoveryStatusLine(netRes, settings) {
     }
     return t('discovery.tcpWaiting');
   }
+  if (isPassiveDiscovery(netRes, settings)) {
+    const { when, hosts } = getArpDiscoveryMeta(netRes);
+    if (!when) return t('discovery.passiveWaiting');
+    return t('discovery.passiveStatusLine', {
+      ago: formatRelativeAgo(when),
+      count: hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : 0,
+    });
+  }
+  if (isScheduledDiscovery(netRes, settings)) {
+    const { when, hosts } = getArpDiscoveryMeta(netRes);
+    if (!when) return t('discovery.scheduledWaiting');
+    return t('discovery.scheduledStatusLine', {
+      ago: formatRelativeAgo(when),
+      count: hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : 0,
+    });
+  }
   if (isArpDiscovery(netRes)) {
     const { when, hosts } = getArpDiscoveryMeta(netRes);
     if (!when) return t('discovery.arpWaiting');
-    const ago = formatRelativeAgo(when);
-    const count = hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : 0;
-    return t('discovery.arpStatusLine', { ago, count });
+    return t('discovery.arpStatusLine', {
+      ago: formatRelativeAgo(when),
+      count: hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : 0,
+    });
   }
   const { when, source, hosts } = getDiscoveryMeta(netRes, settings);
   if (!when) return t('discovery.waiting');
   const ago = formatRelativeAgo(when);
   const src = source || 'agent';
   const count = hosts != null && !Number.isNaN(Number(hosts)) ? Number(hosts) : null;
-  if (count != null) {
-    return t('discovery.statusLine', { ago, source: src, count });
-  }
+  if (count != null) return t('discovery.statusLine', { ago, source: src, count });
   return t('discovery.statusLineNoCount', { ago, source: src });
 }
 
@@ -1253,36 +1302,31 @@ function updateDiscoverySettingsPanel(netRes, settings) {
   const cmd = $('#discovery-install-cmd');
   const card = $('#discovery-status-card');
   const arpIntro = $('#discovery-arp-intro');
-  const discoveryOff = !isDiscoveryEnabled();
-  $('#settings-discovery-enabled')?.toggleAttribute('disabled', !!settings?.discovery_env_locked);
-  $('#settings-discovery-env-locked-hint')?.classList.toggle('hidden', !settings?.discovery_env_locked);
-  $('#settings-auto-discovery-cidr')?.classList.toggle('hidden', discoveryOff || isRemoteDiscovery(netRes));
-  if (discoveryOff) {
-    if (detail) detail.textContent = t('settings.discoveryDisabledStatus');
-    if (arpIntro) arpIntro.classList.add('hidden');
-    if (card) card.classList.remove('discovery-status-card--ok');
-    return;
-  }
-  if (!isAutoDiscovery(netRes)) return;
-  const line = formatDiscoveryStatusLine(netRes, settings);
-  if (detail) detail.textContent = line;
+  const policy = getDiscoveryPolicy(netRes, settings);
+  const envLocked = !!settings?.discovery_env_locked;
+  $('#settings-discovery-policy')?.toggleAttribute('disabled', envLocked);
+  $('#settings-discovery-env-locked-hint')?.classList.toggle('hidden', !envLocked);
+  $('#settings-discovery-legacy-hint')?.classList.toggle('hidden', policy !== 'adaptive');
+  $('#settings-discovery-schedule-row')?.classList.toggle('hidden', policy !== 'scheduled');
+  $('#settings-auto-discovery-cidr')?.classList.toggle('hidden', isRemoteDiscovery(netRes));
+  if (detail) detail.textContent = formatDiscoveryStatusLine(netRes, settings);
   if (cmd) cmd.textContent = buildDiscoveryInstallCommand();
   if (arpIntro) {
-    if (isAdaptiveDiscovery(netRes)) {
+    if (policy === 'adaptive') {
       arpIntro.textContent = t('discovery.adaptiveIntro');
       arpIntro.classList.remove('hidden');
-    } else if (isArpDiscovery(netRes)) {
-      arpIntro.textContent = t('discovery.arpIntro');
+    } else if (policy === 'passive') {
+      arpIntro.textContent = t('discovery.passiveIntro');
       arpIntro.classList.remove('hidden');
     } else {
       arpIntro.classList.add('hidden');
     }
   }
   if (card) {
-    const when = isArpDiscovery(netRes)
+    const when = isBackgroundDiscovery(netRes)
       ? getArpDiscoveryMeta(netRes).when
       : getDiscoveryMeta(netRes, settings).when;
-    card.classList.toggle('discovery-status-card--ok', !!when);
+    card.classList.toggle('discovery-status-card--ok', !!when || policy === 'on_demand');
   }
 }
 
@@ -1320,13 +1364,12 @@ function updateScanButtonsState(netRes) {
   const manual = canUseManualScan(netRes);
   $('#settings-remote-discovery-hint')?.classList.toggle('hidden', !remote);
   $('#settings-adaptive-scan-hint')?.classList.toggle('hidden', !adaptive);
-  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp || adaptive);
+  $('#settings-arp-discovery-hint')?.classList.toggle('hidden', !arp || adaptive || isPassiveDiscovery(netRes, appSettings));
   $('#settings-manual-scan-advanced')?.classList.toggle('hidden', !manual);
   $('#settings-auto-discovery-cidr')?.classList.toggle('hidden', remote);
   $('.scan-test-row')?.classList.toggle('hidden', adaptive);
-  $('#settings-full-scan-row')?.classList.toggle('hidden', !!netRes?.scan_safe_mode);
-  $('#settings-scan-profile-card')?.classList.toggle('hidden', remote || adaptive);
-  $('#settings-scan-profile-weak-hint')?.classList.toggle('hidden', remote || adaptive);
+  $('#settings-scan-profile-card')?.classList.toggle('hidden', remote);
+  $('#settings-scan-profile-weak-hint')?.classList.toggle('hidden', remote);
   if (adaptive) {
     const adaptiveHint = $('#settings-adaptive-scan-hint');
     if (adaptiveHint) adaptiveHint.textContent = t('discovery.adaptiveModeHint');
@@ -4678,7 +4721,8 @@ function readSettingsFromForm() {
     stale_remove_days: $('#settings-stale-enabled').checked
       ? Math.max(1, parseInt($('#settings-stale-days').value, 10) || 7)
       : 0,
-    discovery_enabled: $('#settings-discovery-enabled').checked,
+    discovery_policy: $('#settings-discovery-policy')?.value || 'on_demand',
+    discovery_enabled: ['scheduled', 'passive', 'adaptive'].includes($('#settings-discovery-policy')?.value),
     wol_broadcast_ip: $('#settings-wol-broadcast').value.trim() || '255.255.255.255',
     wol_port: parseInt($('#settings-wol-port').value, 10) || 9,
     sol_port: parseInt($('#settings-sol-port').value, 10) || 9,
@@ -4720,12 +4764,15 @@ function fillSettingsForm() {
   $('#settings-author-url').value = appSettings.author_url || '';
   $('#settings-about-project').value = appSettings.about_project || '';
   $('#settings-scan-cidr').value = appSettings.scan_cidr_default || '';
-  const discoveryOn = appSettings.discovery_env_locked
-    ? appSettings.discovery_effective !== false
-    : appSettings.discovery_enabled !== false;
-  $('#settings-discovery-enabled').checked = discoveryOn;
-  $('#settings-discovery-enabled')?.toggleAttribute('disabled', !!appSettings.discovery_env_locked);
+  const policy = appSettings.discovery_policy_effective
+    || appSettings.discovery_policy
+    || 'on_demand';
+  const policyEl = $('#settings-discovery-policy');
+  if (policyEl) policyEl.value = policy;
+  $('#settings-discovery-policy')?.toggleAttribute('disabled', !!appSettings.discovery_env_locked);
   $('#settings-discovery-env-locked-hint')?.classList.toggle('hidden', !appSettings.discovery_env_locked);
+  $('#settings-discovery-legacy-hint')?.classList.toggle('hidden', policy !== 'adaptive');
+  $('#settings-discovery-schedule-row')?.classList.toggle('hidden', policy !== 'scheduled');
   updateDockerScanWarning(window.__netdashNetwork, appSettings);
   updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
   updateScanProfileUI(window.__netdashNetwork, appSettings);
@@ -4777,8 +4824,16 @@ $('#settings-stale-enabled')?.addEventListener('change', (e) => {
   }
 });
 
-$('#settings-discovery-enabled')?.addEventListener('change', () => {
-  appSettings = { ...appSettings, discovery_enabled: $('#settings-discovery-enabled').checked };
+$('#settings-discovery-policy')?.addEventListener('change', () => {
+  const policy = $('#settings-discovery-policy')?.value || 'on_demand';
+  appSettings = {
+    ...appSettings,
+    discovery_policy: policy,
+    discovery_policy_effective: policy,
+    discovery_enabled: ['scheduled', 'passive', 'adaptive'].includes(policy),
+  };
+  $('#settings-discovery-legacy-hint')?.classList.toggle('hidden', policy !== 'adaptive');
+  $('#settings-discovery-schedule-row')?.classList.toggle('hidden', policy !== 'scheduled');
   updateDiscoverySettingsPanel(window.__netdashNetwork, appSettings);
   updateDiscoveryStatusBar(window.__netdashNetwork, appSettings);
   updateRemoteDiscoveryUI(window.__netdashNetwork, appSettings);
