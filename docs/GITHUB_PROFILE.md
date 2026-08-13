@@ -35,7 +35,7 @@ I build self-hosted tools: dashboards, automation, network utilities.
 
 | Repo | Description |
 |------|-------------|
-| [**NetDash**](https://github.com/lobrzut/netdash) | Homelab dashboard with **automatic LAN service discovery** (Homer alternative) |
+| [**NetDash**](https://github.com/lobrzut/netdash) | Homelab dashboard like Homer/Homepage, with **optional on-demand** LAN discovery |
 | [DjangoAppAK](https://github.com/lobrzut/DjangoAppAK) | Django capstone project |
 | ToDoK / ToDoReact / ToDoAndroid | Todo apps — Kotlin, React, Android |
 

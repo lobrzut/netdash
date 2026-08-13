@@ -14,19 +14,21 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 512M
           cpus: "1.0"
     network_mode: host
     env_file: .env
     environment:
       NETDASH_BUILD_DATE: ${NETDASH_BUILD_DATE:-}
       NETDASH_LISTEN_PORT: "18787"
+      NETDASH_DISCOVERY_POLICY: ${NETDASH_DISCOVERY_POLICY:-on_demand}
+      NETDASH_DISCOVERY_ENABLED: ${NETDASH_DISCOVERY_ENABLED:-false}
       NETDASH_DEFAULT_ADMIN_USER: ${NETDASH_DEFAULT_ADMIN_USER:-admin}
       NETDASH_DEFAULT_ADMIN_PASSWORD: ${NETDASH_DEFAULT_ADMIN_PASSWORD:-changeme}
       NETDASH_SYNC_ADMIN_PASSWORD: ${NETDASH_SYNC_ADMIN_PASSWORD:-true}
       NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
-      # Dedicated VM with spare CPU: NETDASH_SCAN_SAFE_MODE=false for full /24 scans
-      # v1.3.140+: NETDASH_SCAN_ALL_PORTS=true — ~190 ports on live hosts (not for weak NAS)
+      # Prefer dockge/compose.yaml (same defaults). Scan: docs/SCANNING.md
+      # NETDASH_SCAN_PORT_PROFILE=popular — ~45 homelab ports (v1.3.153+)
     volumes:
       - ./data:/app/data
     cap_add:
@@ -41,7 +43,7 @@ services:
       start_period: 40s
 
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    image: nickfedor/watchtower:1.7.1
     container_name: netdash-watchtower
     restart: unless-stopped
     volumes:

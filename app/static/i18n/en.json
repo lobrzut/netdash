@@ -1,5 +1,5 @@
 {
-  "app.tagline": "Homelab dashboard with automatic network discovery",
+  "app.tagline": "Homelab dashboard like Homer — with optional on-demand discovery",
   "boot.loading": "Loading session…",
   "common.yes": "Yes",
   "common.no": "No",

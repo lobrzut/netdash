@@ -1,6 +1,6 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.142**
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.157**
 
 > **Zalecane wdrożenie:** **Dockge na Ubuntu VM (Proxmox)** — nie QNAP. VM **2 GB RAM** wystarczy dla samego NetDash. QNAP: deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** → **[dockge/README.md](dockge/README.md)**.
 
@@ -24,15 +24,15 @@ Obraz: `ghcr.io/lobrzut/netdash:latest` (GHCR, bez budowania lokalnie).
 | **Local / dev** | Windows, Linux bare metal | `python run.py`, `start.ps1`, `start.sh` | http://localhost:18787 |
 | **Server / Docker** | Linux homelab server | `deploy/docker-simple/install.sh` lub `docker compose up -d` | http://&lt;server-ip&gt;:18787 |
 
-### Port (`NETDASH_PORT`)
+### Port (`NETDASH_LISTEN_PORT`)
 
-Domyślnie **18787** — poza typowymi portami homelab i **bez kolizji z Readarr (8787)**.
+Domyślnie **18787** — poza typowymi portami homelab i **bez kolizji z Readarr (8787)**. Aplikacja **nie** czyta `NETDASH_PORT` (stary env jest odrzucany w entrypoint).
 
 | Sytuacja | Co zrobić |
 |----------|-----------|
 | Nowa instalacja | Nic — użyj `http://<host>:18787` |
-| Upgrade z wersji ≤1.3.72 (było 8787) | Dodaj `NETDASH_PORT=8787` w `.env` tymczasowo **lub** zmień zakładkę na `:18787` i zrestartuj kontener |
-| Własny port | `NETDASH_PORT=<port>` w `.env` + healthcheck w compose używa tej samej wartości |
+| Upgrade z wersji ≤1.3.72 (było 8787) | Ustaw `NETDASH_LISTEN_PORT=8787` w `.env` tymczasowo **lub** zmień zakładkę na `:18787` i zrestartuj kontener |
+| Własny port | `NETDASH_LISTEN_PORT=<port>` w `.env` + healthcheck w compose na ten sam port |
 
 ---
 
@@ -74,15 +74,18 @@ Data persists in `./data/netdash.db` (bind mount `./data:/app/data`).
 
 Filozofia projektu: **działa na słabym sprzęcie**. VM **2 GB RAM** wystarczy dla NetDash solo. `dockge/compose.yaml` ustawia:
 
-- `NETDASH_DISCOVERY_ENABLED=false` (włącz w `.env` po stabilnym starcie)
-- `NETDASH_SCAN_SAFE_MODE=true` (domyślnie też w kodzie aplikacji)
+- `NETDASH_DISCOVERY_POLICY=on_demand` + `NETDASH_DISCOVERY_ENABLED=false` (brak TCP w tle)
+- `NETDASH_SCAN_SAFE_MODE=true` (throttling IPS-friendly; ręczny skan nadal może objąć `/24`)
 - `mem_limit: 512M`, `cpu_count: 1`
+
+Skan: **[docs/SCANNING.md](docs/SCANNING.md)**.
 
 | Zmienna | Zalecenie na słabym hoście |
 |---------|----------------------------|
-| `NETDASH_SCAN_SAFE_MODE` | `true` (domyślnie) — nie wyłączaj bez potrzeby |
-| `NETDASH_SCAN_CIDR` | Węższa podsieć, np. `192.168.1.0/28` zamiast `/24` |
-| Pełny skan w UI | Wyłączony w safe mode; profil agresywny tylko po świadomym opt-in |
+| `NETDASH_DISCOVERY_POLICY` | `on_demand` — przycisk **Skanuj sieć**, nie ciągły skaner |
+| `NETDASH_SCAN_SAFE_MODE` | `true` (domyślnie) — nie wyłączaj na współdzielonym VLAN |
+| `NETDASH_SCAN_CIDR` | LAN, np. `192.168.1.0/24`; `/28` tylko gdy chcesz ostrożny podzbiór |
+| Pełny skan w UI | Dozwolony (v1.3.151+); safe mode tylko ogranicza równoległość i porty |
 
 Weryfikacja po deployu:
 
@@ -155,7 +158,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.142",...}
+curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.157",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```

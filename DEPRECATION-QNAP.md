@@ -38,7 +38,7 @@ This is **not a bug** on QNAP — it is the **intended trade-off** to keep the N
 |------|--------------------------|------------|
 | **Safe / weak (QNAP default)** | `SAFE_WEB_PORTS`: 80, 443, 8080, 5000, 18787 · primary TCP list trimmed · manual “aggressive” scan still chunked | `/24` → **16× `/28` chunks**; 2 chunks per 5 min cycle → **~40 minutes** to cover one `/24` |
 | **Normal / strong (Linux server)** | Full `TCP_DISCOVERY_PRIMARY_PORTS` and `WEB_PORTS`; full CIDR each cycle | Entire `NETDASH_SCAN_CIDR` every 2–3 minutes |
-| **scan_all_ports (v1.3.140+, strong host only)** | ~190 service ports on **live** hosts only | Requires `NETDASH_SCAN_SAFE_MODE=false` — **not recommended on QNAP** |
+| **popular / all_listed (v1.3.153+)** | ~45 homelab ports (or ~190 `all_listed`) on **live** hosts only | Works with `NETDASH_SCAN_SAFE_MODE=true` (IPS-friendly). Still **not recommended on QNAP** — use a Linux VM + on-demand scan |
 
 Services on uncommon ports (e.g. custom high ports, some game servers, non-standard admin UIs) may **not appear until their `/28` chunk is scanned**, or may **never appear** if only safe ports are probed in automatic discovery.
 
@@ -69,7 +69,7 @@ Vault notes (`2026-06-08` NetDash session) record early homelab work at `C:\opt\
 git clone https://github.com/lobrzut/netdash.git /opt/stacks/netdash
 cd /opt/stacks/netdash
 cp .env.example .env
-# edit NETDASH_SECRET_KEY, optionally NETDASH_SCAN_SAFE_MODE=false on a dedicated VM
+# edit NETDASH_SECRET_KEY; keep SCAN_SAFE_MODE=true; discovery defaults to on_demand
 docker compose -f dockge/compose.yaml up -d
 ```
 

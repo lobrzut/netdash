@@ -41,7 +41,7 @@ services:
       start_period: 40s
 
   watchtower:
-    image: containrrr/watchtower:1.7.1
+    image: nickfedor/watchtower:1.7.1
     container_name: netdash-watchtower
     restart: unless-stopped
     profiles:

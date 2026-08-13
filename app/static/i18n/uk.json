@@ -1,5 +1,5 @@
 {
-  "app.tagline": "Homelab dashboard з автовиявленням мережі",
+  "app.tagline": "Homelab dashboard як Homer — з опціональним виявленням на вимогу",
   "boot.loading": "Завантаження сесії…",
   "common.yes": "Так",
   "common.no": "Ні",
@@ -476,7 +476,8 @@
   "scan.emptyHint": "Останній скан нічого не знайшов — перевірте CIDR (напр. 192.168.1.0/24) у Налаштування → Сканування і запустіть скан з вкладки Сервіси.",
   "scan.emptyHintDocker": "Контейнер не бачить LAN (мережа Docker) — встановіть NETDASH_SCAN_CIDR або використайте docker-compose.bridge.yml.",
   "scan.emptyHintPing": "ICMP ping заблоковано — NetDash використав TCP-скан. Перевірте CIDR і cap_add: NET_RAW у compose.",
-  "scan.safeModeWarning": "Безпечний скан — max /28, 16 хостів, 2 паралельні зонди. Повний /24 заблоковано (QNAP може зависнути).",
+  "scan.safeModeWarning": "Старий safe mode — ручний скан max /28 (~16 хостів). Повний /24 заблоковано. Discovery за політикою (типово on-demand, без TCP у фоні).",
+  "scan.safeModeThrottleWarning": "Safe mode — IPS-friendly throttling. Ручне «Сканувати мережу» охоплює повний CIDR з налаштувань (зазвичай /24), не лише /28. Discovery за політикою (типово on-demand).",
   "scan.qnapSafeWarning": "QNAP / NAS: скануйте лише /28 (напр. 192.168.1.144/28). Ліміту RAM недостатньо — /24 може «вбити» весь NAS. «Параметри скану…».",
   "scan.error.cidrTooWide": "Діапазон {cidr} занадто широкий для safe mode (max /{max}). Параметри скану… — напр. 192.168.1.144/28.",
   "scan.bannerDismiss": "Приховати",

@@ -6,40 +6,14 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.156"
+VERSION = "1.3.157"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Ręczne dodanie / probe: upsert po host:port (bez duplikatów przez trailing slash), probe nie pada na MultipleResultsFound",
-    "Ukierunkowany skan oznacza serwis jako customized — auto-purge nie usuwa ręcznie dodanych",
-    "Po dodaniu: toast + reset filtrów + przejście do listy Serwisów (wcześniej sukces przy ukrytej kategorii)",
-    "Timeout skanu popularnego /24 — budżet = hosty×porty×(delay+jitter) + overhead, cap 7200 s; porty tylko na żywych hostach",
-    "Postęp skanu: „Porty na żywych hostach 12/30”; limit czasu z zapisanymi wynikami = sukces częściowy (nie czerwony błąd)",
-    "Ukierunkowany skan — w Opcjach skanu: IP + port → sprawdź i dodaj (np. qBittorrent :6363) bez skanu całej sieci",
-    "Popularne porty (zalecane) — Skanuj sieć obejmuje homelab/*arr/media (6363, Plex, Jellyfin, HA, Immich); Podstawowe = krótka lista; nie 1–65535",
-    "NETDASH_SCAN_PORT_PROFILE=safe|popular|all_listed — domyślnie safe; SCAN_ALL_PORTS=true = pełna lista usług (~190)",
-    "Skan ręczny /24 nie blokuje już UI — praca w chunkach /28, częstsze yield’e, timeout skalowany z liczbą hostów, /api/health odpowiada w trakcie skanu",
-    "Skan ręczny „Skanuj sieć” skanuje pełny CIDR z ustawień (np. /24) nawet przy NETDASH_SCAN_SAFE_MODE=true — safe mode tylko throttluje (IPS-friendly), nie ucina do /28",
-    "Komunikaty safe mode / discovery zgodne z polityką (on_demand nie twierdzi, że TCP działa automatycznie w tle)",
-    "Polityka discovery — off / na żądanie (zalecane) / harmonogram / pasywne ARP / legacy adaptive. Domyślnie na żądanie: skan ręczny „Skanuj sieć”, bez ciągłego TCP w tle",
-    "Harmonogram — jeden pełny cykl IPS-friendly dziennie (NETDASH_DISCOVERY_SCHEDULE=03:00) lub co N godzin",
-    "Pasywne discovery — odczyt tablicy ARP co ~10 min, bez skanu portów (przyjazne SEP)",
-    "Tryb IPS-friendly (stealth) — skan rozkłada porty jednego hosta w czasie (1 port/raz, losowa kolejność, odstęp z jitterem), więc nie wyzwala blokad IPS/Symantec SEP („blokuje ruch z IP…”). Domyślnie włączony: NETDASH_IPS_FRIENDLY, NETDASH_PORTS_PER_HOST_DELAY, NETDASH_PORT_PARALLEL_PER_HOST",
-    "Ustawienia → Automatyczne discovery — przełącznik wyłączenia skanowania w tle (ręczne dodawanie serwisów nadal działa)",
-    "Kafelek Brain — link „Otwórz dashboard” (URL z ustawień statystyk, widoczny gdy Brain online)",
-    "Auto-usuwanie nieaktywnych serwisów — NETDASH_STALE_REMOVE_DAYS lub Ustawienia → Skanowanie",
-    "Dwa tryby skanu: automatyczny (w tle, throttled) vs ręczny (przycisk) — NETDASH_AUTO_DISCOVERY_ALL_PORTS",
-    "Wykrywanie serwisów na liście usług — NETDASH_SCAN_ALL_PORTS / profile=all_listed sonduje żywe hosty po ~190 portach (nie 1–65535)",
-    "Kafelek Sieć: latency łącza (Cloudflare/Google) zamiast donuta kategorii; WAN pokazuje miasto i kraj",
-    "Sejf API: klucze nie nakładają się już w wąskim widgecie; notatki jako czytelne wiersze",
-    "Zatrzymanie skanu sieci (przycisk Zatrzymaj) + flaga kraju WAN i czytelny podgląd klucza",
-    "Kafelek Sieć — LAN/brama/CIDR, WAN IP + ISP/kraj (GeoIP), wykresy (sparkline + donut)",
-    "Przycisk Aktualizuj teraz przez Watchtower HTTP API — bez docker.sock w panelu (bezpieczne na QNAP)",
-    "Kafelek Brain (opcjonalny) — statystyki wiedzy z endpointu /stats; domyślnie wyłączony",
-    "Watermark marek/ikon na wszystkich kafelkach — także przypiętych i emoji",
-    "Hardening bezpieczeństwa: limit prób logowania (brute-force)",
-    "Hasło admin zmienione w UI nie jest już nadpisywane przy restarcie",
-    "Swagger /docs domyślnie wyłączony (NETDASH_DOCS_ENABLED=true by włączyć)",
-    "Migracja JWT na PyJWT + guard SSRF na metadane chmurowe",
+    "Pulpit homelab jak Homer/Homepage — kafelki, sejf, notatki; wykrywanie LAN jest opcjonalne i na żądanie (nie ciągły skaner)",
+    "Jak skanować: 1) ustaw CIDR  2) Skanuj sieć → Popularne porty (zalecane)  3) albo ukierunkowany IP:port — docs/SCANNING.md",
+    "Domyślnie on_demand: brak TCP w tle. Safe mode tylko throttluje (IPS/SEP); ręczny skan obejmuje pełny /24 z ustawień",
+    "Ręczne dodanie / probe: upsert po host:port (bez duplikatów); probe = customized (auto-purge nie kasuje)",
+    "Timeout skanu popularnego skalowany (cap 7200 s); porty tylko na żywych hostach; częściowy timeout = sukces",
 ]
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"

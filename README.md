@@ -1,15 +1,19 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.149-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.157-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
 
-**A self-hosted homelab dashboard inspired by [Homer](https://github.com/bastienwirtz/homer), with automatic LAN service discovery.**
+**A self-hosted homelab dashboard like [Homer](https://github.com/bastienwirtz/homer) / [Homepage](https://github.com/gethomepage/homepage) — with optional on-demand discovery.**
+
+Pin services, keep an encrypted API vault and notes, and **scan the LAN only when you click Scan network**. Default policy is **`on_demand`**: not a continuous LAN scanner.
 
 **Default NetDash port: 18787** — chosen to avoid conflicts with common homelab ports such as Readarr (8787).
 
 > **Recommended deploy:** **Ubuntu VM on Proxmox + [Dockge](dockge/README.md)** — not QNAP. A **2 GB RAM** VM is sufficient for NetDash alone (512M container limit). QNAP is **deprecated** — see **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
+
+How to scan (3 steps, IPS/SEP notes): **[docs/SCANNING.md](docs/SCANNING.md)**.
 
 ## Quick start (Docker, no git)
 
@@ -41,34 +45,32 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 
 ## Why NetDash?
 
-| Homer | NetDash |
-|-------|---------|
-| Manual YAML configuration | **Automatic network scanning** (CIDR / local /24) |
-| Static service list | **Service detection and identification** (HTTP, title, favicon) |
+| Homer / Homepage | NetDash |
+|------------------|---------|
+| Manual YAML / Docker labels | **Optional on-demand scan** (CIDR) — or add tiles by hand |
+| Static service list | **Service identification** (HTTP title, favicon) when you scan |
 | Icons from config | **70+ brand icons** (Jellyfin, Grafana, Plex, and more) + favicon fallback |
 | No vault | **Encrypted API key vault** (Fernet) |
 | No notes | **Notes widget** with markdown |
 | — | **Visibility filters**: login required / public |
-| — | **Widgets**: clock, stats, search |
+| — | **Widgets**: clock, stats, search, optional Brain / Network tiles |
 
 ## Features
 
-- **Two scan modes** — automatic adaptive background discovery vs on-demand manual scan (with Stop)
-- Auto-discovery (ping, port scan, HTTP/HTTPS identification)
-- **IPS-friendly / stealth probing** — spreads port probes per host over time to avoid Symantec SEP and similar endpoint IPS blocks (on by default)
-- **Settings toggle** to disable automatic background discovery (manual add and manual scan still work)
-- **Auto-remove stale services** — configurable offline days (`NETDASH_STALE_REMOVE_DAYS` or Settings → Scanning)
-- Dark theme with configurable accent color
-- JWT authentication and encrypted API key vault
-- Per-service notes plus Wake-on-LAN / **Sleep-on-LAN** (install scripts auto-detect MAC per OS; pre-filled from discovery)
+- Homelab **dashboard** — pinned tiles, dark theme, accent color, 70+ [Simple Icons](https://simpleicons.org/)
+- **Discovery policies** — `on_demand` (default), `passive` (ARP), `scheduled`, `off`, legacy `adaptive`
+- **Manual scan** — full CIDR from settings, **Popular** vs **Basic** ports, targeted **IP:port** probe, **Stop**
+- **IPS-friendly** probing — one port at a time per host by default (Symantec SEP / endpoint IPS)
+- Safe mode throttles concurrency; it does **not** cut a manual scan down to `/28` (`NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR`)
+- **Auto-remove stale** services — configurable offline days (`NETDASH_STALE_REMOVE_DAYS` or Settings → Scanning)
+- JWT auth and encrypted API key vault
+- Per-service notes plus Wake-on-LAN / **Sleep-on-LAN** (install scripts auto-detect MAC per OS)
 - **Mobile-friendly WOL/SOL** — tile action buttons tappable on touch devices
-- 70+ brand icons via [Simple Icons](https://simpleicons.org/)
-- Persistent online/offline health checks
-- One-command Docker deployment
-- i18n support: English, Polish, German, Ukrainian
-- **Optional Brain stats tile** — live knowledge-base counts (notes, sessions, library, graph) from a `/stats` endpoint; **“Open dashboard”** link when Brain is online; off by default
-- **Optional Network tile** — LAN/WAN info (public IP, ISP, country), link latency, discovery sparkline; off by default
-- **Remote discovery agent** (v1.3.112): lightweight LAN scanner on a separate host pushing to `POST /api/discovery/import` (ideal for split deployments)
+- Persistent online/offline health checks (local-IP services probed like remote hosts)
+- i18n: English, Polish, German, Ukrainian
+- **Optional Brain stats tile** — live knowledge-base counts; **“Open dashboard”** when Brain is online
+- **Optional Network tile** — LAN/WAN info, link latency; off by default
+- **Remote discovery agent** (v1.3.112): lightweight LAN scanner on a separate host (`POST /api/discovery/import`)
 
 ## Remote Discovery Agent
 
@@ -79,88 +81,32 @@ If NetDash runs on a low-power NAS (for example QNAP) without safe LAN scan acce
 | QNAP `.150` | Dashboard only — `NETDASH_SCAN_DISABLED=true` |
 | Homelab `.201` | `deploy/agent/docker-compose.yml` — `network_mode: host`, arp-scan |
 
-See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md).
+See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.md`](deploy/qnap/README.md). Prefer a Linux VM instead of QNAP — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
 
 ## What's new
 
-### v1.3.149
+### v1.3.157
 
-- **IPS-friendly / stealth scanning** — probes one host gently (1 port at a time by default, randomized order, jittered delay) so Symantec SEP and similar endpoint IPS do not block NetDash's source IP for 600 s. Env: `NETDASH_IPS_FRIENDLY`, `NETDASH_PORT_PARALLEL_PER_HOST`, `NETDASH_PORTS_PER_HOST_DELAY`, `NETDASH_PORTS_PER_HOST_JITTER`, `NETDASH_SCAN_RANDOMIZE_PORTS` (all on by default). Increase `NETDASH_PORTS_PER_HOST_DELAY` if still blocked.
+- **Positioning** — Homer/Homepage-like dashboard first; discovery is optional and **on demand** (not a 24/7 LAN scanner).
+- **Docs** — [docs/SCANNING.md](docs/SCANNING.md) (3-step scan, popular vs basic, targeted probe, SEP/IPS, safe mode vs full `/24`).
+- README / Dockge / DEPLOYMENT / `.env.example` aligned with v1.3.150–156 (policies, popular ports, probe, Watchtower `nickfedor`).
 
-### v1.3.148
+### v1.3.150–156 (scanning model)
 
-- **Mobile WOL/SOL tap fix** — tile action buttons (⚡ WOL, 💤 SOL, pin, edit, notes) are always visible and tappable on touch devices; taps no longer fall through to open the service.
+- **Policies** — `on_demand` (default in Dockge), `off`, `scheduled`, `passive` ARP, legacy `adaptive`.
+- **Manual `/24`** — safe mode throttles (IPS-friendly) but does **not** shrink to `/28`; opt out with `NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false`.
+- **UI stays up** during a full CIDR scan (internal `/28` work chunks, scaled timeout, cap 7200 s).
+- **Popular ports** (~45 homelab) on **live hosts only**; **targeted IP:port** probe; never 1–65535.
+- **Duplicate upsert** — add/probe by `(host, port)`; probe rows are customized (stale-remove skips them).
+- Health lock + `_known_ips` rotation fix (v1.3.152).
 
-### v1.3.147
+### Earlier highlights
 
-- **Sleep-on-LAN install scripts** — auto-detect primary-interface MAC on Linux, Windows, and macOS; MAC from NetDash discovery is pre-filled when generating a script from a service.
+- **IPS-friendly / stealth** (v1.3.149) — `NETDASH_IPS_FRIENDLY` and per-host delays (on by default).
+- **Mobile WOL/SOL**, **SoL MAC auto-detect**, **Brain “Open dashboard”**, **stale auto-remove**, **local-IP health** (v1.3.143–148).
+- **2 GB VM + Dockge** — 512M limit, Watchtower `nickfedor/watchtower:1.7.1` (Docker 29+). QNAP deprecated.
 
-### v1.3.146
-
-- **Settings → Automatic discovery** — UI toggle to disable background network scanning without a container restart. Manual **Add service** and manual scan still work.
-
-### v1.3.145
-
-- **Brain tile** — discreet **“Open dashboard”** link in the tile header when Brain is online (URL derived from `brain_stats_url`).
-
-### v1.3.144
-
-- **Auto-remove inactive services** — `NETDASH_STALE_REMOVE_DAYS` (0 = off) or checkbox in **Settings → Scanning** removes auto-discovered offline entries after N days; pinned and manual entries are skipped.
-
-### v1.3.143
-
-- **Health check fixes** — local-IP services are probed like remote hosts; offline status after N consecutive failures (`NETDASH_HEALTH_OFFLINE_AFTER_FAILURES`).
-
-### v1.3.142
-
-- **`NETDASH_DISCOVERY_ENABLED` kill switch** — master off for background TCP discovery; auto-disabled on hosts with &lt;~2.1 GB RAM. Nuclear-safe **2 GB VM** defaults in `dockge/compose.yaml` (512M limit, discovery off, enrich off).
-- **Watchtower** — `nickfedor/watchtower:1.7.1` in Dockge compose (Docker 29+ / API 1.44+). Balanced deploy: `bash dockge/deploy-balanced.sh`.
-
-### v1.3.141
-
-- **Two scan modes** — **automatic** (adaptive background, `/28` chunks, `NETDASH_AUTO_DISCOVERY_ALL_PORTS`) vs **manual** (Scan options button, hard limits, Stop). QNAP/Proxmox port probes fixed (8006, DSM 5000/5001/8080/8081).
-
-### v1.3.140
-
-- **Discover services on any port** — `NETDASH_AUTO_DISCOVERY_ALL_PORTS=true` (auto, gradual) or `NETDASH_SCAN_ALL_PORTS=true` (manual) deep-probes live hosts against ~190 service ports (`8123`, `32400`, `9090`, …).
-
-### v1.3.137 to 1.3.139
-
-- **Network tile polish** — link latency (Cloudflare / Google) replaced the category donut; the WAN line shows city + country; the tile fits the widget.
-- **API vault & notes** — key cards no longer overlap in the narrow tile; notes are full-width list rows.
-
-### v1.3.136
-
-- **Stop a running network scan** — the scan bar now has a **Stop** button that cancels the background job.
-- Network tile shows a real **country flag image** (emoji flags don't render on Windows); revealed API keys stay inside the card (scrollable).
-
-### v1.3.134
-
-- **Network tile** (off by default) — LAN IP / gateway / subnet, device online/total counts, **WAN public IP + ISP/country** (GeoIP) with flag, a services-by-category **donut** and a 7-day discovery **sparkline**.
-- **"Update now" via the Watchtower HTTP API** — triggers an immediate pull + recreate without mounting `docker.sock` into the portal (safe on QNAP).
-
-### v1.3.133
-
-- **Optional Brain stats tile** (off by default) — point it at a Brain `/stats` endpoint (knowledge counts) in Settings → Appearance and it shows live numbers; served via the auth-gated `/api/brain/stats` proxy.
-
-### v1.3.132
-
-- Visible brand/icon **watermark on every tile** — pinned cards and emoji/letter tiles now included (no more blank backgrounds).
-
-### v1.3.131 — security hardening
-
-- Login **brute-force guard** (`429` + `Retry-After`, 5 attempts / 5 min per IP+user); UI-set password no longer overwritten on restart.
-- Swagger `/docs` **off by default** (`NETDASH_DOCS_ENABLED=true` to enable).
-- `python-jose` → **`PyJWT`** (CVE-2024-33663/33664); SSRF guard for cloud-metadata endpoints.
-
-### Deployment
-
-- **Recommended:** Proxmox Ubuntu VM + Dockge — **[dockge/README.md](dockge/README.md)** (2 GB RAM sufficient; balanced profile: `dockge/deploy-balanced.sh`).
-- **QNAP:** deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
-
-Full version history: **[CHANGELOG.md](CHANGELOG.md)**.
-
-See [ROADMAP.md](ROADMAP.md) for remaining work.
+Full version history: **[CHANGELOG.md](CHANGELOG.md)**. See [ROADMAP.md](ROADMAP.md) for remaining work.
 
 ## Deploy from GitHub
 
@@ -223,22 +169,23 @@ Shortcuts: Windows `.\start.ps1`, Linux `./start.sh`.
 
 ## Network scanning
 
-NetDash supports **discovery policies** (Settings → Automatic discovery or env). Recommended for homelabs with Symantec SEP / endpoint IPS: **`on_demand`** — no background TCP; use **Scan network** when you want a full scan.
+NetDash is **not** a continuous LAN scanner. Default (Dockge): **`on_demand`** — no background TCP. Use **Scan network** when you want an inventory. Details: **[docs/SCANNING.md](docs/SCANNING.md)**.
+
+### Scan in 3 steps
+
+1. Sign in and set LAN CIDR (`NETDASH_SCAN_CIDR` or **Settings → Automatic discovery**).
+2. Leave policy on **On demand** (recommended with Symantec SEP / endpoint IPS).
+3. Click **Scan network** — choose **Popular** ports (homelab), **Basic** (short list), or a **targeted IP:port** probe. **Stop** cancels the job.
 
 | Policy | Background | Best for |
 |--------|------------|----------|
-| **`on_demand`** (default in Dockge) | None | Homelab with SEP — manual **Scan network** only |
+| **`on_demand`** (default in Dockge) | None | Homelab dashboard — manual **Scan network** only |
 | **`off`** | None | Dashboard-only; add services manually |
 | **`passive`** | ARP table read every ~10 min | Light device list without TCP port sweep |
 | **`scheduled`** | One full IPS-friendly cycle at `03:00` UTC or every `24h` | Nightly inventory without continuous load |
 | **`adaptive`** (legacy) | Continuous TCP in `/28` chunks | Old behaviour; may trigger SEP blocks |
 
-**Manual scan** (Scan network / Scan options) always works when local scan is not disabled (`NETDASH_SCAN_DISABLED`). Hard limits apply (`NETDASH_MANUAL_SCAN_MAX_HOSTS`, max `/24`). **Stop** cancels the job.
-
-1. Sign in.
-2. Set **Settings → Automatic discovery → Policy** to **On demand** (recommended).
-3. Set LAN CIDR: `NETDASH_SCAN_CIDR=192.168.1.0/24` or Settings → Automatic discovery.
-4. Click **Scan network** when you want to discover services.
+**Manual scan** always works when local scan is not disabled (`NETDASH_SCAN_DISABLED`). Hard limits apply (`NETDASH_MANUAL_SCAN_MAX_HOSTS`, max `/24`). Safe mode throttles; full CIDR is allowed unless `NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR=false`.
 
 > **Docker note:** without `network_mode: host`, the container scans its own bridge network (172.x), not your LAN. On Linux, `docker-compose.yml` uses `network_mode: host`. On Windows/macOS, disable host mode and set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or in Settings.
 
@@ -250,16 +197,17 @@ NETDASH_DISCOVERY_POLICY=on_demand
 NETDASH_DISCOVERY_ENABLED=false
 NETDASH_IPS_FRIENDLY=true
 NETDASH_SCAN_SAFE_MODE=true
+NETDASH_SCAN_PORT_PROFILE=popular
 NETDASH_AUTO_DISCOVERY_ALL_PORTS=false
 ```
 
-Use **Scan network** weekly or after adding devices. For automatic host list without TCP, use `NETDASH_DISCOVERY_POLICY=passive` and `NETDASH_DISCOVERY_ENABLED=true`. Avoid **`adaptive`** on SEP-protected VLANs.
+Use **Scan network** after adding devices (or weekly). For a host list without TCP, use `NETDASH_DISCOVERY_POLICY=passive` and `NETDASH_DISCOVERY_ENABLED=true`. Avoid **`adaptive`** on SEP-protected VLANs.
 
 ### IPS-friendly scanning (Symantec SEP / endpoint IPS)
 
-On LANs where workstations run Symantec Endpoint Protection or similar endpoint IPS, aggressive port scanning can trigger a **600 s block** on NetDash's source IP (`The client will block traffic from IP address … for the next 600 seconds`). This was most likely when deep-probing ~190 service ports on a single live host at once.
+On LANs where workstations run Symantec Endpoint Protection or similar endpoint IPS, aggressive port scanning can trigger a **600 s block** on NetDash's source IP (`The client will block traffic from IP address … for the next 600 seconds`).
 
-**IPS-friendly mode** (on by default) probes each host gently: limited per-host parallelism, randomized port order, and a jittered delay between probes to the same host. Cross-host parallelism is unchanged, so discovery stays effective. Health checks serialize probes to the same host too.
+**IPS-friendly mode** (on by default) probes each host gently: limited per-host parallelism, randomized port order, and a jittered delay between probes to the same host.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
@@ -269,30 +217,30 @@ On LANs where workstations run Symantec Endpoint Protection or similar endpoint 
 | `NETDASH_PORTS_PER_HOST_JITTER` | `0.2` | Random extra delay (0…N s) per probe |
 | `NETDASH_SCAN_RANDOMIZE_PORTS` | `true` | Randomize port order (avoids sequential scan signatures) |
 
-If SEP still blocks NetDash, increase `NETDASH_PORTS_PER_HOST_DELAY` (e.g. `0.6`–`1.0`). Set `NETDASH_IPS_FRIENDLY=false` only on isolated lab networks where fast scanning matters more than IPS avoidance.
+If SEP still blocks NetDash, increase `NETDASH_PORTS_PER_HOST_DELAY` (e.g. `0.6`–`1.0`). Set `NETDASH_IPS_FRIENDLY=false` only on isolated lab networks.
 
 ## Low-resource hardware profile (RPi, older PC, N100, 2 GB VM)
 
-NetDash is designed to run on low-resource homelab hardware. A **2 GB Proxmox VM** is enough for NetDash solo (512M container limit in `dockge/compose.yaml`). Safe scan mode (`NETDASH_SCAN_SAFE_MODE=true`) is on by default with lower concurrency, a shorter port list, and host limits.
+NetDash is designed to run on low-resource homelab hardware. A **2 GB Proxmox VM** is enough for NetDash solo (512M container limit in `dockge/compose.yaml`). Safe scan mode (`NETDASH_SCAN_SAFE_MODE=true`) is on by default.
 
 | Problem | Recommendation |
 |---------|----------------|
-| Host becomes unstable during scans | Keep safe mode enabled; use **automatic discovery** (chunked `/28`) instead of manual `/24` |
+| Host becomes unstable during scans | Keep safe mode; use **on_demand** + occasional **Scan network** |
 | Need full LAN coverage | `NETDASH_DISCOVERY_POLICY=scheduled` (nightly) or manual **Scan network** with `/24` |
-| Manual scan on strong hardware | Keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs; use `/28` manual scans or accept confirmation for `/24` |
+| Manual scan on strong hardware | Keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs; `/28` preset if you want a careful subset |
 | Scans are too slow on strong hardware | Use **scheduled** or manual scan; avoid legacy **`adaptive`** on SEP VLANs |
-| Full port scan needed | `NETDASH_SCAN_ALL_PORTS=true` (manual only) on 4 GB+ VM |
+| Full port list needed | `NETDASH_SCAN_PORT_PROFILE=all_listed` (manual, live hosts only) on 4 GB+ VM |
 | Discovery overloads weak host | `NETDASH_DISCOVERY_POLICY=on_demand` or `off` |
-| Symantec SEP / IPS blocks NetDash IP | IPS-friendly mode is on by default; increase `NETDASH_PORTS_PER_HOST_DELAY` (e.g. `0.6`–`1.0`) |
+| Symantec SEP / IPS blocks NetDash IP | IPS-friendly is on; increase `NETDASH_PORTS_PER_HOST_DELAY` |
 | Health checks consume too many resources | Increase health-check interval (for example 120s) or disable it |
 | Stale offline services clutter the list | Enable auto-remove in **Settings → Scanning** or set `NETDASH_STALE_REMOVE_DAYS=7` |
 
-Example `.env` for Proxmox VM 2 GB (balanced — or run `bash dockge/deploy-balanced.sh`):
+Example `.env` for Proxmox VM 2 GB (on-demand — or run `bash dockge/deploy-balanced.sh`):
 
 ```env
-NETDASH_DISCOVERY_ENABLED=true
+NETDASH_DISCOVERY_POLICY=on_demand
+NETDASH_DISCOVERY_ENABLED=false
 NETDASH_SCAN_SAFE_MODE=true
-NETDASH_DISCOVERY_MODE=adaptive
 NETDASH_SCAN_CIDR=192.168.1.0/24
 NETDASH_AUTO_DISCOVERY_ALL_PORTS=false
 NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK=true
@@ -305,7 +253,7 @@ NETDASH_SCAN_SAFE_MODE=true
 NETDASH_SCAN_CIDR=192.168.1.0/28
 ```
 
-Check profile output: `curl -s http://127.0.0.1:18787/api/health` → `scan_safe_mode`, `resource_profile`, `auto_discovery_all_ports`.
+Check profile output: `curl -s http://127.0.0.1:18787/api/health` → `scan_safe_mode`, `resource_profile`, `discovery_policy`.
 
 Deployment details: **[DEPLOYMENT.md](DEPLOYMENT.md)** · Dockge: **[dockge/README.md](dockge/README.md)** · QNAP (deprecated): **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)**.
 
@@ -363,23 +311,26 @@ sudo systemctl enable --now netdash
 | `NETDASH_DEFAULT_ADMIN_USER` | Default admin username (`admin`) |
 | `NETDASH_DEFAULT_ADMIN_PASSWORD` | Admin password from env (`changeme` by default — change after first login) |
 | `NETDASH_SYNC_ADMIN_PASSWORD` | Sync admin password from env on every start (`true` by default; set to `false` after changing in UI) |
-| `NETDASH_SCAN_CIDR` | Networks for automatic discovery (and Docker bridge LAN override) |
+| `NETDASH_SCAN_CIDR` | Networks for discovery (and Docker bridge LAN override) |
 | `NETDASH_DISCOVERY_POLICY` | **`on_demand`** (recommended), `off`, `scheduled`, `passive`, or legacy `adaptive` |
 | `NETDASH_DISCOVERY_SCHEDULE` | For `scheduled`: `03:00` (daily UTC) or `24h` / `6h` interval |
 | `NETDASH_PASSIVE_INTERVAL` | Seconds between passive ARP reads (default `600`) |
 | `NETDASH_DISCOVERY_ENABLED` | Master switch for background policies (`scheduled`, `passive`, `adaptive`); off for `on_demand` |
 | `NETDASH_DISCOVERY_MODE` | Legacy — mapped to policy when `NETDASH_DISCOVERY_POLICY` unset |
-| `NETDASH_SCAN_SAFE_MODE` | Safe manual scan limits (`true` by default) |
-| `NETDASH_SCAN_ALL_PORTS` | Deep-probe live hosts on ~190 service ports during **manual** scan (`false` by default) |
+| `NETDASH_SCAN_SAFE_MODE` | Safe manual scan throttling (`true` by default); does not block `/24` |
+| `NETDASH_MANUAL_SCAN_ALLOW_FULL_CIDR` | Manual scan may use full `/24` (`true` by default) |
+| `NETDASH_SCAN_PORT_PROFILE` | Manual ports: `safe` \| `popular` \| `all_listed` |
+| `NETDASH_SCAN_ALL_PORTS` | Deep-probe live hosts on ~190 service ports during **manual** scan (`false`; same as `all_listed`) |
 | `NETDASH_AUTO_DISCOVERY_ALL_PORTS` | Gradual ~190-port probe on live hosts in auto mode (`false` by default on 2 GB VMs) |
 | `NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK` | Never scan full /24 in one auto cycle (`true` by default) |
-| `NETDASH_MANUAL_SCAN_MAX_HOSTS` | Hard cap for manual scan host count (default `128`) |
+| `NETDASH_MANUAL_SCAN_MAX_HOSTS` | Hard cap for manual scan host count (default `256`) |
+| `NETDASH_MANUAL_SCAN_TIMEOUT_CAP` | Wall-clock cap for scaled manual scan (default `7200`) |
 | `NETDASH_IPS_FRIENDLY` | Gentle per-host port probing to avoid endpoint IPS blocks (`true` by default) |
 | `NETDASH_PORT_PARALLEL_PER_HOST` | Max concurrent port probes to one host when IPS-friendly (default `1`) |
 | `NETDASH_PORTS_PER_HOST_DELAY` | Seconds between port probes to the same host (default `0.3`) |
 | `NETDASH_PORTS_PER_HOST_JITTER` | Random extra delay per same-host probe (default `0.2`) |
 | `NETDASH_SCAN_RANDOMIZE_PORTS` | Randomize port probe order (`true` by default) |
-| `NETDASH_STALE_REMOVE_DAYS` | Auto-remove auto-discovered offline services after N days (`0` = off; UI in Settings → Scanning overrides when &gt; 0) |
+| `NETDASH_STALE_REMOVE_DAYS` | Auto-remove auto-discovered offline services after N days (`0` = off) |
 | `NETDASH_HEALTH_OFFLINE_AFTER_FAILURES` | Mark service offline after N consecutive failed health probes (default `2`) |
 | `NETDASH_BUILD_DATE` | Optional build date for About panel |
 
@@ -398,10 +349,11 @@ See **[.env.example](.env.example)** for the full list.
 netdash/
 ├── app/
 │   ├── main.py       # API routes
-│   ├── scanner.py    # Auto-discovery
+│   ├── scanner.py    # Discovery / scan
 │   ├── icons.py      # Brand icons
 │   ├── vault.py      # Key encryption
 │   └── static/       # Frontend
+├── docs/SCANNING.md  # How to scan (on demand)
 ├── deploy/
 ├── dockge/           # Proxmox + Dockge (recommended)
 ├── docker-compose.yml
@@ -421,6 +373,7 @@ netdash/
 ## Acknowledgements
 
 - **[Homer](https://github.com/bastienwirtz/homer)** (Apache-2.0) — UI inspiration and YAML import compatibility.
+- **[Homepage](https://github.com/gethomepage/homepage)** — homelab dashboard category (widgets / service directory).
 - **[GPTWOL](https://github.com/Misterbabou/gptwol)** (MIT, Misterbabou) — Wake/Sleep-on-LAN ideas and optional HTTP gateway integration (`gptwol_url` in settings). NetDash implements WoL/SOL and ARP discovery independently and is not a GPTWOL fork.
 
 ## License
@@ -429,4 +382,4 @@ MIT — suitable for portfolio, homelab, and commercial use.
 
 ---
 
-*A modern Homer alternative with automatic network discovery.*
+*A Homer/Homepage-like homelab dashboard with optional on-demand discovery.*

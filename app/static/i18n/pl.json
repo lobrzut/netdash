@@ -1,5 +1,5 @@
 {
-  "app.tagline": "Homelab dashboard z auto-wykrywaniem sieci",
+  "app.tagline": "Pulpit homelab jak Homer — z opcjonalnym wykrywaniem na żądanie",
   "boot.loading": "Ładowanie sesji…",
   "common.yes": "Tak",
   "common.no": "Nie",

@@ -1,5 +1,5 @@
 {
-  "app.tagline": "Homelab-Dashboard mit automatischer Netzwerkerkennung",
+  "app.tagline": "Homelab-Dashboard wie Homer — optionale Erkennung auf Abruf",
   "boot.loading": "Sitzung wird geladen…",
   "common.yes": "Ja",
   "common.no": "Nein",
@@ -481,7 +481,8 @@
   "scan.emptyHint": "Letzter Scan fand nichts — CIDR prüfen (z. B. 192.168.1.0/24) unter Einstellungen → Scannen und erneut unter Dienste scannen.",
   "scan.emptyHintDocker": "Container erreicht LAN nicht (Docker-Netz) — NETDASH_SCAN_CIDR in Dockge setzen oder docker-compose.bridge.yml verwenden.",
   "scan.emptyHintPing": "ICMP-Ping blockiert — NetDash nutzte TCP-Scan. CIDR und cap_add: NET_RAW im Compose prüfen.",
-  "scan.safeModeWarning": "Sicherer Scan — max /28, 16 Hosts, 2 parallele Sonden. Volles /24 ist blockiert (QNAP kann einfrieren).",
+  "scan.safeModeWarning": "Legacy-Safe-Mode — manueller Scan max /28 (~16 Hosts). Volles /24 blockiert. Discovery folgt der Richtlinie (Standard: on-demand, kein TCP im Hintergrund).",
+  "scan.safeModeThrottleWarning": "Safe Mode — IPS-freundliches Throttling. Manuelles „Netzwerk scannen“ umfasst das volle CIDR aus den Einstellungen (typisch /24), nicht nur /28. Discovery folgt der Richtlinie (Standard: on-demand).",
   "scan.qnapSafeWarning": "QNAP / NAS: nur /28 scannen (z. B. 192.168.1.144/28). RAM-Limit reicht NICHT — /24 kann den ganzen NAS crashen. „Scan-Optionen…“ nutzen.",
   "scan.error.cidrTooWide": "Bereich {cidr} zu groß für Safe Mode (max /{max}). Scan-Optionen… und z. B. 192.168.1.144/28 setzen.",
   "scan.bannerDismiss": "Ausblenden",

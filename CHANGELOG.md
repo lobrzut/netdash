@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3.157
+
+- **Docs + pozycjonowanie** — pulpit homelab jak Homer/Homepage; discovery **na żądanie** (nie ciągły skaner LAN). README, Dockge, DEPLOYMENT, `.env.example` zsynchronizowane z v1.3.150–156.
+- **[docs/SCANNING.md](docs/SCANNING.md)** — 3 kroki skanu, Popularne vs Podstawowe, ukierunkowany IP:port, safe mode vs pełny `/24`, SEP/IPS.
+- **i18n** — tagline logowania nie obiecuje już automatycznego skanu TCP w tle.
+- **Dockge** — `deploy-balanced.sh` i profil 2 GB: `on_demand` (wcześniej wymuszały legacy `adaptive` + tag `1.3.142`).
+- **Watchtower** — `nickfedor/watchtower:1.7.1` także w root `docker-compose.yml` i `deploy/docker-simple`.
+- Banner „co nowego” skrócony do aktualnego modelu skanu (wcześniej dump całej historii).
+- **Obraz**: ghcr.io/lobrzut/netdash:1.3.157.
+
 ## v1.3.156
 
 - **Fix: ręczne dodanie / probe nie gubi serwisu** — `POST /api/services` robi upsert po `(host, port)` zamiast tworzyć duplikat (np. URL z `/` vs bez). GET listy scala istniejące bliźniaki.

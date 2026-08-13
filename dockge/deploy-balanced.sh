@@ -17,7 +17,7 @@ if [ ! -f .env ]; then
   sed -i "s/^NETDASH_SECRET_KEY=.*/NETDASH_SECRET_KEY=${SECRET_KEY}/" .env
 fi
 
-# Zbalansowany profil — discovery ON, bez network flood
+# Zbalansowany profil — dashboard + skan na żądanie (bez ciągłego TCP)
 apply_env() {
   local key="$1" val="$2"
   if grep -q "^${key}=" .env 2>/dev/null; then
@@ -28,18 +28,17 @@ apply_env() {
 }
 
 apply_env NETDASH_SCAN_CIDR "192.168.1.0/24"
-apply_env NETDASH_DISCOVERY_ENABLED "true"
-apply_env NETDASH_DISCOVERY_MODE "adaptive"
-apply_env NETDASH_DISCOVERY_PROFILE "normal"
-apply_env NETDASH_DISCOVERY_INTERVAL "300"
-apply_env NETDASH_DISCOVERY_STARTUP_DELAY "180"
+apply_env NETDASH_DISCOVERY_POLICY "on_demand"
+apply_env NETDASH_DISCOVERY_ENABLED "false"
+apply_env NETDASH_DISCOVERY_MODE "local"
+apply_env NETDASH_DISCOVERY_PROFILE "weak"
 apply_env NETDASH_STARTUP_ENRICH_ENABLED "false"
 apply_env NETDASH_WEAK_DUAL_CHUNK "false"
 apply_env NETDASH_AUTO_DISCOVERY_ALL_PORTS "false"
 apply_env NETDASH_AUTO_DISCOVERY_ALWAYS_CHUNK "true"
 apply_env NETDASH_SCAN_SAFE_MODE "true"
-apply_env NETDASH_ARP_EXTRA_HOSTS "192.168.1.200,192.168.1.150"
-apply_env NETDASH_IMAGE_TAG "1.3.142"
+apply_env NETDASH_SCAN_PORT_PROFILE "popular"
+apply_env NETDASH_IMAGE_TAG "latest"
 
 echo "Pobieranie obrazu i start..."
 docker compose -f dockge/compose.yaml pull netdash

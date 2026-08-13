@@ -44,19 +44,19 @@ docker compose -f dockge/compose.yaml up -d
 
 6. **Verify:** `curl -s http://127.0.0.1:18787/api/health` → open `http://<vm-ip>:18787`, login `admin` / `changeme`, change password.
 
-7. **Tuning (dedicated VM):** keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs. Set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or **Settings → Automatic discovery**. Auto-discovery (`NETDASH_DISCOVERY_MODE=adaptive`, default in `dockge/compose.yaml`) scans in `/28` chunks with gradual all-port probing on live hosts. Manual scan via **Scan options** has hard limits — avoid `NETDASH_SCAN_SAFE_MODE=false` on `/24` unless you accept network load.
+7. **Tuning (dedicated VM):** keep `NETDASH_SCAN_SAFE_MODE=true` on shared VLANs. Set `NETDASH_SCAN_CIDR=192.168.1.0/24` in `.env` or **Settings → Automatic discovery**. Default policy is **`on_demand`** (no background TCP) — click **Scan network** when you want an inventory. See **[docs/SCANNING.md](../docs/SCANNING.md)**. Avoid legacy `adaptive` on SEP-protected VLANs. Keep `NETDASH_SCAN_SAFE_MODE=true` on `/24`.
 
 ## 2 GB Proxmox VM — memory and discovery
 
 On a **2 GB RAM** Ubuntu VM (OS + Docker + Dockge + NetDash), a **1024M** container limit together with **NETDASH_AUTO_DISCOVERY_ALL_PORTS=true** can push the host into **OOM** and kernel panics (observed on v1.3.141).
 
-**Defaults in dockge/compose.yaml (v1.3.142+):** memory: 512M, NETDASH_AUTO_DISCOVERY_ALL_PORTS=false, NETDASH_DISCOVERY_MODE=adaptive.
+**Defaults in dockge/compose.yaml (v1.3.150+):** memory: 512M, `NETDASH_DISCOVERY_POLICY=on_demand`, `NETDASH_DISCOVERY_ENABLED=false`, `NETDASH_AUTO_DISCOVERY_ALL_PORTS=false`.
 
-Recommended .env on 2 GB hosts (see [.env.example](../.env.example) — *PROFIL 2 GB VM*):
+Recommended .env on 2 GB hosts (see [.env.example](../.env.example) — *PROFIL ULTRA-SAFE / on-demand*):
 
-- NETDASH_DISCOVERY_PROFILE=weak **or** NETDASH_DISCOVERY_INTERVAL=600
-- Keep NETDASH_AUTO_DISCOVERY_ALL_PORTS=false unless you have more RAM
-- NETDASH_SCAN_SAFE_MODE=true and a bounded NETDASH_SCAN_CIDR
+- NETDASH_DISCOVERY_POLICY=on_demand (manual **Scan network** only)
+- Keep NETDASH_AUTO_DISCOVERY_ALL_PORTS=false unless you have more RAM and enable a background policy
+- NETDASH_SCAN_SAFE_MODE=true and NETDASH_SCAN_CIDR for your LAN
 
 After git pull, redeploy: docker compose -f dockge/compose.yaml up -d
 
@@ -65,9 +65,9 @@ After git pull, redeploy: docker compose -f dockge/compose.yaml up -d
 Dla dedykowanej VM **2 GB RAM**, **1–2 vCPU**, limit kontenera **512M** w `dockge/compose.yaml`:
 
 - **4 GB RAM na VM to overkill** sam dla NetDash — wcześniejsze crashe wynikały z **floodu sieciowego** (skan /24, `SCAN_SAFE_MODE=false`), nie z braku pamięci.
-- Szybki deploy: `bash dockge/deploy-balanced.sh` (wkleja profil zbalansowany do `.env` i startuje stack).
-- Ręcznie: blok **PROFIL ZBALANSOWANY 2 GB VM** z [.env.example](../.env.example) — discovery włączone, `all_ports=false`, chunki `/28`, interwał 300 s.
-- `NETDASH_ARP_EXTRA_HOSTS=192.168.1.200,192.168.1.150` — Proxmox i QNAP zawsze w rotacji ARP.
+- Szybki deploy: `bash dockge/deploy-balanced.sh` (wkleja profil **on_demand** do `.env` i startuje stack).
+- Ręcznie: blok **PROFIL ZBALANSOWANY 2 GB VM** z [.env.example](../.env.example) — `on_demand`, bez TCP w tle, `all_ports=false`.
+- `NETDASH_ARP_EXTRA_HOSTS` przydaje się tylko przy polityce `passive` / `adaptive`.
 
 Redeploy: `docker compose -f dockge/compose.yaml up -d`
 
@@ -165,7 +165,7 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 
 | Topic | Detail |
 |-------|--------|
-| **Host network** | Required for LAN scan. Container listens on host port **18787** (`NETDASH_PORT`) directly — no `ports:` mapping. |
+| **Host network** | Required for LAN scan. Container listens on host port **18787** (`NETDASH_LISTEN_PORT`) directly — no `ports:` mapping. |
 | **ports + host** | Never combine `network_mode: host` with `ports:` — Docker will refuse to start. |
 | **Linux only** | `network_mode: host` on Docker Desktop (Windows/Mac) does not expose your LAN; use native `python run.py` or `docker-compose.dev.yml` with `NETDASH_SCAN_CIDR`. |
 | **Data** | Bind mount `./data:/app/data` — SQLite `./data/netdash.db`, uploaded icons/logos `./data/uploads/`. Back up `/opt/stacks/netdash/data/`. |
