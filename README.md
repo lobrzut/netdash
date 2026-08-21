@@ -53,7 +53,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 | No vault | **Encrypted API key vault** (Fernet) |
 | No notes | **Notes widget** with markdown |
 | — | **Visibility filters**: login required / public |
-| — | **Widgets**: clock, stats, search, optional Brain / Network tiles |
+| — | **Widgets**: clock, stats, search, optional Pomnia / Network tiles |
 
 ## Features
 
@@ -68,7 +68,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 - **Mobile-friendly WOL/SOL** — tile action buttons tappable on touch devices
 - Persistent online/offline health checks (local-IP services probed like remote hosts)
 - i18n: English, Polish, German, Ukrainian
-- **Optional Brain stats tile** — live knowledge-base counts; **“Open dashboard”** when Brain is online
+- **Optional Pomnia stats tile** — live knowledge-base counts; **“Open dashboard”** when Pomnia is online; Bearer via Settings or `NETDASH_POMNIA_TOKEN`
 - **Optional Network tile** — LAN/WAN info, link latency; off by default
 - **Remote discovery agent** (v1.3.112): lightweight LAN scanner on a separate host (`POST /api/discovery/import`)
 
@@ -103,7 +103,7 @@ See [`deploy/agent/README.md`](deploy/agent/README.md) and [`deploy/qnap/README.
 ### Earlier highlights
 
 - **IPS-friendly / stealth** (v1.3.149) — `NETDASH_IPS_FRIENDLY` and per-host delays (on by default).
-- **Mobile WOL/SOL**, **SoL MAC auto-detect**, **Brain “Open dashboard”**, **stale auto-remove**, **local-IP health** (v1.3.143–148).
+- **Mobile WOL/SOL**, **SoL MAC auto-detect**, **Pomnia “Open dashboard”**, **stale auto-remove**, **local-IP health** (v1.3.143–148).
 - **2 GB VM + Dockge** — 512M limit, Watchtower `nickfedor/watchtower:1.7.1` (Docker 29+). QNAP deprecated.
 
 Full version history: **[CHANGELOG.md](CHANGELOG.md)**. See [ROADMAP.md](ROADMAP.md) for remaining work.

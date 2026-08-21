@@ -132,9 +132,11 @@ class AppSettings(Base):
     discovery_last_import_hosts: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Set true after the admin changes their password in-app; blocks env password sync on restart.
     admin_password_user_set: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Optional "Brain" knowledge-base stats tile on the dashboard.
+    # Optional Pomnia (formerly Brain) knowledge-base stats tile on the dashboard.
     show_brain: Mapped[bool] = mapped_column(Boolean, default=False)
     brain_stats_url: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Bearer for Pomnia /stats or /healthz; env NETDASH_POMNIA_TOKEN / NETDASH_BRAIN_TOKEN is fallback.
+    brain_token: Mapped[str | None] = mapped_column(String(512), nullable=True)
     # Optional "Network" tile (LAN/WAN/charts). Opt-in (WAN does an external GeoIP lookup).
     show_network: Mapped[bool] = mapped_column(Boolean, default=False)
 

@@ -1077,6 +1077,7 @@ const DEFAULT_SETTINGS = {
   show_stats: true,
   show_brain: false,
   brain_stats_url: null,
+  brain_token: null,
   show_network: false,
   show_category_filters: true,
   show_service_urls: true,
@@ -4915,6 +4916,7 @@ function readSettingsFromForm() {
     show_stats: $('#settings-show-stats').checked,
     show_brain: $('#settings-show-brain').checked,
     brain_stats_url: $('#settings-brain-url').value.trim() || null,
+    brain_token: $('#settings-brain-token').value.trim() || null,
     show_network: $('#settings-show-network').checked,
     show_category_filters: $('#settings-show-category-filters').checked,
     show_service_urls: $('#settings-show-service-urls').checked,
@@ -4978,6 +4980,7 @@ function fillSettingsForm() {
   $('#settings-show-stats').checked = appSettings.show_stats !== false;
   $('#settings-show-brain').checked = appSettings.show_brain === true;
   $('#settings-brain-url').value = appSettings.brain_stats_url || '';
+  $('#settings-brain-token').value = appSettings.brain_token || '';
   $('#settings-brain-url-row')?.classList.toggle('hidden', appSettings.show_brain !== true);
   $('#settings-show-network').checked = appSettings.show_network === true;
   $('#settings-show-category-filters').checked = appSettings.show_category_filters !== false;
@@ -5865,7 +5868,7 @@ function openSolSetupHelp() {
 const SETTINGS_PREVIEW_IDS = [
   'settings-title', 'settings-subtitle', 'settings-footer', 'settings-favicon',
   'settings-custom-css', 'settings-accent', 'settings-show-clock', 'settings-show-vault',
-  'settings-show-notes', 'settings-show-stats', 'settings-show-brain', 'settings-brain-url', 'settings-show-network', 'settings-show-category-filters',
+  'settings-show-notes', 'settings-show-stats', 'settings-show-brain', 'settings-brain-url', 'settings-brain-token', 'settings-show-network', 'settings-show-category-filters',
   'settings-show-service-urls', 'settings-show-ports', 'settings-services-grouped',
   'settings-default-access', 'settings-services-columns', 'settings-card-style',
   'settings-pinned-card-size',

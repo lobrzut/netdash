@@ -1,4 +1,4 @@
-"""Brain dashboard URL derivation from stats endpoint."""
+"""Pomnia dashboard URL derivation from stats/healthz endpoint."""
 
 from __future__ import annotations
 
@@ -18,6 +18,12 @@ class BrainDashboardUrlTests(unittest.TestCase):
         self.assertEqual(
             brain_dashboard_url("http://192.168.1.201:7860/stats/"),
             "http://192.168.1.201:7860/",
+        )
+
+    def test_strips_healthz_path(self) -> None:
+        self.assertEqual(
+            brain_dashboard_url("http://192.168.1.150:7865/healthz"),
+            "http://192.168.1.150:7865/",
         )
 
     def test_preserves_non_stats_path(self) -> None:

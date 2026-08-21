@@ -16,7 +16,7 @@ def ensure_str(value: str | bytes | None) -> str:
 
 
 def brain_dashboard_url(stats_url: str | None) -> str | None:
-    """Derive Brain UI base URL from the configured stats endpoint (e.g. …/stats → …/)."""
+    """Derive Pomnia UI base URL from stats/healthz endpoint (e.g. …/stats → …/)."""
     text = ensure_str(stats_url).strip()
     if not text:
         return None
@@ -25,8 +25,10 @@ def brain_dashboard_url(stats_url: str | None) -> str | None:
         if parsed.scheme not in ("http", "https") or not parsed.netloc:
             return None
         path = parsed.path.rstrip("/")
-        if path.endswith("/stats"):
-            path = path[: -len("/stats")] or "/"
+        for suffix in ("/stats", "/healthz"):
+            if path.endswith(suffix):
+                path = path[: -len(suffix)] or "/"
+                break
         return urlunparse(parsed._replace(path=path or "/", params="", query="", fragment=""))
     except Exception:
         return None

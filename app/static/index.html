@@ -173,7 +173,7 @@
             <div class="widget-body notes-grid" id="notes-list"></div>
           </div>
 
-          <div class="widget widget-brain hidden" id="widget-brain" aria-label="Brain">
+          <div class="widget widget-brain hidden" id="widget-brain" aria-label="Pomnia">
             <div class="brain-tile" id="brain-tile"></div>
           </div>
           <div class="widget widget-network hidden" id="widget-network" aria-label="Network">
@@ -409,14 +409,16 @@
             <label class="checkbox-row"><input type="checkbox" id="settings-show-vault" /><span data-i18n="settings.showVault">Pokaż sejf API</span></label>
             <label class="checkbox-row"><input type="checkbox" id="settings-show-notes" /><span data-i18n="settings.showNotes">Pokaż notatki</span></label>
             <label class="checkbox-row"><input type="checkbox" id="settings-show-stats" /><span data-i18n="settings.showStats">Pokaż statystyki</span></label>
-            <!-- Brain tile: optional integration, OFF by default. Enable here and set a Brain
-                 /stats endpoint URL that returns knowledge counts (notes/sessions/library_docs/
-                 graph_nodes/activity_7d). Wired to widget #widget-brain, server proxy
-                 /api/brain/stats and renderBrainStats(). -->
-            <label class="checkbox-row"><input type="checkbox" id="settings-show-brain" /><span data-i18n="settings.showBrain">Pokaż kafelkę Brain</span></label>
+            <!-- Pomnia tile: optional integration, OFF by default. Enable here, set /stats or
+                 /healthz URL, and optionally a Bearer token (or NETDASH_POMNIA_TOKEN /
+                 NETDASH_BRAIN_TOKEN in .env). Wired to #widget-brain, /api/brain/stats,
+                 renderBrainStats(). -->
+            <label class="checkbox-row"><input type="checkbox" id="settings-show-brain" /><span data-i18n="settings.showBrain">Pokaż kafelkę Pomnia</span></label>
             <div class="settings-brain-url hidden" id="settings-brain-url-row" style="margin:6px 0 2px;">
-              <label for="settings-brain-url" data-i18n="settings.brainStatsUrl" style="display:block; font-size:0.8125rem; color:var(--text-muted); margin-bottom:4px;">URL statystyk Brain</label>
-              <input type="url" id="settings-brain-url" placeholder="http://192.168.1.201:7860/stats" autocomplete="off" />
+              <label for="settings-brain-url" data-i18n="settings.brainStatsUrl" style="display:block; font-size:0.8125rem; color:var(--text-muted); margin-bottom:4px;">URL statystyk Pomni</label>
+              <input type="url" id="settings-brain-url" placeholder="http://192.168.1.150:7865/stats" autocomplete="off" />
+              <label for="settings-brain-token" data-i18n="settings.brainToken" style="display:block; font-size:0.8125rem; color:var(--text-muted); margin:10px 0 4px;">Token Pomni (Bearer)</label>
+              <input type="password" id="settings-brain-token" placeholder="btk_…" autocomplete="off" spellcheck="false" />
             </div>
             <!-- Network tile: LAN/WAN/charts. OFF by default; WAN does an external GeoIP lookup. -->
             <label class="checkbox-row"><input type="checkbox" id="settings-show-network" /><span data-i18n="settings.showNetwork">Pokaż kafelkę Sieć</span></label>

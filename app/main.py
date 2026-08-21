@@ -1,6 +1,7 @@
 import asyncio
 import ipaddress
 import logging
+import os
 import re
 import time
 import uuid
@@ -295,6 +296,7 @@ def _migrate_db(sync_conn):
             ("admin_password_user_set", "BOOLEAN DEFAULT 0"),
             ("show_brain", "BOOLEAN DEFAULT 0"),
             ("brain_stats_url", "VARCHAR(256)"),
+            ("brain_token", "VARCHAR(512)"),
             ("show_network", "BOOLEAN DEFAULT 0"),
         ]
         for name, ddl in settings_migrations:
@@ -1141,20 +1143,34 @@ async def update_settings(
     return _settings_to_out(app_settings)
 
 
-_brain_stats_cache: dict[str, object] = {"at": 0.0, "data": None, "url": None}
+_brain_stats_cache: dict[str, object] = {"at": 0.0, "data": None, "url": None, "tok": None}
+
+
+def _resolve_pomnia_token(app_settings: AppSettings) -> str:
+    """UI settings token wins; env fallbacks for Dockge/.env without committing secrets."""
+    ui = (getattr(app_settings, "brain_token", None) or "").strip()
+    if ui:
+        return ui
+    for key in ("NETDASH_POMNIA_TOKEN", "NETDASH_BRAIN_TOKEN", "POMNIA_STATS_TOKEN"):
+        val = (os.environ.get(key) or "").strip()
+        if val:
+            return val
+    return ""
 
 
 @app.get("/api/brain/stats")
 async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
-    """Proxy + normalize the Brain knowledge-base stats JSON (server-side, cached 60s)."""
+    """Proxy + normalize Pomnia /stats or /healthz JSON (server-side, cached 60s)."""
     app_settings = await _get_or_create_settings(db)
     url = (app_settings.brain_stats_url or "").strip()
     if not app_settings.show_brain or not url:
         return {"ok": False, "configured": bool(url), "error": "disabled"}
 
+    tok = _resolve_pomnia_token(app_settings)
     now = time.monotonic()
     if (
         _brain_stats_cache.get("url") == url
+        and _brain_stats_cache.get("tok") == tok
         and _brain_stats_cache.get("data") is not None
         and now - float(_brain_stats_cache.get("at") or 0) < 60
     ):
@@ -1162,26 +1178,39 @@ async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_
 
     try:
         timeout = httpx.Timeout(4.0, connect=2.0)
+        headers = {"User-Agent": "NetDash/1.0 PomniaStats"}
+        if tok:
+            headers["Authorization"] = f"Bearer {tok}"
         async with httpx.AsyncClient(verify=False, timeout=timeout) as client:
-            resp = await client.get(url, headers={"User-Agent": "NetDash/1.0 BrainStats"})
+            resp = await client.get(url, headers=headers)
         resp.raise_for_status()
         raw = resp.json()
+        idx = raw.get("index") if isinstance(raw.get("index"), dict) else {}
+        files = int(raw.get("notes") or raw.get("library_docs") or (idx or {}).get("files") or 0)
+        chunks = int(raw.get("graph_nodes") or (idx or {}).get("chunks") or 0)
         activity = raw.get("activity_7d")
         data = {
             "ok": True,
             "dashboard_url": brain_dashboard_url(url),
-            "notes": int(raw.get("notes") or 0),
+            "notes": files,
             "sessions": int(raw.get("sessions") or 0),
-            "library_docs": int(raw.get("library_docs") or 0),
+            "library_docs": int(raw.get("library_docs") or files),
             "code_files": int(raw.get("code_files") or 0),
-            "graph_nodes": int(raw.get("graph_nodes") or 0),
+            "graph_nodes": chunks,
             "last_session_at": raw.get("last_session_at"),
             "activity_7d": [int(x) for x in activity][:14] if isinstance(activity, list) else [],
+            "pomnia": {
+                "version": raw.get("version"),
+                "status": raw.get("status") or raw.get("service"),
+                "vaultOwner": raw.get("vaultOwner"),
+                "uptimeSec": raw.get("uptimeSec"),
+                "embed": raw.get("embed"),
+            },
         }
     except Exception as exc:
         return {"ok": False, "configured": True, "error": str(exc)[:200]}
 
-    _brain_stats_cache.update(at=now, data=data, url=url)
+    _brain_stats_cache.update(at=now, data=data, url=url, tok=tok)
     return data
 
 

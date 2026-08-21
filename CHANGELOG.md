@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.158
+
+- **Pomnia branding** — settings/tile labels Brain → Pomnia (PL: „Pokaż kafelkę Pomnia”, „URL statystyk Pomni”, „Token Pomni (Bearer)”).
+- **Pomnia Bearer token** — new Settings field `brain_token` (password input); proxy `/api/brain/stats` sends `Authorization: Bearer …`. Fallback env: `NETDASH_POMNIA_TOKEN`, then legacy `NETDASH_BRAIN_TOKEN` / `POMNIA_STATS_TOKEN` (never commit tokens).
+- **Pomnia `/healthz` + `/stats`** — normalize `index.files` / `index.chunks`; dashboard link strips `/healthz` as well as `/stats`.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.158.
+
 ## v1.3.157
 
 - **Docs + pozycjonowanie** — pulpit homelab jak Homer/Homepage; discovery **na żądanie** (nie ciągły skaner LAN). README, Dockge, DEPLOYMENT, `.env.example` zsynchronizowane z v1.3.150–156.
