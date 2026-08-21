@@ -47,6 +47,7 @@ from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
 from app.service_endpoints import pick_endpoint_service
+from app.pomnia_stats import normalize_pomnia_stats
 from app.url_utils import brain_dashboard_url, normalize_endpoint_url, sanitize_service_url
 from app.scanner import (
     expand_cidrs_for_safe_mode,
@@ -1178,35 +1179,16 @@ async def brain_stats(db: AsyncSession = Depends(get_db), _: User = Depends(get_
 
     try:
         timeout = httpx.Timeout(4.0, connect=2.0)
-        headers = {"User-Agent": "NetDash/1.0 PomniaStats"}
+        headers = {"User-Agent": f"NetDash/{VERSION} PomniaStats"}
         if tok:
             headers["Authorization"] = f"Bearer {tok}"
         async with httpx.AsyncClient(verify=False, timeout=timeout) as client:
             resp = await client.get(url, headers=headers)
         resp.raise_for_status()
         raw = resp.json()
-        idx = raw.get("index") if isinstance(raw.get("index"), dict) else {}
-        files = int(raw.get("notes") or raw.get("library_docs") or (idx or {}).get("files") or 0)
-        chunks = int(raw.get("graph_nodes") or (idx or {}).get("chunks") or 0)
-        activity = raw.get("activity_7d")
-        data = {
-            "ok": True,
-            "dashboard_url": brain_dashboard_url(url),
-            "notes": files,
-            "sessions": int(raw.get("sessions") or 0),
-            "library_docs": int(raw.get("library_docs") or files),
-            "code_files": int(raw.get("code_files") or 0),
-            "graph_nodes": chunks,
-            "last_session_at": raw.get("last_session_at"),
-            "activity_7d": [int(x) for x in activity][:14] if isinstance(activity, list) else [],
-            "pomnia": {
-                "version": raw.get("version"),
-                "status": raw.get("status") or raw.get("service"),
-                "vaultOwner": raw.get("vaultOwner"),
-                "uptimeSec": raw.get("uptimeSec"),
-                "embed": raw.get("embed"),
-            },
-        }
+        if not isinstance(raw, dict):
+            return {"ok": False, "configured": True, "error": "invalid JSON object"}
+        data = normalize_pomnia_stats(raw, dashboard_url=brain_dashboard_url(url))
     except Exception as exc:
         return {"ok": False, "configured": True, "error": str(exc)[:200]}
 

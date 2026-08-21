@@ -6,14 +6,14 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.158"
+VERSION = "1.3.159"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Kafelek Pomnia (dawniej Brain) — branding w ustawieniach; Bearer token w UI lub NETDASH_POMNIA_TOKEN / NETDASH_BRAIN_TOKEN",
-    "Pomnia /healthz i /stats — proxy normalizuje index.files/chunks; token nie trafia do publicznego GH",
-    "Pulpit homelab jak Homer/Homepage — kafelki, sejf, notatki; wykrywanie LAN opcjonalne i na żądanie",
-    "Jak skanować: 1) ustaw CIDR  2) Skanuj sieć → Popularne porty  3) albo ukierunkowany IP:port — docs/SCANNING.md",
-    "Domyślnie on_demand: brak TCP w tle; safe mode throttluje IPS/SEP; ręczny skan może objąć pełny /24",
+    "Kafelek Pomnia: Pliki indeksu / Fragmenty / Status / Uptime (nie udawane Notatki/Sesje)",
+    "Proxy /api/brain/stats — index.files/chunks; null≠0 gdy healthz redaguje liczniki",
+    "Kafelek Pomnia (dawniej Brain) — branding + Bearer token w ustawieniach",
+    "Pulpit homelab jak Homer/Homepage — kafelki, sejf, notatki; skan LAN na żądanie",
+    "Jak skanować: CIDR → Popularne porty lub ukierunkowany IP:port — docs/SCANNING.md",
 ]
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here
 GITHUB_REPO = "https://github.com/lobrzut/netdash"

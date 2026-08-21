@@ -1973,10 +1973,25 @@ async function copyToClipboard(text) {
   }
 }
 
+function formatUptimeSec(sec) {
+  const n = Number(sec);
+  if (!Number.isFinite(n) || n < 0) return '—';
+  if (n < 60) return `${Math.round(n)}s`;
+  if (n < 3600) return `${Math.floor(n / 60)}m`;
+  if (n < 86400) {
+    const h = Math.floor(n / 3600);
+    const m = Math.floor((n % 3600) / 60);
+    return m ? `${h}h ${m}m` : `${h}h`;
+  }
+  const d = Math.floor(n / 86400);
+  const h = Math.floor((n % 86400) / 3600);
+  return h ? `${d}d ${h}h` : `${d}d`;
+}
+
 async function renderBrainStats() {
   const tile = document.getElementById('brain-tile');
   if (!tile || appSettings.show_brain !== true) return;
-  const fmt = (n) => Number(n || 0).toLocaleString('pl-PL');
+  const fmtCount = (n) => (n == null || n === '' ? '—' : Number(n).toLocaleString('pl-PL'));
   const dashLink = (href) => href
     ? `<a class="brain-dash-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="${esc(t('brain.openDashboard'))}">${t('brain.openDashboard')}</a>`
     : '';
@@ -1996,22 +2011,29 @@ async function renderBrainStats() {
     renderEmpty(d && d.configured ? t('brain.unreachable') : t('brain.notConfigured'));
     return;
   }
-  const bars = Array.isArray(d.activity_7d) ? d.activity_7d.slice(-7) : [];
-  const max = Math.max(1, ...bars);
-  const barsHtml = bars.map((v, i) =>
-    `<span class="brain-bar ${i === bars.length - 1 ? 'brain-bar--last' : ''}" style="height:${Math.max(4, Math.round((Number(v) || 0) / max * 100))}%" title="${Number(v) || 0}"></span>`
-  ).join('');
-  const last = d.last_session_at ? formatRelativeTime(d.last_session_at) : '—';
+  const files = d.index_files != null ? d.index_files : d.notes;
+  const chunks = d.index_chunks != null ? d.index_chunks : d.library_docs;
+  const countsOk = d.counts_available === true || (files != null && chunks != null);
+  const statusLabel = (d.status || 'ok').toString();
+  const uptime = formatUptimeSec(d.uptime_sec ?? d.pomnia?.uptimeSec);
+  const version = d.version || d.pomnia?.version || '—';
+  const embed = d.embed || d.pomnia?.embed || null;
+  const embedBit = embed?.backend
+    ? `${embed.backend}${embed.ready === false ? ` · ${t('brain.embedNotReady')}` : ''}`
+    : null;
   const dashboardUrl = d.dashboard_url || null;
+  const redactedHint = !countsOk
+    ? `<div class="brain-activity-label">${esc(t('brain.countsRedacted'))}</div>`
+    : '';
   tile.innerHTML = head('', 'online', dashboardUrl)
     + `<div class="brain-metrics">
-        <div class="brain-metric"><div class="brain-metric-label">${t('brain.notes')}</div><div class="brain-metric-value">${fmt(d.notes)}</div></div>
-        <div class="brain-metric"><div class="brain-metric-label">${t('brain.sessions')}</div><div class="brain-metric-value">${fmt(d.sessions)}</div></div>
-        <div class="brain-metric"><div class="brain-metric-label">${t('brain.library')}</div><div class="brain-metric-value">${fmt(d.library_docs)}</div></div>
-        <div class="brain-metric"><div class="brain-metric-label">${t('brain.code')}</div><div class="brain-metric-value">${fmt(d.code_files)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.indexFiles')}</div><div class="brain-metric-value">${fmtCount(countsOk ? files : null)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.chunks')}</div><div class="brain-metric-value">${fmtCount(countsOk ? chunks : null)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.status')}</div><div class="brain-metric-value">${esc(statusLabel)}</div></div>
+        <div class="brain-metric"><div class="brain-metric-label">${t('brain.uptime')}</div><div class="brain-metric-value">${esc(uptime)}</div></div>
       </div>`
-    + (barsHtml ? `<div><div class="brain-activity-label">${t('brain.activity')}</div><div class="brain-bars">${barsHtml}</div></div>` : '')
-    + `<div class="brain-foot"><span>${t('brain.lastSession')} · ${esc(last)}</span><span>${t('brain.graph')} · ${fmt(d.graph_nodes)}</span></div>`;
+    + redactedHint
+    + `<div class="brain-foot"><span>${t('brain.version')} · ${esc(String(version))}</span><span>${embedBit ? esc(embedBit) : esc(t('brain.searchAppliance'))}</span></div>`;
 }
 
 function _netFlag(cc) {

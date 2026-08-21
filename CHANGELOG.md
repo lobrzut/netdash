@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.159
+
+- **Pomnia tile labels** — search-appliance metrics: Index files / Chunks / Status / Uptime (PL: Pliki indeksu / Fragmenty / Status / Uptime). No more fake Notes / Sessions / Library / Code / Graph.
+- **Honest redaction** — when Pomnia returns `index: null` (public or bad Bearer), NetDash shows `—` + hint instead of zeros.
+- **Normalize helper** — `app/pomnia_stats.py` maps `index.files` / `index.chunks` / `uptimeSec` / `status` / `version` / `embed`.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.159.
+
 ## v1.3.158
 
 - **Pomnia branding** — settings/tile labels Brain → Pomnia (PL: „Pokaż kafelkę Pomnia”, „URL statystyk Pomni”, „Token Pomni (Bearer)”).
