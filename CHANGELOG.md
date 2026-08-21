@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.160
+
+- **Fix: targeted probe hung on „Sprawdzanie…”** — UI polling no longer `await`s a full `POST /api/services/health-check` (100+ services + IPS delays held a browser HTTP slot for minutes and queued the probe). Refresh = `loadServices()` only; server `_health_check_loop` remains SoT.
+- **Probe client timeout** — `Sprawdź i dodaj` aborts after 25s with a clear error instead of spinning forever; re-entry guard on the button.
+- **Health-check API** — if a full pass is already running, return `{skipped: already_running}` immediately.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.160.
+
 ## v1.3.159
 
 - **Pomnia tile labels** — search-appliance metrics: Index files / Chunks / Status / Uptime (PL: Pliki indeksu / Fragmenty / Status / Uptime). No more fake Notes / Sessions / Library / Code / Graph.

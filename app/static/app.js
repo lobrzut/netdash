@@ -142,18 +142,25 @@ function friendlyFetchError(err) {
 }
 
 async function api(path, options = {}) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const { timeoutMs, ...fetchOptions } = options;
+  const headers = { 'Content-Type': 'application/json', ...fetchOptions.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  const doFetch = (hdrs) => {
+    const opts = { credentials: 'include', ...fetchOptions, headers: hdrs };
+    return timeoutMs
+      ? fetchWithTimeout(`${API}${path}`, opts, timeoutMs)
+      : fetch(`${API}${path}`, opts);
+  };
   let res;
   try {
-    res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers });
+    res = await doFetch(headers);
   } catch (err) {
     throw new Error(friendlyFetchError(err));
   }
   if (res.status === 401 && headers.Authorization) {
-    const cookieOnly = { 'Content-Type': 'application/json', ...options.headers };
+    const cookieOnly = { 'Content-Type': 'application/json', ...fetchOptions.headers };
     try {
-      res = await fetch(`${API}${path}`, { credentials: 'include', ...options, headers: cookieOnly });
+      res = await doFetch(cookieOnly);
     } catch (err) {
       throw new Error(friendlyFetchError(err));
     }
@@ -1780,9 +1787,12 @@ function startHealthPolling() {
   serviceRefreshInterval = setInterval(() => {
     loadServices().catch(() => {});
   }, refreshMs);
+  // Do NOT await a full /api/services/health-check here: with 100+ services and
+  // IPS-friendly delays it holds a browser HTTP/1.1 slot for minutes and queues
+  // short calls (e.g. targeted probe → stuck on „Sprawdzanie…”). The server
+  // already runs _health_check_loop; the UI only needs a fresh service list.
   healthPollInterval = setInterval(async () => {
     try {
-      await api('/api/services/health-check', { method: 'POST' });
       await loadServices();
     } catch {
       /* ignore background refresh errors */
@@ -4693,7 +4703,10 @@ function showProbeResult(text, ok) {
   el.classList.toggle('is-err', !!text && !ok);
 }
 
+let probeInFlight = false;
+
 async function runTargetedProbe() {
+  if (probeInFlight) return;
   const host = ($('#probe-host')?.value || '').trim();
   const portRaw = ($('#probe-port')?.value || '').trim();
   const protocol = ($('#probe-protocol')?.value || 'auto').trim() || 'auto';
@@ -4708,11 +4721,15 @@ async function runTargetedProbe() {
   }
   const btn = $('#probe-submit');
   if (btn) btn.disabled = true;
+  probeInFlight = true;
   showProbeResult(t('modal.scan.probeRunning'), true);
   try {
+    // Hard client deadline — probe itself is ~50ms; anything longer is queueing
+    // behind a stuck browser connection (historically: long health-check POST).
     const res = await api('/api/scan/probe', {
       method: 'POST',
       body: JSON.stringify({ host, port, protocol, add: true }),
+      timeoutMs: 25000,
     });
     const parts = [];
     if (res.message) parts.push(res.message);
@@ -4739,6 +4756,7 @@ async function runTargetedProbe() {
   } catch (err) {
     showProbeResult(err.message || t('modal.scan.probeError'), false);
   } finally {
+    probeInFlight = false;
     if (btn) btn.disabled = false;
   }
 }

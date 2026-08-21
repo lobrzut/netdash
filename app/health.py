@@ -21,6 +21,11 @@ logger = logging.getLogger("netdash.health")
 # used to race on the same AsyncSession rows (StaleDataError).
 _health_check_lock = asyncio.Lock()
 
+
+def health_check_in_progress() -> bool:
+    """True while a full-table health pass holds the lock (may take minutes)."""
+    return _health_check_lock.locked()
+
 _HTTP_STATUS_RE = re.compile(r"^HTTP\s+(\d{3})\b", re.IGNORECASE)
 # Auth / redirect responses mean the host is reachable, not an outage.
 _REACHABLE_HTTP_CODES = frozenset(range(300, 400)) | {401, 403}

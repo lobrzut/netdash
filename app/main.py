@@ -42,7 +42,12 @@ from app.docker_update import (
 from app.updates import fetch_latest_release, is_newer_version, normalize_version
 from app.database import Base, async_session, engine, get_db
 from app.enrich import enrich_all_services, enrich_mac_addresses, enrich_service_icons, should_auto_wol
-from app.health import check_all_services, effective_stale_remove_days, purge_stale_services
+from app.health import (
+    check_all_services,
+    effective_stale_remove_days,
+    health_check_in_progress,
+    purge_stale_services,
+)
 from app.homer_import import parse_homer_config
 from app.models import DEFAULT_ABOUT_PROJECT, ApiKey, AppSettings, Note, ScanJob, Service, User
 from app.vault import decrypt_secret, encrypt_secret, mask_secret
@@ -2528,6 +2533,11 @@ async def run_health_check(db: AsyncSession = Depends(get_db), _: User = Depends
     # Avoid racing the background health loop / starving the scan event loop.
     if _scan_in_progress():
         return {"checked": 0, "skipped": "scan_in_progress"}
+    # Full pass over 100+ services with IPS delays can take minutes. If one is
+    # already running, return immediately so browser HTTP/1.1 slots stay free
+    # for interactive calls (targeted probe, settings, etc.).
+    if health_check_in_progress():
+        return {"checked": 0, "skipped": "already_running"}
     count = await check_all_services(db)
     return {"checked": count}
 
