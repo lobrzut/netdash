@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.162
+
+- **iPad / Home Screen PWA** — tapping a service tile no longer opens the in-app Safari sheet with only „Gotowe” (Done). In standalone mode NetDash navigates to the service URL in the same window so Portainer/Proxmox/Pomnia load full UI. Desktop still uses a new tab.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.162.
+
 ## v1.3.161
 
 - **Pomnia service branding** — local `/static/pomnia-icon.png` for card icon + watermark (LAN favicons stay blocked; no more generic plug). Port `7865` / name `Pomnia` / `brain-core` mapped. Category hint: AI.

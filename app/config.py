@@ -6,13 +6,13 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.161"
+VERSION = "1.3.162"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
-    "Pomnia: własna ikona + watermark na kafelku serwisu (nie generyczna wtyczka)",
-    "Fix: „Sprawdź i dodaj” nie wisi na Sprawdzanie… (health-check nie blokuje przeglądarki)",
+    "iPad/Home Screen: klik kafelka otwiera serwis pełnym ekranem (nie arkusz „Gotowe”)",
+    "Pomnia: własna ikona + watermark na kafelku serwisu",
+    "Fix: „Sprawdź i dodaj” nie wisi na Sprawdzanie…",
     "Kafelek Pomnia: Pliki indeksu / Fragmenty / Status / Uptime",
-    "Proxy /api/brain/stats — index.files/chunks; null≠0 gdy healthz redaguje liczniki",
     "Jak skanować: CIDR → Popularne porty lub ukierunkowany IP:port — docs/SCANNING.md",
 ]
 FORBIDDEN_LISTEN_PORT = 8787  # Readarr — never bind here

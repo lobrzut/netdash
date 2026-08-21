@@ -141,6 +141,34 @@ function friendlyFetchError(err) {
   return msg || t('error.unknown');
 }
 
+/** True when the UI runs as an installed web app (iPad/iPhone Home Screen, etc.). */
+function isStandaloneDisplay() {
+  try {
+    if (window.navigator.standalone === true) return true;
+    if (window.matchMedia('(display-mode: standalone)').matches) return true;
+    if (window.matchMedia('(display-mode: fullscreen)').matches) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * Open a service URL. On iOS/iPadOS standalone NetDash, window.open/_blank shows an
+ * in-app Safari sheet with only „Gotowe” (Done) — not the real service UI. Navigate
+ * the same window instead so Portainer/Proxmox/Pomnia load full-screen.
+ */
+function openServiceUrl(url) {
+  const href = (url || '').trim();
+  if (!href || href === '#') return;
+  if (isStandaloneDisplay()) {
+    window.location.assign(href);
+    return;
+  }
+  const opened = window.open(href, '_blank', 'noopener,noreferrer');
+  if (!opened) window.location.assign(href);
+}
+
 async function api(path, options = {}) {
   const { timeoutMs, ...fetchOptions } = options;
   const headers = { 'Content-Type': 'application/json', ...fetchOptions.headers };
@@ -2905,7 +2933,7 @@ function bindServiceCards(root) {
     card.addEventListener('click', (e) => {
       if (e.target.closest('.service-delete, .service-action, .service-edit-btn')) return;
       const url = card.dataset.url;
-      if (url && url !== '#') window.open(url, '_blank', 'noopener');
+      if (url && url !== '#') openServiceUrl(url);
     });
   });
   root.querySelectorAll('.service-edit-btn').forEach((btn) => {
@@ -3659,7 +3687,7 @@ function bindPinnedChips(root) {
     chip.addEventListener('click', (e) => {
       if (e.target.closest('.pinned-chip-action, .pinned-chip-unpin-corner')) return;
       const url = chip.dataset.url;
-      if (url && url !== '#') window.open(url, '_blank', 'noopener');
+      if (url && url !== '#') openServiceUrl(url);
     });
   });
   root.querySelectorAll('.pinned-chip-unpin-corner').forEach((btn) => {
