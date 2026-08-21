@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.161
+
+- **Pomnia service branding** — local `/static/pomnia-icon.png` for card icon + watermark (LAN favicons stay blocked; no more generic plug). Port `7865` / name `Pomnia` / `brain-core` mapped. Category hint: AI.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.161.
+
 ## v1.3.160
 
 - **Fix: targeted probe hung on „Sprawdzanie…”** — UI polling no longer `await`s a full `POST /api/services/health-check` (100+ services + IPS delays held a browser HTTP slot for minutes and queued the probe). Refresh = `loadServices()` only; server `_health_check_loop` remains SoT.

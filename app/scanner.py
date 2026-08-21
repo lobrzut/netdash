@@ -176,6 +176,8 @@ PORT_SIGNATURES: dict[int, tuple[str, str, str]] = {
     51820: ("WireGuard", "lock", "Sieć"),
     8787: ("NetDash (legacy)", "dashboard", "Dashboard"),
     18787: ("NetDash", "dashboard", "Dashboard"),
+    7865: ("Pomnia", "ai", "AI"),
+    7860: ("Pomnia (legacy)", "ai", "AI"),
 }
 
 HTTP_TITLE_RE = re.compile(r"<title[^>]*>([^<]+)</title>", re.IGNORECASE)
@@ -261,6 +263,7 @@ TITLE_HINTS: list[tuple[str, str, str, str]] = [
     (r"openwebui", "Open WebUI", "ai", "AI"),
     (r"comfyui", "ComfyUI", "ai", "AI"),
     (r"stable\s*diffusion", "Stable Diffusion", "ai", "AI"),
+    (r"pomnia|brain-core", "Pomnia", "ai", "AI"),
 ]
 
 ProgressCallback = Callable[[str, int, int], Awaitable[None]]

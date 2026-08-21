@@ -121,8 +121,35 @@ BRAND_SLUGS: list[tuple[str, str]] = [
     (r"amp", "amp"),
 ]
 
+# First-party brands shipped under /static (not on simpleicons CDN).
+LOCAL_BRAND_ICONS: list[tuple[str, str]] = [
+    (r"pomnia|brain-core", "/static/pomnia-icon.png"),
+]
 
-# Common homelab ports → simple-icons slug (watermark when HTTP title is generic)
+
+# Common homelab ports → brand icon URL (simpleicons or local static)
+PORT_BRAND_ICONS: dict[int, str] = {
+    8006: "https://cdn.simpleicons.org/proxmox",
+    9090: "https://cdn.simpleicons.org/prometheus",
+    9000: "https://cdn.simpleicons.org/portainer",
+    8080: "https://cdn.simpleicons.org/qnap",
+    5000: "https://cdn.simpleicons.org/docker",
+    5001: "https://cdn.simpleicons.org/qnap",
+    8443: "https://cdn.simpleicons.org/nginx",
+    9443: "https://cdn.simpleicons.org/nginx",
+    3000: "https://cdn.simpleicons.org/nodedotjs",
+    3306: "https://cdn.simpleicons.org/mysql",
+    5432: "https://cdn.simpleicons.org/postgresql",
+    6379: "https://cdn.simpleicons.org/redis",
+    5672: "https://cdn.simpleicons.org/rabbitmq",
+    9200: "https://cdn.simpleicons.org/elasticsearch",
+    27017: "https://cdn.simpleicons.org/mongodb",
+    18787: "https://cdn.simpleicons.org/docker",
+    7865: "/static/pomnia-icon.png",
+    7860: "/static/pomnia-icon.png",
+}
+
+# Back-compat alias used by older call sites / docs.
 PORT_BRAND_SLUGS: dict[int, str] = {
     8006: "proxmox",
     9090: "prometheus",
@@ -146,6 +173,9 @@ PORT_BRAND_SLUGS: dict[int, str] = {
 def resolve_port_brand_icon(port: int | None) -> str | None:
     if port is None:
         return None
+    local = PORT_BRAND_ICONS.get(port)
+    if local:
+        return local
     slug = PORT_BRAND_SLUGS.get(port)
     if slug:
         return simple_icon_url(slug)
@@ -161,6 +191,9 @@ def resolve_brand_icon(*texts: str | None) -> str | None:
         if not text:
             continue
         lowered = text.lower()
+        for pattern, path in LOCAL_BRAND_ICONS:
+            if re.search(pattern, lowered):
+                return path
         for pattern, slug in BRAND_SLUGS:
             if re.search(pattern, lowered):
                 return simple_icon_url(slug)

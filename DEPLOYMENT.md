@@ -1,6 +1,6 @@
 # NetDash — deployment guide
 
-Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.160**
+Repository: [lobrzut/netdash](https://github.com/lobrzut/netdash) · wersja: **1.3.161**
 
 > **Zalecane wdrożenie:** **Dockge na Ubuntu VM (Proxmox)** — nie QNAP. VM **2 GB RAM** wystarczy dla samego NetDash. QNAP: deprecated — **[DEPRECATION-QNAP.md](DEPRECATION-QNAP.md)** → **[dockge/README.md](dockge/README.md)**.
 
@@ -158,7 +158,7 @@ NetDash on a Linux server includes several resilience layers:
 ### Post-deploy verification
 
 ```bash
-curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.160",...}
+curl -s http://127.0.0.1:18787/api/health          # {"ok":true,"version":"1.3.161",...}
 docker inspect netdash --format='RestartCount={{.RestartCount}}'
 docker compose ps                                  # healthy
 ```
