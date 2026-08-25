@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.163
+
+- **Targeted probe UX** — one address field (`http://host:port` or `host:port`) instead of separate IP / port / protocol cells; scheme sets protocol, Enter submits.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.163.
+
 ## v1.3.162
 
 - **iPad / Home Screen PWA** — tapping a service tile no longer opens the in-app Safari sheet with only „Gotowe” (Done). In standalone mode NetDash navigates to the service URL in the same window so Portainer/Proxmox/Pomnia load full UI. Desktop still uses a new tab.

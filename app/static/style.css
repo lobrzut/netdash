@@ -5599,20 +5599,21 @@ body[data-dashboard-layout="classic-sm"] .service-card--pinned .service-actions-
   border-top: 1px solid var(--border);
 }
 
-.scan-probe-grid {
-  display: grid;
-  grid-template-columns: 1.4fr 0.7fr 0.8fr;
+.scan-probe-url-row {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.625rem;
+  align-items: flex-end;
 }
 
-@media (max-width: 640px) {
-  .scan-probe-grid {
-    grid-template-columns: 1fr;
-  }
+.scan-probe-url-field {
+  flex: 1 1 16rem;
+  min-width: 0;
 }
 
-.scan-probe-actions {
-  margin-top: 0.75rem;
+.scan-probe-url-row #probe-submit {
+  flex: 0 0 auto;
+  margin-bottom: 0.125rem;
 }
 
 .scan-probe-result {

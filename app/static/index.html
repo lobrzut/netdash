@@ -23,8 +23,8 @@
     })();
   </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="/static/style.css?v=1.3.162" />
-  <script src="/static/i18n.js?v=1.3.162"></script>
+  <link rel="stylesheet" href="/static/style.css?v=1.3.163" />
+  <script src="/static/i18n.js?v=1.3.163"></script>
 </head>
 <body data-dashboard-layout="medium">
   <div id="app">
@@ -897,27 +897,12 @@ sol --udp-port 9
       </fieldset>
       <div class="scan-probe-section" id="scan-probe-section">
         <h3 class="modal-section-label" data-i18n="modal.scan.probeTitle">Ukierunkowany skan</h3>
-        <p class="hint" data-i18n="modal.scan.probeDesc">Znasz IP i port? Sprawdź jeden serwis (np. qBittorrent :6363) bez skanowania całej sieci.</p>
-        <div class="scan-probe-grid">
-          <div class="field">
-            <label for="probe-host" data-i18n="modal.scan.probeHost">IP / host</label>
-            <input type="text" id="probe-host" data-i18n-placeholder="modal.scan.probeHostPlaceholder" placeholder="192.168.1.150" autocomplete="off" />
+        <p class="hint" data-i18n="modal.scan.probeDesc">Wklej cały adres (np. http://192.168.1.201:7865) — bez rozbijania na pola.</p>
+        <div class="scan-probe-url-row">
+          <div class="field scan-probe-url-field">
+            <label for="probe-target" data-i18n="modal.scan.probeTarget">Adres serwisu</label>
+            <input type="text" id="probe-target" data-i18n-placeholder="modal.scan.probeTargetPlaceholder" placeholder="http://192.168.1.150:6363" autocomplete="off" spellcheck="false" />
           </div>
-          <div class="field">
-            <label for="probe-port" data-i18n="modal.scan.probePort">Port</label>
-            <input type="number" id="probe-port" min="1" max="65535" placeholder="6363" />
-          </div>
-          <div class="field">
-            <label for="probe-protocol" data-i18n="modal.scan.probeProtocol">Protokół</label>
-            <select id="probe-protocol">
-              <option value="auto" data-i18n="modal.scan.probeProtoAuto">auto</option>
-              <option value="http">http</option>
-              <option value="https">https</option>
-              <option value="tcp">tcp</option>
-            </select>
-          </div>
-        </div>
-        <div class="scan-probe-actions">
           <button type="button" class="btn btn-ghost" id="probe-submit" data-i18n="modal.scan.probeSubmit">Sprawdź i dodaj</button>
         </div>
         <p class="hint scan-probe-result hidden" id="probe-result" role="status" aria-live="polite"></p>
@@ -1337,6 +1322,6 @@ sol --udp-port 9
       }
     })();
   </script>
-  <script src="/static/app.js?v=1.3.162"></script>
+  <script src="/static/app.js?v=1.3.163"></script>
 </body>
 </html>

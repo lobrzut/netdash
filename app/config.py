@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.162"
+VERSION = "1.3.163"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
     "iPad/Home Screen: klik kafelka otwiera serwis pełnym ekranem (nie arkusz „Gotowe”)",

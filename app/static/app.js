@@ -4731,22 +4731,75 @@ function showProbeResult(text, ok) {
   el.classList.toggle('is-err', !!text && !ok);
 }
 
+/**
+ * Parse a pasted service address into { host, port, protocol }.
+ * Accepts: http://host:7865, https://host/path, host:7865, [ipv6]:port
+ */
+function parseProbeTarget(raw) {
+  let text = (raw || '').trim();
+  if (!text) return { error: 'needTarget' };
+
+  // Strip surrounding quotes / accidental whitespace noise
+  text = text.replace(/^['"]+|['"]+$/g, '').trim();
+
+  let protocol = 'auto';
+  let host = '';
+  let port = null;
+
+  try {
+    const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(text);
+    const parsed = new URL(hasScheme ? text : `http://${text}`);
+    const scheme = (parsed.protocol || '').replace(':', '').toLowerCase();
+    if (scheme === 'http' || scheme === 'https') protocol = scheme;
+    else if (scheme === 'tcp') protocol = 'tcp';
+    host = parsed.hostname || '';
+    if (parsed.port) {
+      port = Number(parsed.port);
+    } else if (scheme === 'https') {
+      port = 443;
+    } else if (scheme === 'http' && hasScheme) {
+      port = 80;
+    }
+  } catch {
+    return { error: 'badTarget' };
+  }
+
+  // host:port without scheme where URL() dropped port — handle bare "ip:port"
+  if (port == null) {
+    const bare = text.match(/^\[?([^\s\/\]]+)\]?:(\d{1,5})$/);
+    if (bare) {
+      host = bare[1];
+      port = Number(bare[2]);
+      protocol = 'auto';
+    }
+  }
+
+  host = (host || '').replace(/^\[|\]$/g, '').trim();
+  if (!host) return { error: 'needTarget' };
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    return { error: 'needPort' };
+  }
+  return { host, port, protocol };
+}
+
 let probeInFlight = false;
 
 async function runTargetedProbe() {
   if (probeInFlight) return;
-  const host = ($('#probe-host')?.value || '').trim();
-  const portRaw = ($('#probe-port')?.value || '').trim();
-  const protocol = ($('#probe-protocol')?.value || 'auto').trim() || 'auto';
-  const port = Number(portRaw);
-  if (!host) {
-    showProbeResult(t('modal.scan.probeNeedHost'), false);
+  const parsed = parseProbeTarget($('#probe-target')?.value || '');
+  if (parsed.error === 'needTarget') {
+    showProbeResult(t('modal.scan.probeNeedTarget'), false);
     return;
   }
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  if (parsed.error === 'badTarget') {
+    showProbeResult(t('modal.scan.probeBadTarget'), false);
+    return;
+  }
+  if (parsed.error === 'needPort') {
     showProbeResult(t('modal.scan.probeNeedPort'), false);
     return;
   }
+  const { host, port, protocol } = parsed;
   const btn = $('#probe-submit');
   if (btn) btn.disabled = true;
   probeInFlight = true;
@@ -4812,6 +4865,12 @@ function openScanModal() {
 }
 
 function bindScanUi() {
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (e.target?.id !== 'probe-target') return;
+    e.preventDefault();
+    void runTargetedProbe();
+  });
   document.addEventListener('click', (e) => {
     const settingsLink = e.target.closest('#empty-settings-scan-link, #discovery-settings-scan-link');
     if (settingsLink) {
