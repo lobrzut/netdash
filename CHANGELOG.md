@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.3.165
+
+- **Update copy no longer talks about QNAP.** QNAP is deprecated and the recommended deploy is a Proxmox VM with Dockge, yet the update dialog was titled "Manual update (QNAP)" and 40 strings across en/pl/de/uk told users to go fix a NAS they may not own. All rewritten around the real precondition: an unmounted `docker.sock`.
+- **Fix: "Update now" could not work on the recommended deploy.** `NETDASH_WATCHTOWER_API_URL` and `WATCHTOWER_HTTP_API_UPDATE` existed only in `deploy/qnap/docker-compose.yml`. Both Dockge composes now wire the Watchtower HTTP API, bound to `127.0.0.1:18080`. It stays **off** until you set `WATCHTOWER_HTTP_API_UPDATE=true` and `WATCHTOWER_HTTP_TOKEN=<random>` in `.env` — a shipped placeholder token would be a backdoor, not a feature.
+- **Fix: the dialog misreported the update interval.** It read `watchtower_poll_interval` (default 3600) and announced "~1 h" while the Dockge compose ran Watchtower at `86400`. `WATCHTOWER_POLL_INTERVAL` now feeds both sides, so they cannot drift.
+- **Removed `discovery.autoIntro`** — dead key (zero references), and de/uk asserted the opposite of en/pl about whether the host scans the LAN.
+- **Renamed `scan.qnapSafeWarning` → `scan.lowResourceSafeWarning`** — the banner fires on safe-mode + docker-bridge + no-full-CIDR, which is a low-memory condition, not a QNAP detection.
+- **Test**: `tests/test_i18n_consistency.py` fails the build on QNAP-named copy and on any of the 547 UI keys missing from `en.json`.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.165.
+
 ## v1.3.164
 
 - **Brand icons are served locally** — 81 SVGs vendored from simple-icons into `app/static/brands/` and served from NetDash itself. Rendering a tile no longer makes an outbound request to `cdn.simpleicons.org`; an offline homelab now shows real icons instead of blank squares. Set `NETDASH_BRAND_ICON_CDN=true` to restore the old behaviour.

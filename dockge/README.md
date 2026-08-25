@@ -173,4 +173,24 @@ For a full git-backed stack, clone the repo into `/opt/stacks/netdash/` afterwar
 | **Updates** | Watchtower (`nickfedor/watchtower:1.7.1` — Docker 29+) polls GHCR daily, updates NetDash via label. Manual: `docker compose pull && docker compose up -d`. Balanced redeploy: `bash dockge/deploy-balanced.sh`. Build from git: `git pull && docker compose up -d --build`. Set `WATCHTOWER_LABEL_ENABLE=false` on watchtower to update all containers on the host. |
 | **Secrets** | Never commit `.env`. Dockge stores compose on disk; keep `.env` gitignored. |
 
+## Enabling the in-app "Update now" button
+
+Off by default. NetDash never touches `docker.sock` — it asks Watchtower over
+HTTP, and Watchtower does the pull and restart. Two lines in `.env`:
+
+```bash
+WATCHTOWER_HTTP_API_UPDATE=true
+WATCHTOWER_HTTP_TOKEN=$(openssl rand -hex 32)   # paste the value, not the command
+```
+
+Then `docker compose -f dockge/compose.yaml up -d`, or Update the stack in Dockge.
+
+The API is published on `127.0.0.1:18080` only. **Do not publish that port** — anyone
+who reaches it with the token can restart your containers. There is deliberately no
+default token: a placeholder shipped in the repo would be a backdoor, not a feature.
+
+Leave it off and updates still arrive on the Watchtower schedule
+(`WATCHTOWER_POLL_INTERVAL`, default 86400 = daily); the panel then shows the manual
+Dockge instructions instead of the button.
+
 Full deployment guide: **[DEPLOYMENT.md](../DEPLOYMENT.md)**

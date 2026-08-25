@@ -29,6 +29,15 @@ services:
       NETDASH_SCAN_SAFE_MODE: ${NETDASH_SCAN_SAFE_MODE:-true}
       # Prefer dockge/compose.yaml (same defaults). Scan: docs/SCANNING.md
       # NETDASH_SCAN_PORT_PROFILE=popular — ~45 homelab ports (v1.3.153+)
+      # In-app "Update now" + auto-update status. Off until you opt in:
+      #   .env -> WATCHTOWER_HTTP_API_UPDATE=true and WATCHTOWER_HTTP_TOKEN=<random>
+      # Generate one with:  openssl rand -hex 32
+      NETDASH_WATCHTOWER_ENABLED: ${NETDASH_WATCHTOWER_ENABLED:-true}
+      NETDASH_WATCHTOWER_API_URL: ${NETDASH_WATCHTOWER_API_URL:-http://127.0.0.1:18080/v1/update}
+      NETDASH_WATCHTOWER_API_TOKEN: ${WATCHTOWER_HTTP_TOKEN:-}
+      # Same variable drives Watchtower below, so the interval NetDash reports
+      # cannot drift away from the interval Watchtower actually runs at.
+      NETDASH_WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
     volumes:
       - ./data:/app/data
     cap_add:
@@ -46,6 +55,8 @@ services:
     image: nickfedor/watchtower:1.7.1
     container_name: netdash-watchtower
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:8080"   # HTTP API on loopback only — never expose this
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -54,3 +65,7 @@ services:
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_INCLUDE_RESTARTING: "true"
       WATCHTOWER_ROLLING_RESTART: "true"
+      # "Update now" in the panel posts here. Both default to off/empty: an HTTP
+      # API with a shipped placeholder token would be a backdoor, not a feature.
+      WATCHTOWER_HTTP_API_UPDATE: ${WATCHTOWER_HTTP_API_UPDATE:-false}
+      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_HTTP_TOKEN:-}

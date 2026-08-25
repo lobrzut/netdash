@@ -1654,7 +1654,7 @@ function updateScanConfigWarning(netRes, settings, lastScan) {
     });
   } else if (net.scan_safe_mode && net.docker_bridge && !isScanSafeBannerDismissed()) {
     message = net.manual_scan_allow_full_cidr === false
-      ? t('scan.qnapSafeWarning')
+      ? t('scan.lowResourceSafeWarning')
       : t('scan.safeModeThrottleWarning');
     dismissible = true;
   } else if ((net.scan_safe_mode || scanNeedsConfirm(net)) && !isScanSafeBannerDismissed()) {

@@ -833,7 +833,7 @@ sol --udp-port 9
         <p id="update-watchtower-version" class="hint"></p>
         <details class="update-watchtower-fallback">
           <summary data-i18n="about.updates.modal.watchtowerFallbackSummary">Ręczna aktualizacja (gdy Watchtower wyłączony)</summary>
-          <p class="hint" data-i18n="about.updates.modal.watchtowerFallbackBody">Dockge → stack netdash → Update (pull + redeploy). Aktualizacja z poziomu aplikacji wymaga docker.sock — na QNAP zwykle niedostępne.</p>
+          <p class="hint" data-i18n="about.updates.modal.watchtowerFallbackBody">Dockge → stack netdash → Update (pull + redeploy). Aktualizacja z portalu wymaga docker.sock, który nie jest zamontowany.</p>
         </details>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" id="update-watchtower-close" data-i18n="modal.close">Zamknij</button>
@@ -842,7 +842,7 @@ sol --udp-port 9
       </div>
 
       <div id="update-view-manual" class="update-view hidden">
-        <p class="modal-desc" data-i18n="about.updates.modal.manualIntro">Aktualizacja z portalu wymaga docker.sock na hoście. Na QNAP zaktualizuj obraz ręcznie:</p>
+        <p class="modal-desc" data-i18n="about.updates.modal.manualIntro">Aktualizacja z portalu wymaga docker.sock na hoście. Zaktualizuj obraz ręcznie:</p>
         <ol class="update-manual-steps">
           <li data-i18n="about.updates.modal.manualStep1">Watchtower (docker-compose.full.yml z obrazem :latest) — automatycznie co 24 h</li>
           <li data-i18n="about.updates.modal.manualStep2">Dockge → stack netdash → Update (pobiera ghcr.io/lobrzut/netdash)</li>
