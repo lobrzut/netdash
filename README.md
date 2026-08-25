@@ -1,6 +1,6 @@
 # NetDash
 
-[![Version](https://img.shields.io/badge/version-1.3.163-blue)](app/config.py)
+[![Version](https://img.shields.io/badge/version-1.3.164-blue)](app/config.py)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](requirements.txt)
 [![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
@@ -29,19 +29,22 @@ Open **http://<server-ip>:18787** and sign in with **`admin` / `changeme`**, the
 
 Windows (Docker Desktop): `irm https://raw.githubusercontent.com/lobrzut/netdash/main/deploy/docker-simple/install.ps1 | iex` — see [deploy/docker-simple/](deploy/docker-simple/).
 
-## Screenshots
+## How the scan behaves
 
-Dark-theme homelab dashboard with pinned services, API key vault, notes, and network filters.
+NetDash probes **one port at a time per host**, in randomised order, with a jittered
+delay — so an endpoint IPS never sees a burst of many distinct ports from one source
+and blockhole your dashboard's IP as a port scanner.
 
-| Dashboard | Services |
-|-----------|----------|
-| ![Dashboard — widgets and pinned services](docs/screenshots/dashboard.png) | ![Services — filters and service cards](docs/screenshots/services.png) |
+![What your endpoint IPS actually sees: a burst scan gets the source IP quarantined; NetDash spreads the same 40 probes over time and passes](docs/diagrams/ips-burst-vs-jitter.svg)
 
-| Settings | Login |
-|----------|-------|
-| ![Settings — sidebar and general options](docs/screenshots/settings.png) | ![Login — JWT authentication](docs/screenshots/login.png) |
+Defaults: `NETDASH_PORT_PARALLEL_PER_HOST=1`, `NETDASH_SCAN_RANDOMIZE_PORTS=true`,
+`NETDASH_PORTS_PER_HOST_JITTER=0.2`. Set `NETDASH_IPS_FRIENDLY=false` to probe at full
+speed on a network you know does not care.
 
-> **Screenshots use demo data only** (`*.demo.local`, `10.0.0.x`, masked keys like `sk-demo-…`). Regenerate with `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py` (requires Playwright and a running app on port 18787).
+> **Screenshots**: the previous set was captured in July against 1.3.14x and is gone —
+> it predated the current widgets and showed blank brand icons (fixed in 1.3.164).
+> Regenerate with `NETDASH_DEMO_MODE=1 python scripts/capture_screenshots.py`
+> (Playwright, app on 18787, demo data only: `*.demo.local`, `10.0.0.x`, masked keys).
 
 ## Why NetDash?
 
@@ -49,7 +52,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 |------------------|---------|
 | Manual YAML / Docker labels | **Optional on-demand scan** (CIDR) — or add tiles by hand |
 | Static service list | **Service identification** (HTTP title, favicon) when you scan |
-| Icons from config | **70+ brand icons** (Jellyfin, Grafana, Plex, and more) + favicon fallback |
+| Icons from config | **81 brand icons served locally** (Jellyfin, Grafana, Plex, and more) + favicon fallback — no CDN call to draw a tile |
 | No vault | **Encrypted API key vault** (Fernet) |
 | No notes | **Notes widget** with markdown |
 | — | **Visibility filters**: login required / public |
@@ -57,7 +60,7 @@ Dark-theme homelab dashboard with pinned services, API key vault, notes, and net
 
 ## Features
 
-- Homelab **dashboard** — pinned tiles, dark theme, accent color, 70+ [Simple Icons](https://simpleicons.org/)
+- Homelab **dashboard** — pinned tiles, dark theme, accent color, 81 [Simple Icons](https://simpleicons.org/) **vendored into the image** (CC0) — no outbound request renders a tile, so an offline homelab still shows icons
 - **Discovery policies** — `on_demand` (default), `passive` (ARP), `scheduled`, `off`, legacy `adaptive`
 - **Manual scan** — full CIDR from settings, **Popular** vs **Basic** ports, targeted **IP:port** probe, **Stop**
 - **IPS-friendly** probing — one port at a time per host by default (Symantec SEP / endpoint IPS)

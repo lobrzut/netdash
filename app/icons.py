@@ -1,5 +1,12 @@
+import os
 import re
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
+
+BRANDS_DIR = Path(__file__).resolve().parent / "static" / "brands"
+VENDORED_BRAND_SLUGS: frozenset[str] = frozenset(
+    p.stem for p in BRANDS_DIR.glob("*.svg")
+) if BRANDS_DIR.is_dir() else frozenset()
 
 FAVICON_LINK_RE = re.compile(
     r'<link[^>]*rel=["\'](?:shortcut icon|icon|apple-touch-icon)["\'][^>]*>',
@@ -22,12 +29,6 @@ BRAND_SLUGS: list[tuple[str, str]] = [
     (r"home\s*assistant", "homeassistant"),
     (r"sonarr", "sonarr"),
     (r"radarr", "radarr"),
-    (r"prowlarr", "prowlarr"),
-    (r"lidarr", "lidarr"),
-    (r"readarr", "readarr"),
-    (r"bazarr", "bazarr"),
-    (r"overseerr", "overseerr"),
-    (r"jackett", "jackett"),
     (r"transmission", "transmission"),
     (r"qbittorrent", "qbittorrent"),
     (r"deluge", "deluge"),
@@ -53,26 +54,19 @@ BRAND_SLUGS: list[tuple[str, str]] = [
     (r"vault", "vault"),
     (r"minio", "minio"),
     (r"phpmyadmin", "phpmyadmin"),
-    (r"pgadmin", "pgadmin"),
     (r"vaultwarden", "bitwarden"),
     (r"bitwarden", "bitwarden"),
     (r"immich", "immich"),
     (r"paperless", "paperlessngx"),
-    (r"homer", "homer"),
     (r"pi-?hole", "pihole"),
     (r"adguard", "adguard"),
     (r"n8n", "n8n"),
     (r"homebridge", "homebridge"),
     (r"proxmox", "proxmox"),
-    (r"mesh\s*central|meshcentral", "meshcentral"),
-    (r"code-server", "visualstudiocode"),
     (r"ollama", "ollama"),
-    (r"openwebui", "openai"),
-    (r"comfyui", "comfyui"),
-    (r"stable\s*diffusion", "stablediffusion"),
     (r"nginx", "nginx"),
     (r"apache", "apache"),
-    (r"traefik", "traefik"),
+    (r"traefik", "traefikproxy"),
     (r"caddy", "caddy"),
     (r"docker", "docker"),
     (r"kubernetes", "kubernetes"),
@@ -101,20 +95,12 @@ BRAND_SLUGS: list[tuple[str, str]] = [
     (r"netdata", "netdata"),
     (r"watchtower", "watchtower"),
     (r"duplicati", "duplicati"),
-    (r"resilio", "resilio"),
-    (r"sabnzbd", "sabnzbd"),
-    (r"file\s*browser", "filebrowser"),
     (r"audiobookshelf", "audiobookshelf"),
     (r"calibre", "calibreweb"),
-    (r"komga", "komga"),
-    (r"navidrome", "navidrome"),
-    (r"airsonic", "airsonic"),
-    (r"photoprism", "photoprism"),
     (r"mealie", "mealie"),
     (r"wordpress", "wordpress"),
     (r"ghost", "ghost"),
     (r"mattermost", "mattermost"),
-    (r"slack", "slack"),
     (r"discord", "discord"),
     (r"teamspeak|mumble", "teamspeak"),
     (r"pterodactyl", "pterodactyl"),
@@ -129,22 +115,22 @@ LOCAL_BRAND_ICONS: list[tuple[str, str]] = [
 
 # Common homelab ports → brand icon URL (simpleicons or local static)
 PORT_BRAND_ICONS: dict[int, str] = {
-    8006: "https://cdn.simpleicons.org/proxmox",
-    9090: "https://cdn.simpleicons.org/prometheus",
-    9000: "https://cdn.simpleicons.org/portainer",
-    8080: "https://cdn.simpleicons.org/qnap",
-    5000: "https://cdn.simpleicons.org/docker",
-    5001: "https://cdn.simpleicons.org/qnap",
-    8443: "https://cdn.simpleicons.org/nginx",
-    9443: "https://cdn.simpleicons.org/nginx",
-    3000: "https://cdn.simpleicons.org/nodedotjs",
-    3306: "https://cdn.simpleicons.org/mysql",
-    5432: "https://cdn.simpleicons.org/postgresql",
-    6379: "https://cdn.simpleicons.org/redis",
-    5672: "https://cdn.simpleicons.org/rabbitmq",
-    9200: "https://cdn.simpleicons.org/elasticsearch",
-    27017: "https://cdn.simpleicons.org/mongodb",
-    18787: "https://cdn.simpleicons.org/docker",
+    8006: "/static/brands/proxmox.svg",
+    9090: "/static/brands/prometheus.svg",
+    9000: "/static/brands/portainer.svg",
+    8080: "/static/brands/qnap.svg",
+    5000: "/static/brands/docker.svg",
+    5001: "/static/brands/qnap.svg",
+    8443: "/static/brands/nginx.svg",
+    9443: "/static/brands/nginx.svg",
+    3000: "/static/brands/nodedotjs.svg",
+    3306: "/static/brands/mysql.svg",
+    5432: "/static/brands/postgresql.svg",
+    6379: "/static/brands/redis.svg",
+    5672: "/static/brands/rabbitmq.svg",
+    9200: "/static/brands/elasticsearch.svg",
+    27017: "/static/brands/mongodb.svg",
+    18787: "/static/brands/docker.svg",
     7865: "/static/pomnia-icon.png",
     7860: "/static/pomnia-icon.png",
 }
@@ -182,8 +168,22 @@ def resolve_port_brand_icon(port: int | None) -> str | None:
     return None
 
 
-def simple_icon_url(slug: str) -> str:
-    return f"https://cdn.simpleicons.org/{slug}"
+def simple_icon_url(slug: str) -> str | None:
+    """Brand icon served from /static/brands (vendored simple-icons, CC0).
+
+    NetDash makes no outbound request to render a tile: a self-hosted dashboard
+    should not phone a third-party CDN, and an offline homelab would show blank
+    tiles if it did. When a slug has no vendored file we return None on purpose,
+    so the caller falls through to the favicon path instead of pointing <img>
+    at a URL that 404s and leaves an empty square forever.
+
+    Set NETDASH_BRAND_ICON_CDN=true to restore the old cdn.simpleicons.org behaviour.
+    """
+    if slug in VENDORED_BRAND_SLUGS:
+        return f"/static/brands/{slug}.svg"
+    if os.getenv("NETDASH_BRAND_ICON_CDN", "").strip().lower() in {"1", "true", "yes", "on"}:
+        return f"https://cdn.simpleicons.org/{slug}"
+    return None
 
 
 def resolve_brand_icon(*texts: str | None) -> str | None:

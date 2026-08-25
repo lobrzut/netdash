@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.3.164
+
+- **Brand icons are served locally** — 81 SVGs vendored from simple-icons into `app/static/brands/` and served from NetDash itself. Rendering a tile no longer makes an outbound request to `cdn.simpleicons.org`; an offline homelab now shows real icons instead of blank squares. Set `NETDASH_BRAND_ICON_CDN=true` to restore the old behaviour.
+- **Fix: 21 brands were permanently blank** — `airsonic bazarr comfyui filebrowser homer jackett komga lidarr meshcentral navidrome openai overseerr pgadmin photoprism prowlarr readarr resilio sabnzbd slack stablediffusion visualstudiocode` no longer exist in simple-icons, so the CDN answered 404. Because the resolver had returned a URL, the favicon fallback never ran and those tiles stayed empty forever. The dead slugs are gone and `simple_icon_url()` now returns `None`, which is what hands the caller back to the favicon path.
+- **Fix: Traefik icon** — upstream slug renamed `traefik` → `traefikproxy`.
+- **Regeneration**: `npm install simple-icons && node scripts/vendor_brand_icons.mjs`. `tests/test_brand_icons_local.py` fails the build if a slug in `app/icons.py` has no vendored file.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.164.
+
 ## v1.3.163
 
 - **Targeted probe UX** — one address field (`http://host:port` or `host:port`) instead of separate IP / port / protocol cells; scheme sets protocol, Enter submits.
