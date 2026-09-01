@@ -6,9 +6,11 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.3.165"
+VERSION = "1.3.167"
 DEFAULT_LISTEN_PORT = 18787
 WHATS_NEW = [
+    "Serwisy: przycisk „Na górę” po przewinięciu w dół",
+    "Fix: klik kafelka na desktopie otwiera serwis tylko w nowej karcie (dashboard zostaje)",
     "iPad/Home Screen: klik kafelka otwiera serwis pełnym ekranem (nie arkusz „Gotowe”)",
     "Pomnia: własna ikona + watermark na kafelku serwisu",
     "Fix: „Sprawdź i dodaj” nie wisi na Sprawdzanie…",

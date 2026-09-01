@@ -157,6 +157,7 @@ function isStandaloneDisplay() {
  * Open a service URL. On iOS/iPadOS standalone NetDash, window.open/_blank shows an
  * in-app Safari sheet with only „Gotowe” (Done) — not the real service UI. Navigate
  * the same window instead so Portainer/Proxmox/Pomnia load full-screen.
+ * Desktop browser: new tab only — never navigate the dashboard away.
  */
 function openServiceUrl(url) {
   const href = (url || '').trim();
@@ -165,8 +166,7 @@ function openServiceUrl(url) {
     window.location.assign(href);
     return;
   }
-  const opened = window.open(href, '_blank', 'noopener,noreferrer');
-  if (!opened) window.location.assign(href);
+  window.open(href, '_blank', 'noopener,noreferrer');
 }
 
 async function api(path, options = {}) {
@@ -1022,6 +1022,16 @@ function applyLayout() {
   updateScanConfigWarning(window.__netdashNetwork, appSettings, window.__lastScanStatus);
 }
 
+const SCROLL_TO_TOP_THRESHOLD = 200;
+
+function updateScrollToTopButton() {
+  const btn = $('#scroll-to-top-btn');
+  if (!btn) return;
+  const visible = currentPage === 'services' && window.scrollY > SCROLL_TO_TOP_THRESHOLD;
+  btn.classList.toggle('hidden', !visible);
+  btn.setAttribute('aria-hidden', visible ? 'false' : 'true');
+}
+
 function navigateTo(page) {
   if (page !== 'home' && page !== 'services') return;
   currentPage = page;
@@ -1038,6 +1048,7 @@ function navigateTo(page) {
   window.scrollTo(0, 0);
   if (page === 'home') renderPinnedServices();
   else renderServices();
+  updateScrollToTopButton();
 }
 
 function setAccentColor(hex) {
@@ -2927,34 +2938,33 @@ function serviceCardHtml(s, opts = {}) {
     </div>`;
 }
 
-function bindServiceCards(root) {
-  bindServiceDeletes(root);
-  root.querySelectorAll('.service-card').forEach((card) => {
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('.service-delete, .service-action, .service-edit-btn')) return;
-      const url = card.dataset.url;
-      if (url && url !== '#') openServiceUrl(url);
-    });
+function bindOneServiceCard(card) {
+  if (!card || card.dataset.ndBound === '1') return;
+  card.dataset.ndBound = '1';
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.service-delete, .service-action, .service-edit-btn')) return;
+    const url = card.dataset.url;
+    if (url && url !== '#') openServiceUrl(url);
   });
-  root.querySelectorAll('.service-edit-btn').forEach((btn) => {
+  card.querySelectorAll('.service-edit-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       openServiceEditModal(Number(btn.dataset.id));
     });
   });
-  root.querySelectorAll('.service-pin-btn').forEach((btn) => {
+  card.querySelectorAll('.service-pin-btn').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       await toggleServicePin(Number(btn.dataset.id));
     });
   });
-  root.querySelectorAll('.service-notes-btn').forEach((btn) => {
+  card.querySelectorAll('.service-notes-btn').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       openServiceNotesModal(Number(btn.dataset.id));
     });
   });
-  root.querySelectorAll('.service-wol-btn:not(.is-placeholder)').forEach((btn) => {
+  card.querySelectorAll('.service-wol-btn:not(.is-placeholder)').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       try {
@@ -2968,7 +2978,7 @@ function bindServiceCards(root) {
       }
     });
   });
-  root.querySelectorAll('.service-sleep-btn:not(.is-placeholder)').forEach((btn) => {
+  card.querySelectorAll('.service-sleep-btn:not(.is-placeholder)').forEach((btn) => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       if (!confirm(t('confirm.sleep'))) return;
@@ -2981,6 +2991,11 @@ function bindServiceCards(root) {
       }
     });
   });
+}
+
+function bindServiceCards(root) {
+  bindServiceDeletes(root);
+  root.querySelectorAll('.service-card').forEach(bindOneServiceCard);
 }
 
 let serviceNotesMacAuto = false;
@@ -3823,7 +3838,7 @@ function patchServiceCardsForId(id) {
     const next = wrapper.firstElementChild;
     if (next) {
       card.replaceWith(next);
-      bindServiceCards(next.parentElement || document);
+      bindOneServiceCard(next);
     }
   });
 }
@@ -4994,6 +5009,10 @@ $('#logout-btn').addEventListener('click', logout);
 $('#nav-home-btn')?.addEventListener('click', () => navigateTo('home'));
 $('#nav-services-btn')?.addEventListener('click', () => navigateTo('services'));
 $('#goto-services-btn')?.addEventListener('click', () => navigateTo('services'));
+$('#scroll-to-top-btn')?.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+window.addEventListener('scroll', updateScrollToTopButton, { passive: true });
 bindScanUi();
 $('#add-btn').addEventListener('click', () => openAddServiceModal());
 const debouncedRenderServices = debounce(renderServices, 200);

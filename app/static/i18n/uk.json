@@ -62,6 +62,7 @@
   "empty.pinned.hint": "Закріпіть сервіси, натиснувши ★ на картці у вкладці Сервіси.",
   "empty.pinned.go": "Перейти до Сервісів",
   "services.search": "Шукати сервіси...",
+  "services.scrollToTop": "Нагору",
   "filter.all": "Усі",
   "filter.access": "Фільтр доступу",
   "filter.availability": "Фільтр доступності",

@@ -62,6 +62,7 @@
   "empty.pinned.hint": "Pinne Dienste mit ★ auf einer Karte im Tab Dienste.",
   "empty.pinned.go": "Zu Dienste",
   "services.search": "Dienste suchen...",
+  "services.scrollToTop": "Nach oben",
   "filter.all": "Alle",
   "filter.access": "Zugriffsfilter",
   "filter.availability": "Verfügbarkeitsfilter",

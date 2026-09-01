@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.167
+
+- **Serwisy: przycisk „Na górę”** — po przewinięciu listy serwisów w dół pojawia się pływający przycisk powrotu na górę (widoczny tylko na zakładce Serwisy).
+- **Fix: klik kafelka na desktopie** — serwis otwiera się wyłącznie w nowej karcie; dashboard nie jest już nadpisywany, gdy popup blocker zablokuje `window.open`.
+- **Fix: podwójne handlery na kafelkach** — `bindOneServiceCard()` wiąże kartę raz (`data-nd-bound`); patch po pin/unpin nie duplikuje listenerów.
+- **Image**: ghcr.io/lobrzut/netdash:1.3.167.
+
 ## v1.3.165
 
 - **Update copy no longer talks about QNAP.** QNAP is deprecated and the recommended deploy is a Proxmox VM with Dockge, yet the update dialog was titled "Manual update (QNAP)" and 40 strings across en/pl/de/uk told users to go fix a NAS they may not own. All rewritten around the real precondition: an unmounted `docker.sock`.

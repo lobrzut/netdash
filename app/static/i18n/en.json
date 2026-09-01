@@ -74,6 +74,7 @@
   "empty.pinned.hint": "Pin services by clicking ★ on a card in the Services tab.",
   "empty.pinned.go": "Go to Services",
   "services.search": "Search services...",
+  "services.scrollToTop": "Back to top",
   "filter.all": "All",
   "filter.access": "Access filter",
   "filter.availability": "Availability filter",

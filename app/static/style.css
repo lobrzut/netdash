@@ -2120,6 +2120,38 @@ body.modal-open {
 
 .footer-sep { opacity: 0.4; }
 
+.scroll-to-top {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 90;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.scroll-to-top:hover {
+  color: var(--accent-bright);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-glow);
+}
+
+.scroll-to-top:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 #dashboard-view {
   display: block;
   min-height: 100vh;
@@ -5987,6 +6019,7 @@ button.service-edit-icon-preview.icon-preview-btn[aria-expanded="true"] {
 
 @media (max-width: 768px) {
   .header { padding: 1rem; flex-wrap: wrap; gap: 0.75rem; }
+  .scroll-to-top { right: 1rem; bottom: 1rem; width: 40px; height: 40px; }
   .header-nav { order: 3; width: 100%; justify-content: flex-start; }
   .nav-segment { max-width: 100%; width: 100%; }
   .header-actions { width: 100%; justify-content: flex-end; flex-wrap: nowrap; }
